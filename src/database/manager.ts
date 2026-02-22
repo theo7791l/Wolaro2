@@ -13,7 +13,7 @@ export class DatabaseManager {
       database: config.database.name,
       user: config.database.user,
       password: config.database.password,
-      max: 20,
+      max: config.database.maxConnections,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });
@@ -99,12 +99,11 @@ export class DatabaseManager {
 
   async getGuildConfig(guildId: string): Promise<any> {
     const result = await this.query(
-      `SELECT g.*, 
-              json_agg(json_build_object(
-                'module_name', gm.module_name,
-                'enabled', gm.enabled,
-                'config', gm.config
-              )) as modules
+      `SELECT g.*, json_agg(json_build_object(
+         'module_name', gm.module_name,
+         'enabled', gm.enabled,
+         'config', gm.config
+       )) as modules
        FROM guilds g
        LEFT JOIN guild_modules gm ON g.guild_id = gm.guild_id
        WHERE g.guild_id = $1
@@ -135,7 +134,7 @@ export class DatabaseManager {
 
   async updateModuleConfig(guildId: string, moduleName: string, config: any): Promise<void> {
     await this.query(
-      `UPDATE guild_modules 
+      `UPDATE guild_modules
        SET config = $3, updated_at = CURRENT_TIMESTAMP
        WHERE guild_id = $1 AND module_name = $2`,
       [guildId, moduleName, JSON.stringify(config)]
@@ -150,7 +149,8 @@ export class DatabaseManager {
     const result = await this.query(
       `INSERT INTO global_profiles (user_id, username)
        VALUES ($1, $2)
-       ON CONFLICT (user_id) DO UPDATE SET username = $2
+       ON CONFLICT (user_id)
+       DO UPDATE SET username = $2
        RETURNING *`,
       [userId, username]
     );
@@ -161,7 +161,7 @@ export class DatabaseManager {
     await this.query(
       `UPDATE global_profiles
        SET global_xp = global_xp + $2,
-           global_level = FLOOR(POWER(global_xp / 100, 0.5)) + 1
+           global_level = FLOOR(POWER((global_xp + $2) / 100, 0.5)) + 1
        WHERE user_id = $1`,
       [userId, xpGain]
     );
@@ -213,19 +213,11 @@ export class DatabaseManager {
     const result = await this.query(
       `INSERT INTO guild_economy (guild_id, user_id, balance)
        VALUES ($1, $2, 0)
-       ON CONFLICT (guild_id, user_id) DO NOTHING
+       ON CONFLICT (guild_id, user_id)
+       DO UPDATE SET updated_at = CURRENT_TIMESTAMP
        RETURNING balance`,
       [guildId, userId]
     );
-    
-    if (result.length === 0) {
-      const existing = await this.query(
-        'SELECT balance FROM guild_economy WHERE guild_id = $1 AND user_id = $2',
-        [guildId, userId]
-      );
-      return existing[0]?.balance || 0;
-    }
-    
     return result[0]?.balance || 0;
   }
 
