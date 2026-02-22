@@ -11,7 +11,7 @@ export class SkipCommand implements ICommand {
   guildOnly = true;
   cooldown = 2;
 
-  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
+  async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
     const member = interaction.member as GuildMember;
     const voiceChannel = member.voice.channel;
 
