@@ -203,11 +203,28 @@ export class DatabaseManager {
     return result[0];
   }
 
+  /**
+   * FIX: updateGlobalXP — trois corrections appliquées :
+   *
+   *  1. GREATEST(0, global_xp + $2) sur global_xp :
+   *     empêche les XP négatifs si xpGain est négatif (sanction, correction, etc.).
+   *     Sans ce garde, POWER(xp_négatif / 100.0, 0.5) produit NaN en PostgreSQL,
+   *     ce qui corrompt silencieusement la colonne global_level.
+   *
+   *  2. Division par 100.0 (float) au lieu de 100 (integer) :
+   *     évite la troncature entière, ex. POWER(199/100, 0.5) = POWER(1, 0.5) = 1.0
+   *     au lieu de POWER(1.99, 0.5) = 1.41 — les deux donnent level=2 dans ce cas,
+   *     mais aux bornes exactes (ex. xp=100) le résultat peut diverger.
+   *
+   *  3. GREATEST(1, ...) sur global_level :
+   *     garantit que le niveau ne peut jamais tomber en dessous de 1
+   *     même si la formule retourne 0 dans un cas limite.
+   */
   async updateGlobalXP(userId: string, xpGain: number): Promise<void> {
     await this.query(
       `UPDATE global_profiles
-       SET global_xp = global_xp + $2,
-           global_level = FLOOR(POWER((global_xp + $2) / 100, 0.5)) + 1
+       SET global_xp = GREATEST(0, global_xp + $2),
+           global_level = GREATEST(1, FLOOR(POWER(GREATEST(0, global_xp + $2) / 100.0, 0.5))::INTEGER + 1)
        WHERE user_id = $1`,
       [userId, xpGain]
     );

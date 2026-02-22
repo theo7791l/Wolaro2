@@ -178,13 +178,24 @@ export class WebSocketServer {
 
   /**
    * Auto-join user to their guild rooms
+   * FIX: parenthèses explicites autour du bloc AND pour corriger la précédence
+   * avec OR sur un LEFT JOIN. Sans parenthèses, la clause
+   *   WHERE gm.user_id=$1 AND gm.permissions @> ... OR g.owner_id=$1
+   * est évaluée comme :
+   *   WHERE (gm.user_id=$1 AND gm.permissions @> ...) OR (g.owner_id=$1)
+   * ce qui est correct en SQL standard, MAIS sur un LEFT JOIN, quand
+   * g.owner_id=$1 matche sans ligne guild_members, la condition
+   * g.owner_id=$1 peut retourner plusieurs lignes dupliquées pour
+   * chaque membre de la guild via le LEFT JOIN. Le DISTINCT masque le
+   * problème, mais les parenthèses explicites rendent l'intention claire
+   * et préviennent toute régression lors d'une refactorisation.
    */
   private async joinUserGuilds(socket: Socket, userId: string): Promise<void> {
     try {
       const guilds = await this.database.query(
         `SELECT DISTINCT g.guild_id FROM guilds g
          LEFT JOIN guild_members gm ON g.guild_id = gm.guild_id
-         WHERE gm.user_id = $1 AND gm.permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+         WHERE (gm.user_id = $1 AND gm.permissions @> ARRAY['ADMINISTRATOR']::varchar[])
          OR g.owner_id = $1`,
         [userId]
       );

@@ -99,7 +99,15 @@ if (config.security.encryptionKey.length < 32) {
   console.warn('[Wolaro] Avertissement : ENCRYPTION_KEY doit faire au moins 32 caractères');
 }
 
+// FIX: jwtSecret par défaut bloque le démarrage en production (risque sécurité critique).
+// En développement, un warn suffit ; en production, le bot ne doit pas démarrer avec
+// la valeur par défaut qui rendrait tous les tokens JWT triviallement falsifiables.
 if (config.api.jwtSecret === 'change_this_secret') {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      '[Wolaro] API_JWT_SECRET doit être changé en production (valeur par défaut interdite)'
+    );
+  }
   console.warn('[Wolaro] Avertissement : Changez API_JWT_SECRET en production');
 }
 
