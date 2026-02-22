@@ -1,5 +1,11 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits } from 'discord.js';
+import {
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+  PermissionFlagsBits,
+  User,
+} from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
+import { EmbedStyles } from '../../../utils/embeds';
 
 export class BanCommand implements ICommand {
   data = new SlashCommandBuilder()
@@ -7,24 +13,25 @@ export class BanCommand implements ICommand {
     .setDescription('Bannir un membre du serveur')
     .addUserOption((option) =>
       option
-        .setName('membre')
+        .setName('utilisateur')
         .setDescription('Le membre à bannir')
         .setRequired(true)
     )
     .addStringOption((option) =>
       option
         .setName('raison')
-        .setDescription('La raison du bannissement')
+        .setDescription('Raison du bannissement')
         .setRequired(false)
     )
     .addIntegerOption((option) =>
       option
-        .setName('jours-messages')
-        .setDescription('Nombre de jours de messages à supprimer (0-7)')
+        .setName('supprimer_messages')
+        .setDescription('Supprimer les messages des X derniers jours (0-7)')
         .setMinValue(0)
         .setMaxValue(7)
         .setRequired(false)
-    ) as SlashCommandBuilder;
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers) as SlashCommandBuilder;
 
   module = 'moderation';
   permissions = [PermissionFlagsBits.BanMembers];
@@ -32,47 +39,101 @@ export class BanCommand implements ICommand {
   cooldown = 3;
 
   async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
-    const target = interaction.options.getUser('membre', true);
+    const user = interaction.options.getUser('utilisateur', true);
     const reason = interaction.options.getString('raison') || 'Aucune raison fournie';
-    const deleteMessageDays = interaction.options.getInteger('jours-messages') || 0;
+    const deleteMessageDays = interaction.options.getInteger('supprimer_messages') || 0;
 
-    try {
-      const member = await interaction.guild!.members.fetch(target.id);
-
-      // Check hierarchy
-      if (member.roles.highest.position >= interaction.member!.roles.highest.position) {
-        await interaction.reply({
-          content: '❌ Vous ne pouvez pas bannir ce membre (rôle supérieur ou égal).',
-          ephemeral: true,
-        });
+    // Check if user can be banned
+    const member = await interaction.guild!.members.fetch(user.id).catch(() => null);
+    
+    if (member) {
+      if (member.id === interaction.user.id) {
+        const embed = EmbedStyles.error(
+          'Erreur',
+          'Vous ne pouvez pas vous bannir vous-même.'
+        );
+        await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
       }
 
-      // Ban the user
-      await member.ban({ deleteMessageSeconds: deleteMessageDays * 86400, reason });
+      if (member.id === interaction.guild!.ownerId) {
+        const embed = EmbedStyles.error(
+          'Erreur',
+          'Vous ne pouvez pas bannir le propriétaire du serveur.'
+        );
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+      }
 
-      // Get case number
+      if (member.roles.highest.position >= (interaction.member as any).roles.highest.position) {
+        const embed = EmbedStyles.error(
+          'Erreur',
+          'Vous ne pouvez pas bannir un membre avec un rôle supérieur ou égal au vôtre.'
+        );
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+      }
+    }
+
+    await interaction.deferReply();
+
+    try {
+      // Ban user
+      await interaction.guild!.members.ban(user.id, {
+        reason: `${reason} | Modérateur: ${interaction.user.tag}`,
+        deleteMessageSeconds: deleteMessageDays * 86400,
+      });
+
+      // Create moderation case
       const caseResult = await context.database.query(
-        'SELECT COALESCE(MAX(case_number), 0) + 1 as next_case FROM moderation_cases WHERE guild_id = $1',
-        [interaction.guildId!]
-      );
-      const caseNumber = caseResult[0].next_case;
-
-      // Log to database
-      await context.database.query(
-        `INSERT INTO moderation_cases (guild_id, case_number, user_id, moderator_id, action_type, reason)
-         VALUES ($1, $2, $3, $4, 'BAN', $5)`,
-        [interaction.guildId!, caseNumber, target.id, interaction.user.id, reason]
+        `INSERT INTO moderation_cases (
+          guild_id, case_number, user_id, moderator_id, action_type, reason, created_at
+        ) VALUES (
+          $1,
+          COALESCE((SELECT MAX(case_number) FROM moderation_cases WHERE guild_id = $1), 0) + 1,
+          $2, $3, $4, $5, NOW()
+        ) RETURNING case_number`,
+        [interaction.guildId!, user.id, interaction.user.id, 'BAN', reason]
       );
 
-      await interaction.reply({
-        content: `✅ **${target.tag}** a été banni.\n**Raison:** ${reason}\n**Cas #${caseNumber}**`,
-      });
+      const caseNumber = caseResult[0]?.case_number || 0;
+
+      // Success embed
+      const embed = EmbedStyles.moderationCase(
+        caseNumber,
+        'BAN',
+        `${user.tag} (${user.id})`,
+        interaction.user.tag,
+        reason
+      );
+
+      if (deleteMessageDays > 0) {
+        embed.addFields({
+          name: 'Messages supprimés',
+          value: `${deleteMessageDays} jour(s)`,
+          inline: true,
+        });
+      }
+
+      await interaction.editReply({ embeds: [embed] });
+
+      // Try to DM user
+      try {
+        const dmEmbed = EmbedStyles.warning(
+          `Banni de ${interaction.guild!.name}`,
+          `Vous avez été banni de **${interaction.guild!.name}**.\n\n**Raison:** ${reason}`
+        ).setFooter({ text: `Case #${caseNumber}` });
+
+        await user.send({ embeds: [dmEmbed] });
+      } catch {
+        // User has DMs disabled
+      }
     } catch (error) {
-      await interaction.reply({
-        content: '❌ Impossible de bannir ce membre.',
-        ephemeral: true,
-      });
+      const embed = EmbedStyles.error(
+        'Erreur de bannissement',
+        'Une erreur est survenue lors du bannissement. Vérifiez que le bot a les permissions nécessaires.'
+      );
+      await interaction.editReply({ embeds: [embed] });
     }
   }
 }
