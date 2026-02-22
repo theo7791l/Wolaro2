@@ -1,184 +1,379 @@
-# Wolaro - Discord Cloud Engine
+# Wolaro - Advanced Multi-Tenant Discord Bot
 
-> **Multi-tenant Discord bot with advanced SaaS web panel, modular architecture, and enterprise-grade security**
+<div align="center">
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
-[![Discord.js](https://img.shields.io/badge/Discord.js-v14+-7289DA.svg)](https://discord.js.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791.svg)](https://www.postgresql.org/)
-[![Redis](https://img.shields.io/badge/Redis-7+-DC382D.svg)](https://redis.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Wolaro Logo](https://via.placeholder.com/200x200?text=WOLARO)
 
-## 🚀 Overview
+**Un bot Discord modulaire ultra-performant avec architecture multi-tenant**
 
-Wolaro is a cutting-edge **single-bot, multi-tenant Discord platform** that revolutionizes how Discord bots are deployed and managed. Instead of spawning multiple bot instances, Wolaro uses a sophisticated **guild-based multi-tenancy system** where one bot serves thousands of servers with isolated configurations.
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-green)](https://nodejs.org/)
+[![Discord.js](https://img.shields.io/badge/Discord.js-14.14-blurple)](https://discord.js.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-### Key Features
+</div>
 
-- 🏛️ **Single Bot Architecture**: One bot token, unlimited servers
-- 🔧 **Dynamic Module System**: Hot-reload modules without restarting
-- 🌐 **Advanced Web Panel**: SaaS-style dashboard with OAuth2
-- 🛡️ **Military-Grade Security**: Rate limiting, anti-raid, encryption
-- 👑 **Master Admin System**: God-mode access with impersonation
-- 📊 **Real-time Analytics**: Business intelligence for server owners
-- 🔌 **WebSocket Sync**: Instant updates between bot and panel
-- 🎨 **Components V2 UI**: Modern Discord interaction system
+## 🌟 Fonctionnalités
 
-## 🏗️ Architecture
+### 💻 Core Features
 
-### Technology Stack
+- **Multi-Tenant Architecture**: Un bot, des milliers de serveurs avec configurations isolées
+- **Module System**: Chargement dynamique avec hot-reload
+- **Master Admin System**: Contrôle total avec impersonation et blacklist
+- **Security First**: Rate limiting triple couche, anti-raid, anti-spam
+- **Performance**: Redis cache, connection pooling, cluster mode
+- **Real-time**: WebSocket API pour synchronisation instantanée
+- **Production Ready**: Docker, PM2, health checks, logging avancé
 
-```
-Frontend:          React + TypeScript + TailwindCSS
-Backend API:       Express + TypeScript + Zod validation
-Bot Engine:        Discord.js v14+ with Sharding
-Database:          PostgreSQL with optimized indexing
-Cache Layer:       Redis for sessions & rate limiting
-Real-time:         WebSocket (ws) for live updates
-Security:          Helmet, bcrypt, JWT, 2FA
-Infrastructure:    Docker + PM2/Cluster mode
-```
+### 🛡️ Modules Disponibles
 
-### Multi-Tenant Design
+#### Moderation
+- `/ban`, `/kick`, `/warn`, `/timeout` avec hiérarchie de rôles
+- `/clear` avec filtres utilisateur et date
+- `/lockdown` pour verrouillage de salon
+- Auto-modération avec détection de patterns
+- Système de cas numérotés
+- Anti-raid et anti-spam automatiques
 
-```sql
-guilds (guild_id PK) → guild_modules (JSONB)
-                    → guild_settings (JSONB)
-                    → guild_economy
-                    → audit_logs
+#### Economy
+- `/balance`, `/daily`, `/work`, `/pay`
+- Système de banque et portefeuille
+- Daily streaks avec bonus progressifs
+- Boutique configurable
+- Inventaire utilisateur
+- Leaderboard des plus riches
 
-global_profiles (user_id PK) → Cross-server user data
-master_admins (user_id PK)   → Super admin permissions
-```
+#### Leveling
+- `/rank` avec cartes de progression
+- `/levels` pour classement XP
+- Gain d'XP automatique sur messages
+- Rôles de récompense par niveau
+- Configuration XP par message et cooldown
+- Stack ou remplacement de rôles
 
-## 📦 Module System
+#### Admin (Master Only)
+- `/impersonate` pour voir config de n'importe quel serveur
+- `/blacklist` pour bannir des serveurs
+- `/stats` avec métriques système et bot
+- `/reload` pour hot-reload de modules
+- `/eval` pour exécution de code (danger!)
 
-Each module is a self-contained directory:
+## 🚀 Quick Start
 
-```
-src/modules/
-├── moderation/
-│   ├── commands/
-│   ├── events/
-│   ├── config.schema.ts
-│   └── index.ts
-├── economy/
-├── music/
-├── ai/
-└── rpg/
-```
+### Prérequis
 
-**Dynamic Loading**: Modules can be enabled/disabled per-guild from the web panel without bot restart.
+- Node.js 20+
+- PostgreSQL 15+
+- Redis 7+
+- Discord Bot Token
 
-## 🛡️ Security Features
-
-### Rate Limiting
-- **Per-IP**: Blocks DDoS attempts
-- **Per-User**: Prevents spam abuse
-- **Per-Guild**: Protects from server flooding
-
-### Anti-Raid System
-- **Join Spike Detection**: Auto-lockdown on mass joins
-- **Message Flood Protection**: Automatic slowmode
-- **Intelligent Banning**: ML-based pattern recognition
-
-### Master Access
-```typescript
-isMaster(userId) // Bypass all permission checks
-/impersonate <guild_id> // View any server config
-/masterban <guild_id> // Global blacklist
-```
-
-## 🌍 Web Panel Features
-
-### Bot Builder Interface
-- **Toggle Modules**: Enable/disable with one click
-- **Visual Config**: Drag-and-drop command designer
-- **Custom Commands**: Create slash commands from panel
-- **Embed Designer**: Customize colors, messages, variables
-- **Template Store**: Share & import server configs
-
-### Analytics Dashboard
-- Member retention graphs
-- Hourly activity heatmaps
-- Module usage statistics
-- Command execution metrics
-
-## 🚀 Installation
-
-### Prerequisites
-```bash
-Node.js >= 18.0.0
-PostgreSQL >= 15
-Redis >= 7
-Docker (optional)
-```
-
-### Quick Start
+### Installation
 
 ```bash
-# Clone repository
+# Cloner le repository
 git clone https://github.com/theo7791l/Wolaro2.git
 cd Wolaro2
 
-# Install dependencies
-npm install
+# Installation automatique
+chmod +x scripts/setup.sh
+./scripts/setup.sh
 
-# Configure environment
+# Configurer .env
 cp .env.example .env
-# Edit .env with your credentials
-
-# Setup database
-npm run migrate
-
-# Start development
-npm run dev
-
-# Production build
-npm run build
-npm start
-
-# Cluster mode (recommended for production)
-npm run start:cluster
+nano .env
 ```
 
-### Docker Deployment
+### Configuration
+
+```env
+# Discord
+DISCORD_TOKEN=your_bot_token_here
+DISCORD_CLIENT_ID=your_client_id
+DISCORD_CLIENT_SECRET=your_client_secret
+
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=wolaro
+DB_USER=wolaro
+DB_PASSWORD=your_password
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+
+# API
+API_PORT=3000
+API_JWT_SECRET=your_super_secret_jwt_key_min_32_chars
+
+# Master Admins (Discord User IDs)
+MASTER_ADMIN_IDS=123456789012345678,987654321098765432
+```
+
+### Lancement
 
 ```bash
+# Développement
+npm run dev
+
+# Production simple
+npm start
+
+# Production cluster (recommandé)
+npm run start:cluster
+
+# Docker (recommandé)
 docker-compose up -d
 ```
 
-## 📖 Documentation
+## 📚 Documentation
 
-- [Architecture Guide](docs/ARCHITECTURE.md)
-- [Module Development](docs/MODULES.md)
-- [Security Best Practices](docs/SECURITY.md)
-- [API Reference](docs/API.md)
-- [Database Schema](docs/DATABASE.md)
+- [Architecture Guide](docs/ARCHITECTURE.md) - Diagrammes et design patterns
+- [Module Development](docs/MODULES.md) - Créer vos propres modules
+- [API Reference](docs/API.md) - REST API et WebSocket
+- [Security Guide](docs/SECURITY.md) - Best practices de sécurité
+- [Deployment Guide](docs/DEPLOYMENT.md) - Guide de production
 
-## 🎯 Roadmap
+## 📦 Structure du Projet
 
-- [ ] Phase 1: Core engine + Basic modules
-- [ ] Phase 2: Web panel + OAuth2
-- [ ] Phase 3: Advanced AI integration
-- [ ] Phase 4: Cross-server networking
-- [ ] Phase 5: Marketplace & monetization
+```
+Wolaro2/
+├── src/
+│   ├── api/              # REST API Express
+│   │   ├── routes/       # Endpoints
+│   │   └── middlewares/  # Auth, rate limit, etc.
+│   ├── cache/            # Redis manager
+│   ├── commands/         # Command handler
+│   ├── database/         # PostgreSQL manager
+│   ├── events/           # Event handler
+│   ├── modules/          # Modules dynamiques
+│   │   ├── moderation/
+│   │   ├── economy/
+│   │   ├── leveling/
+│   │   └── admin/
+│   ├── utils/            # Utilitaires (logger, security)
+│   ├── websocket/        # WebSocket server
+│   ├── cluster.ts        # Cluster manager
+│   ├── config.ts         # Configuration
+│   ├── index.ts          # Entry point
+│   └── types.ts          # TypeScript types
+├── docs/               # Documentation complète
+├── scripts/            # Scripts d'installation
+├── Dockerfile          # Image Docker
+├── docker-compose.yml  # Stack complète
+├── ecosystem.config.js # PM2 cluster
+└── package.json
+```
 
-## 🤝 Contributing
+## 🔧 Commandes NPM
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
+```bash
+npm run dev          # Développement avec hot-reload
+npm run build        # Compiler TypeScript
+npm start            # Production (single instance)
+npm run start:cluster # Production (cluster mode)
+npm run migrate      # Migrations base de données
+npm run lint         # Linter ESLint
+npm test             # Tests (TODO)
+```
 
-## 📄 License
+## 👥 Multi-Tenant Design
 
-MIT License - see [LICENSE](LICENSE) for details.
+### Isolation par Serveur
 
-## 👨‍💻 Author
+Chaque serveur Discord a :
+- Configuration de modules indépendante
+- Économie locale (ou globale selon config)
+- Logs de modération séparés
+- Settings personnalisés
 
-**theo7791l** - [GitHub](https://github.com/theo7791l)
+### Cache Intelligent
 
-## 🌟 Support
+```typescript
+// Exemple de flux
+1. Requête: GET /api/guilds/:id
+2. Check Redis: guild:config:{id} (TTL: 1h)
+3. Si absent: PostgreSQL + mise en cache
+4. WebSocket notify sur update
+5. Invalidation cache automatique
+```
 
-If you find this project useful, please consider giving it a ⭐!
+## 🔒 Sécurité
+
+### Rate Limiting
+
+- **IP**: 100 req/min
+- **User**: 200 req/min
+- **Guild**: Cooldowns par commande (3-30s)
+
+### Master Admin
+
+```typescript
+if (SecurityManager.isMaster(userId)) {
+  // Bypass all permissions
+  // Access all guilds
+  // View all audit logs
+}
+```
+
+### Anti-Raid
+
+- Détection de join spike (>10 en 10s)
+- Auto-lockdown configurable
+- Message spam détection
+- Auto-timeout des spammers
+
+## 📊 Performance
+
+### Benchmarks (Attendus)
+
+- **Command Response**: <100ms
+- **Database Query**: <50ms (cached: <5ms)
+- **Module Toggle**: <200ms
+- **Concurrent Commands**: 1000+/s
+
+### Optimisations
+
+- Connection pooling (max 20)
+- Redis cache multi-niveaux
+- Query batching
+- Lazy loading des modules
+- Cluster mode auto-scaling
+
+## 🚀 Deployment
+
+### Docker (Recommandé)
+
+```bash
+# Lancer stack complète
+docker-compose up -d
+
+# Voir les logs
+docker-compose logs -f bot
+
+# Arrêter
+docker-compose down
+```
+
+### PM2 Cluster
+
+```bash
+# Installer PM2
+npm install -g pm2
+
+# Lancer en cluster
+pm2 start ecosystem.config.js
+
+# Monitoring
+pm2 monit
+
+# Logs
+pm2 logs wolaro-bot
+```
+
+### Kubernetes (Avancé)
+
+Voir [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) pour manifests K8s.
+
+## 🧑‍💻 Développement
+
+### Créer un Module
+
+```bash
+# Créer la structure
+mkdir -p src/modules/my-module/commands
+touch src/modules/my-module/index.ts
+
+# Voir docs/MODULES.md pour le template
+```
+
+### Hot Reload
+
+```typescript
+// Master admin command
+await moduleLoader.reloadModule('my-module');
+```
+
+### Tests
+
+```bash
+npm test          # Run all tests
+npm run test:watch # Watch mode
+```
+
+## 📡 API & WebSocket
+
+### REST API
+
+```bash
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:3000/api/guilds/123456789
+```
+
+### WebSocket
+
+```javascript
+const ws = new WebSocket('ws://localhost:3001');
+
+ws.on('message', (data) => {
+  const event = JSON.parse(data);
+  console.log('Event:', event.type);
+});
+```
+
+Voir [docs/API.md](docs/API.md) pour documentation complète.
+
+## 📝 Roadmap
+
+### Version 1.1
+- [ ] Music module (lecteur audio)
+- [ ] AI module (chatbot + auto-mod IA)
+- [ ] RPG module (combats + quêtes)
+- [ ] Panel web React
+
+### Version 1.2
+- [ ] Template marketplace
+- [ ] Command designer drag-and-drop
+- [ ] Analytics dashboard
+- [ ] Multi-language support
+
+### Version 2.0
+- [ ] Microservices architecture
+- [ ] Kubernetes native
+- [ ] GraphQL API
+- [ ] Mobile app
+
+## 🤝 Contribution
+
+Les contributions sont les bienvenues !
+
+1. Fork le projet
+2. Créer une branche (`git checkout -b feature/amazing-feature`)
+3. Commit (`git commit -m 'Add amazing feature'`)
+4. Push (`git push origin feature/amazing-feature`)
+5. Ouvrir une Pull Request
+
+## 📜 License
+
+MIT License - voir [LICENSE](LICENSE) pour détails.
+
+## 💬 Support
+
+- Discord: [Rejoindre le serveur](https://discord.gg/wolaro)
+- Documentation: [docs/](docs/)
+- Issues: [GitHub Issues](https://github.com/theo7791l/Wolaro2/issues)
+
+## ❤️ Credits
+
+Développé avec ❤️ par [theo7791l](https://github.com/theo7791l)
 
 ---
 
-**Built with ❤️ using TypeScript, Discord.js, and PostgreSQL**
+<div align="center">
+
+**Wolaro** - The Next Generation Discord Bot Framework
+
+[Documentation](docs/) · [API Reference](docs/API.md) · [Discord Server](https://discord.gg/wolaro)
+
+</div>
