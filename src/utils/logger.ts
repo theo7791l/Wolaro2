@@ -1,5 +1,8 @@
 import winston from 'winston';
-import { config } from '../config';
+
+// FIX: utiliser process.env directement (config.logLevel et config.environment n'existent pas dans BotConfig)
+const logLevel = process.env.LOG_LEVEL || 'info';
+const nodeEnv = process.env.NODE_ENV || 'development';
 
 const customFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
@@ -10,14 +13,17 @@ const customFormat = winston.format.combine(
   })
 );
 
+// FIX: Transport Console unique (pas de doublon)
+// En production : Console + fichiers de log
+// En développement : Console colorée + fichiers
 export const logger = winston.createLogger({
-  level: config.logLevel,
+  level: logLevel,
   format: customFormat,
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize(),
-        customFormat
+        nodeEnv !== 'production' ? winston.format.simple() : customFormat
       ),
     }),
     new winston.transports.File({
@@ -33,14 +39,3 @@ export const logger = winston.createLogger({
     }),
   ],
 });
-
-if (config.environment !== 'production') {
-  logger.add(
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      ),
-    })
-  );
-}
