@@ -13,11 +13,8 @@ const router = Router();
  * Returns names instead of IDs for panel display
  */
 
-// Apply standard rate limiting
-router.use(standardRateLimiter);
-
 // Get guild channels with names
-router.get('/guilds/:guildId/channels', authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/channels', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -114,7 +111,7 @@ router.get('/guilds/:guildId/channels', authMiddleware, async (req: Request, res
 });
 
 // Get guild roles with names
-router.get('/guilds/:guildId/roles', authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/roles', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -180,7 +177,7 @@ router.get('/guilds/:guildId/roles', authMiddleware, async (req: Request, res: R
 });
 
 // Get guild members (with search)
-router.get('/guilds/:guildId/members', authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/members', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
