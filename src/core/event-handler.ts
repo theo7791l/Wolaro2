@@ -58,7 +58,7 @@ export class EventHandler {
       if (message.author.bot || !message.guild) return;
 
       try {
-        const { isSpam, count } = AntiRaidManager.trackMessage(
+        const { isSpam, _count } = AntiRaidManager.trackMessage(
           message.guild.id,
           message.author.id
         );
