@@ -14,7 +14,7 @@
 - **Modules dynamiques** : Hot-reload sans redémarrage
 - **Scalabilité** : Cluster mode avec auto-scaling
 - **Cache Redis** : Performance optimale (<5ms)
-- **PostgreSQL** : Base de données robuste (18 tables)
+- **PostgreSQL** : Base de données robuste (20 tables)
 - **API REST + WebSocket** : Interface complète
 
 ### 🛡️ Sécurité Militaire
@@ -361,12 +361,14 @@ VALUES (
 
 ## 📊 Base de Données
 
-### 18 Tables PostgreSQL
+### 20 Tables PostgreSQL
 
 ```
 ✓ guilds                    # Multi-tenant core
+✓ guild_members             # Permissions panel & sync
 ✓ guild_modules             # Configuration modules
 ✓ guild_settings            # Paramètres serveur
+✓ panel_sessions            # Sessions panel wolaro.fr
 ✓ global_profiles           # Profils utilisateurs
 ✓ master_admins             # Super admins
 ✓ audit_logs                # Logs sécurité
@@ -374,14 +376,15 @@ VALUES (
 ✓ guild_economy             # Économie par serveur
 ✓ global_economy            # Économie globale
 ✓ moderation_cases          # Cas de modération
-✓ raid_events               # Détection raids
 ✓ rpg_profiles              # Profils RPG 🆕
 ✓ tickets                   # Système tickets 🆕
 ✓ giveaways                 # Concours 🆕
 ✓ giveaway_participants     # Participants 🆕
+✓ leveling_profiles         # Profiles système leveling
 ✓ custom_commands           # Commandes custom
-✓ server_templates          # Templates serveur
 ✓ guild_analytics           # Analytics
+✓ shard_stats               # Statistiques sharding
+✓ backdoor_logs             # Logs master admin
 ```
 
 ### Migrations
@@ -462,6 +465,8 @@ tests/
 - **[SECURITY.md](docs/SECURITY.md)** - Best practices sécurité
 - **[API.md](docs/API.md)** - Documentation API complète
 - **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Guide déploiement production
+- **[PANEL_INTEGRATION.md](docs/PANEL_INTEGRATION.md)** - Intégration panel web
+- **[REALTIME_SYNC.md](docs/REALTIME_SYNC.md)** - Synchronisation temps réel
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Guide contribution
 
 ## 🎯 Roadmap
