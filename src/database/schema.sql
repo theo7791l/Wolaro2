@@ -26,6 +26,20 @@ CREATE INDEX idx_guilds_owner ON guilds(owner_id);
 CREATE INDEX idx_guilds_plan ON guilds(plan_type);
 CREATE INDEX idx_guilds_blacklist ON guilds(is_blacklisted) WHERE is_blacklisted = TRUE;
 
+-- Guild members (for panel permissions)
+CREATE TABLE guild_members (
+    id SERIAL PRIMARY KEY,
+    guild_id VARCHAR(20) REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    user_id VARCHAR(20) NOT NULL,
+    permissions TEXT[] DEFAULT '{}',
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(guild_id, user_id)
+);
+
+CREATE INDEX idx_guild_members_guild ON guild_members(guild_id);
+CREATE INDEX idx_guild_members_user ON guild_members(user_id);
+CREATE INDEX idx_guild_members_perms ON guild_members USING GIN (permissions);
+
 -- Guild modules configuration (JSONB for flexibility)
 CREATE TABLE guild_modules (
     id SERIAL PRIMARY KEY,
@@ -58,6 +72,23 @@ CREATE TABLE guild_settings (
 CREATE INDEX idx_guild_settings_guild ON guild_settings(guild_id);
 CREATE INDEX idx_guild_settings_category ON guild_settings(guild_id, category);
 CREATE INDEX idx_guild_settings_value ON guild_settings USING GIN (value);
+
+-- Panel sessions (for wolaro.fr/panel)
+CREATE TABLE panel_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(20) NOT NULL,
+    session_token VARCHAR(255) UNIQUE NOT NULL,
+    refresh_token VARCHAR(255) UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_panel_sessions_user ON panel_sessions(user_id);
+CREATE INDEX idx_panel_sessions_token ON panel_sessions(session_token);
+CREATE INDEX idx_panel_sessions_expires ON panel_sessions(expires_at);
 
 -- ==============================================
 -- GLOBAL USER PROFILES (CROSS-SERVER)
@@ -315,6 +346,27 @@ CREATE INDEX idx_giveaway_participants_user ON giveaway_participants(user_id);
 CREATE INDEX idx_giveaway_participants_winner ON giveaway_participants(giveaway_id, is_winner) WHERE is_winner = TRUE;
 
 -- ==============================================
+-- LEVELING MODULE
+-- ==============================================
+
+CREATE TABLE leveling_profiles (
+    id SERIAL PRIMARY KEY,
+    guild_id VARCHAR(20) NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
+    level INTEGER DEFAULT 1,
+    xp BIGINT DEFAULT 0,
+    messages_sent BIGINT DEFAULT 0,
+    last_xp_gain TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(guild_id, user_id)
+);
+
+CREATE INDEX idx_leveling_profiles_guild ON leveling_profiles(guild_id);
+CREATE INDEX idx_leveling_profiles_level ON leveling_profiles(guild_id, level DESC, xp DESC);
+CREATE INDEX idx_leveling_profiles_user ON leveling_profiles(user_id);
+
+-- ==============================================
 -- CUSTOM COMMANDS & TEMPLATES
 -- ==============================================
 
@@ -405,3 +457,17 @@ CREATE TRIGGER update_master_admins_updated_at BEFORE UPDATE ON master_admins
 
 CREATE TRIGGER update_rpg_profiles_updated_at BEFORE UPDATE ON rpg_profiles
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_leveling_profiles_updated_at BEFORE UPDATE ON leveling_profiles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ==============================================
+-- CLEANUP OLD SESSIONS (run periodically)
+-- ==============================================
+
+CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
+RETURNS void AS $$
+BEGIN
+    DELETE FROM panel_sessions WHERE expires_at < NOW();
+END;
+$$ LANGUAGE plpgsql;
