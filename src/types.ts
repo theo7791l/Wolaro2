@@ -216,7 +216,7 @@ export interface APIResponse<T = any> {
   timestamp: string;
 }
 
-export interface PaginatedResponse<T> extends APIResponse<T[]> {
+export interface PaginatedResponse<T = any> extends APIResponse<T> {
   page: number;
   perPage: number;
   total: number;
@@ -248,6 +248,7 @@ export interface BotConfig {
   clientId: string;
   clientSecret: string;
   masterAdmins: string[];
+  geminiApiKey: string;
   database: DatabaseConfig;
   redis: RedisConfig;
   api: APIConfig;
@@ -274,6 +275,7 @@ export interface RedisConfig {
 
 export interface APIConfig {
   port: number;
+  host: string;
   jwtSecret: string;
   corsOrigin: string[];
   wsPort: number;
@@ -303,7 +305,7 @@ export interface FeatureFlags {
 // UTILITY TYPES
 // ==============================================
 
-export type ModuleName = 
+export type ModuleName =
   | 'moderation'
   | 'economy'
   | 'leveling'
