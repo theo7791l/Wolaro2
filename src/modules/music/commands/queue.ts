@@ -11,7 +11,7 @@ export class QueueCommand implements ICommand {
   guildOnly = true;
   cooldown = 5;
 
-  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
+  async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
     const queue = MusicQueue.get(interaction.guildId!);
 
     if (!queue || queue.tracks.length === 0) {
