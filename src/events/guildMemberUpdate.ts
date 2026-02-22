@@ -53,8 +53,8 @@ export class GuildMemberUpdateEvent {
         `INSERT INTO guild_members (guild_id, user_id, permissions)
          VALUES ($1, $2, $3)
          ON CONFLICT (guild_id, user_id)
-         DO UPDATE SET permissions = $3, joined_at = NOW()`,
-        [guildId, userId, permissions]
+      DO UPDATE SET permissions = $3, updated_at = NOW()`,      
+              [guildId, userId, permissions]
       );
 
       logger.info(`Updated permissions for user ${userId} in guild ${guildId}`);
