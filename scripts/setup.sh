@@ -1,76 +1,87 @@
 #!/bin/bash
 
-echo "========================================"
-echo "  Wolaro - Installation Script"
-echo "========================================"
+# Wolaro Setup Script
+# This script sets up the development environment
+
+set -e
+
+echo "==========================================="
+echo "    Wolaro Setup Script"
+echo "==========================================="
 echo ""
 
-# Check if Node.js is installed
-if ! command -v node &> /dev/null; then
-    echo "❌ Node.js is not installed. Please install Node.js 18+ first."
+# Check Node.js version
+echo "[1/7] Checking Node.js version..."
+NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+if [ "$NODE_VERSION" -lt 20 ]; then
+    echo "Error: Node.js 20+ is required (current: v$NODE_VERSION)"
     exit 1
 fi
+echo "✓ Node.js $(node -v) detected"
+echo ""
 
-echo "✓ Node.js $(node --version) detected"
-
-# Check if PostgreSQL is installed
+# Check PostgreSQL
+echo "[2/7] Checking PostgreSQL..."
 if ! command -v psql &> /dev/null; then
-    echo "⚠️ PostgreSQL not found. Please install PostgreSQL 15+."
+    echo "Warning: PostgreSQL not found. Please install PostgreSQL 15+"
+else
+    echo "✓ PostgreSQL detected"
 fi
+echo ""
 
-# Check if Redis is installed
+# Check Redis
+echo "[3/7] Checking Redis..."
 if ! command -v redis-cli &> /dev/null; then
-    echo "⚠️ Redis not found. Please install Redis 7+."
+    echo "Warning: Redis not found. Please install Redis 7+"
+else
+    echo "✓ Redis detected"
 fi
+echo ""
 
 # Install dependencies
-echo ""
-echo "Installing dependencies..."
+echo "[4/7] Installing dependencies..."
 npm install
-
-if [ $? -ne 0 ]; then
-    echo "❌ Failed to install dependencies"
-    exit 1
-fi
-
 echo "✓ Dependencies installed"
+echo ""
 
-# Create .env file if it doesn't exist
+# Create .env file
+echo "[5/7] Setting up environment..."
 if [ ! -f .env ]; then
-    echo ""
-    echo "Creating .env file..."
     cp .env.example .env
-    echo "✓ .env file created. Please edit it with your credentials."
+    echo "✓ .env file created from .env.example"
+    echo "Please edit .env with your configuration:"
+    echo "  - DISCORD_TOKEN"
+    echo "  - DB_PASSWORD"
+    echo "  - GEMINI_API_KEY (for AI module)"
+    echo "  - ENCRYPTION_KEY (32+ chars)"
+    echo "  - API_JWT_SECRET (32+ chars)"
 else
     echo "✓ .env file already exists"
 fi
+echo ""
 
 # Create logs directory
+echo "[6/7] Creating directories..."
 mkdir -p logs
 echo "✓ Logs directory created"
+echo ""
 
 # Build TypeScript
-echo ""
-echo "Building TypeScript..."
+echo "[7/7] Building TypeScript..."
 npm run build
-
-if [ $? -ne 0 ]; then
-    echo "❌ Failed to build"
-    exit 1
-fi
-
-echo "✓ Build completed"
-
+echo "✓ TypeScript compiled"
 echo ""
-echo "========================================"
-echo "  Installation Complete!"
-echo "========================================"
+
+echo "==========================================="
+echo "    Setup Complete!"
+echo "==========================================="
 echo ""
 echo "Next steps:"
-echo "1. Edit .env with your Discord bot token and database credentials"
-echo "2. Setup PostgreSQL database and run migrations"
-echo "3. Start the bot with: npm start"
+echo "  1. Edit .env file with your credentials"
+echo "  2. Run migrations: npm run migrate"
+echo "  3. Start bot: npm run dev"
 echo ""
-echo "For production: npm run start:cluster"
-echo "For Docker: docker-compose up -d"
+echo "For production:"
+echo "  - Docker: npm run docker:up"
+echo "  - PM2: npm run pm2:start"
 echo ""
