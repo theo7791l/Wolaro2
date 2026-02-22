@@ -223,6 +223,98 @@ CREATE INDEX idx_raid_events_guild ON raid_events(guild_id, started_at DESC);
 CREATE INDEX idx_raid_events_active ON raid_events(guild_id, is_active) WHERE is_active = TRUE;
 
 -- ==============================================
+-- RPG MODULE
+-- ==============================================
+
+CREATE TABLE rpg_profiles (
+    id SERIAL PRIMARY KEY,
+    guild_id VARCHAR(20) NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
+    level INTEGER DEFAULT 1,
+    xp BIGINT DEFAULT 0,
+    gold BIGINT DEFAULT 100,
+    health INTEGER DEFAULT 100,
+    max_health INTEGER DEFAULT 100,
+    attack INTEGER DEFAULT 10,
+    defense INTEGER DEFAULT 5,
+    class VARCHAR(50) DEFAULT 'Adventurer',
+    wins INTEGER DEFAULT 0,
+    losses INTEGER DEFAULT 0,
+    inventory JSONB DEFAULT '[]',
+    equipped JSONB DEFAULT '{}',
+    quests_completed JSONB DEFAULT '[]',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(guild_id, user_id)
+);
+
+CREATE INDEX idx_rpg_profiles_guild ON rpg_profiles(guild_id);
+CREATE INDEX idx_rpg_profiles_level ON rpg_profiles(guild_id, level DESC);
+CREATE INDEX idx_rpg_profiles_user ON rpg_profiles(user_id);
+
+-- ==============================================
+-- TICKETS MODULE
+-- ==============================================
+
+CREATE TABLE tickets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    guild_id VARCHAR(20) NOT NULL,
+    channel_id VARCHAR(20) UNIQUE NOT NULL,
+    ticket_number INTEGER NOT NULL,
+    user_id VARCHAR(20) NOT NULL,
+    subject TEXT NOT NULL,
+    type VARCHAR(50) DEFAULT 'general',
+    status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+    claimed_by VARCHAR(20),
+    claimed_at TIMESTAMP,
+    closed_by VARCHAR(20),
+    closed_at TIMESTAMP,
+    close_reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(guild_id, ticket_number)
+);
+
+CREATE INDEX idx_tickets_guild ON tickets(guild_id, ticket_number DESC);
+CREATE INDEX idx_tickets_user ON tickets(user_id);
+CREATE INDEX idx_tickets_status ON tickets(guild_id, status);
+CREATE INDEX idx_tickets_channel ON tickets(channel_id);
+
+-- ==============================================
+-- GIVEAWAYS MODULE
+-- ==============================================
+
+CREATE TABLE giveaways (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    guild_id VARCHAR(20) NOT NULL,
+    channel_id VARCHAR(20) NOT NULL,
+    message_id VARCHAR(20) UNIQUE NOT NULL,
+    prize TEXT NOT NULL,
+    winners_count INTEGER DEFAULT 1,
+    host_id VARCHAR(20) NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'ended', 'cancelled')),
+    ended_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_giveaways_guild ON giveaways(guild_id);
+CREATE INDEX idx_giveaways_status ON giveaways(status, end_time);
+CREATE INDEX idx_giveaways_message ON giveaways(message_id);
+
+CREATE TABLE giveaway_participants (
+    id SERIAL PRIMARY KEY,
+    giveaway_id UUID REFERENCES giveaways(id) ON DELETE CASCADE,
+    user_id VARCHAR(20) NOT NULL,
+    is_winner BOOLEAN DEFAULT FALSE,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(giveaway_id, user_id)
+);
+
+CREATE INDEX idx_giveaway_participants_giveaway ON giveaway_participants(giveaway_id);
+CREATE INDEX idx_giveaway_participants_user ON giveaway_participants(user_id);
+CREATE INDEX idx_giveaway_participants_winner ON giveaway_participants(giveaway_id, is_winner) WHERE is_winner = TRUE;
+
+-- ==============================================
 -- CUSTOM COMMANDS & TEMPLATES
 -- ==============================================
 
@@ -309,4 +401,7 @@ CREATE TRIGGER update_global_profiles_updated_at BEFORE UPDATE ON global_profile
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_master_admins_updated_at BEFORE UPDATE ON master_admins
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_rpg_profiles_updated_at BEFORE UPDATE ON rpg_profiles
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
