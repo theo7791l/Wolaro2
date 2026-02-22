@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-02-22
+
+### Fixed
+- **`database/manager.ts`** — `updateGlobalXP`: la formule de calcul du niveau utilisait `global_xp` (valeur *avant* ajout) au lieu de `global_xp + $2` (valeur *après* ajout), causant un retard d'un palier dans la mise à jour du niveau
+- **`database/manager.ts`** — `constructor`: `max` du pool de connexions était hardcodé à `20` au lieu d'utiliser `config.database.maxConnections` lu depuis `.env`
+- **`database/manager.ts`** — `getBalance`: remplacé le pattern double-requête (`INSERT ... DO NOTHING` + `SELECT` séparé) par un seul `UPSERT DO UPDATE RETURNING balance` toujours fiable
+
+### Changed
+- **`src/index.ts`** — Suppression du commentaire de développement `(fix: config.token, not config.discord.token)` sur la ligne `client.login`
+- **`src/config.ts`** — Suppression du commentaire trompeur `// Read WS_ENABLED and PANEL_URL from .env.example` sur le champ `wsEnabled`
+
+---
+
 ## [1.0.0] - 2026-02-22
 
 ### Added
