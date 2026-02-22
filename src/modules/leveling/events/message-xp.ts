@@ -72,7 +72,7 @@ export class MessageXPHandler implements IEvent {
     message: Message,
     newLevel: number,
     config: any,
-    context: any
+    _context: any
   ): Promise<void> {
     try {
       // Send level up message
