@@ -3,8 +3,6 @@ import { DatabaseManager } from '../../database/manager';
 import { PubSubManager } from '../../cache/pubsub';
 import { authMiddleware } from '../middleware/auth';
 import { standardRateLimiter } from '../middleware/rateLimiter';
-import jwt from 'jsonwebtoken';
-import config from '../../config';
 import { logger } from '../../utils/logger';
 
 const router = Router();
