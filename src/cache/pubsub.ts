@@ -12,11 +12,18 @@ import { logger } from '../utils/logger';
 
 export class PubSubManager {
   private redis: RedisManager;
-  private client: Client;
+  /**
+   * FIX: type élargi à Client | null.
+   * startAPI() instancie PubSubManager sans client Discord (panel-only) ;
+   * le passer à null est légitime car aucune méthode de cette classe
+   * n'accède à this.client. L'ancien type `Client` forçait un cast
+   * non-sûr `null as any` au site d'appel.
+   */
+  private client: Client | null;
   private database: DatabaseManager;
   private subscriber: any;
 
-  constructor(redis: RedisManager, client: Client, database: DatabaseManager) {
+  constructor(redis: RedisManager, client: Client | null, database: DatabaseManager) {
     this.redis = redis;
     this.client = client;
     this.database = database;
