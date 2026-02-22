@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { DatabaseManager } from '../../database/manager';
 import { PubSubManager } from '../../cache/pubsub';
-import { authMiddleware, masterAdminMiddleware } from '../middlewares/auth';
-import { rateLimitMiddleware } from '../middlewares/ratelimit';
+import { authMiddleware } from '../middleware/auth';
+import { standardRateLimiter } from '../middleware/rateLimiter';
 import jwt from 'jsonwebtoken';
 import config from '../../config';
 import { logger } from '../../utils/logger';
@@ -15,21 +15,24 @@ const router = Router();
  * With Redis Pub/Sub for real-time sync
  */
 
+// Use standard rate limiter for all panel routes
+router.use(standardRateLimiter);
+
 // Get user guilds with bot presence and permissions
-router.get('/guilds', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
+    const userId = (req as any).user.id;
+    const database: DatabaseManager = req.app.locals.database;
 
     // Get guilds where user is admin and bot is present
     const guilds = await database.query(
-      `SELECT g.*, 
+      `SELECT g.*,
         CASE WHEN gm.user_id IS NOT NULL THEN true ELSE false END as is_admin
-       FROM guilds g
-       LEFT JOIN guild_members gm ON g.guild_id = gm.guild_id AND gm.user_id = $1
-       WHERE gm.permissions @> ARRAY['ADMINISTRATOR']::varchar[]
-       OR g.owner_id = $1
-       ORDER BY g.joined_at DESC`,
+      FROM guilds g
+      LEFT JOIN guild_members gm ON g.guild_id = gm.guild_id AND gm.user_id = $1
+      WHERE gm.permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+         OR g.owner_id = $1
+      ORDER BY g.joined_at DESC`,
       [userId]
     );
 
@@ -48,17 +51,15 @@ router.get('/guilds', authMiddleware, rateLimitMiddleware, async (req: Request, 
 });
 
 // Get specific guild configuration
-router.get('/guilds/:guildId', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
+    const userId = (req as any).user.id;
+    const database: DatabaseManager = req.app.locals.database;
 
     // Verify user has access to this guild
     const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
       [guildId, userId]
@@ -95,19 +96,17 @@ router.get('/guilds/:guildId', authMiddleware, rateLimitMiddleware, async (req: 
 });
 
 // Update guild settings
-router.patch('/guilds/:guildId', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
+router.patch('/guilds/:guildId', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
-    const pubsub: PubSubManager = (req as any).pubsub;
+    const userId = (req as any).user.id;
+    const database: DatabaseManager = req.app.locals.database;
+    const pubsub: PubSubManager = req.app.locals.pubsub;
     const { settings } = req.body;
 
     // Verify access
     const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
       [guildId, userId]
@@ -130,11 +129,7 @@ router.patch('/guilds/:guildId', authMiddleware, rateLimitMiddleware, async (req
     await pubsub.publishConfigUpdate(guildId, settings);
 
     // Log action
-    await database.query(
-      `INSERT INTO audit_logs (guild_id, user_id, action_type, changes, timestamp)
-       VALUES ($1, $2, $3, $4, NOW())`,
-      [guildId, userId, 'GUILD_SETTINGS_UPDATED', JSON.stringify({ settings })]
-    );
+    await database.logAction(userId, 'GUILD_SETTINGS_UPDATED', { settings }, guildId);
 
     res.json({
       success: true,
@@ -151,17 +146,15 @@ router.patch('/guilds/:guildId', authMiddleware, rateLimitMiddleware, async (req
 });
 
 // Get guild modules
-router.get('/guilds/:guildId/modules', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/modules', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
+    const userId = (req as any).user.id;
+    const database: DatabaseManager = req.app.locals.database;
 
     // Verify access
     const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
       [guildId, userId]
@@ -176,7 +169,7 @@ router.get('/guilds/:guildId/modules', authMiddleware, rateLimitMiddleware, asyn
 
     // Get modules
     const modules = await database.query(
-      'SELECT * FROM guild_modules WHERE guild_id = $1 ORDER BY priority DESC, module_name ASC',
+      'SELECT * FROM guild_modules WHERE guild_id = $1 ORDER BY module_name ASC',
       [guildId]
     );
 
@@ -194,19 +187,17 @@ router.get('/guilds/:guildId/modules', authMiddleware, rateLimitMiddleware, asyn
 });
 
 // Toggle module
-router.patch('/guilds/:guildId/modules/:moduleName', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
+router.patch('/guilds/:guildId/modules/:moduleName', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId, moduleName } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
-    const pubsub: PubSubManager = (req as any).pubsub;
+    const userId = (req as any).user.id;
+    const database: DatabaseManager = req.app.locals.database;
+    const pubsub: PubSubManager = req.app.locals.pubsub;
     const { enabled, config: moduleConfig } = req.body;
 
     // Verify access
     const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
       [guildId, userId]
@@ -220,39 +211,19 @@ router.patch('/guilds/:guildId/modules/:moduleName', authMiddleware, rateLimitMi
     }
 
     // Update module
-    const updateFields = [];
-    const updateValues = [];
-    let paramIndex = 1;
-
     if (typeof enabled === 'boolean') {
-      updateFields.push(`enabled = $${paramIndex++}`);
-      updateValues.push(enabled);
+      await database.toggleModule(guildId, moduleName, enabled);
     }
 
     if (moduleConfig) {
-      updateFields.push(`config = $${paramIndex++}`);
-      updateValues.push(JSON.stringify(moduleConfig));
+      await database.updateModuleConfig(guildId, moduleName, moduleConfig);
     }
-
-    updateFields.push(`updated_at = NOW()`);
-    updateValues.push(guildId, moduleName);
-
-    await database.query(
-      `UPDATE guild_modules 
-       SET ${updateFields.join(', ')}
-       WHERE guild_id = $${paramIndex} AND module_name = $${paramIndex + 1}`,
-      updateValues
-    );
 
     // Publish module toggle event to Redis
     await pubsub.publishModuleToggle(guildId, moduleName, enabled, moduleConfig);
 
     // Log action
-    await database.query(
-      `INSERT INTO audit_logs (guild_id, user_id, action_type, target_type, target_id, changes, timestamp)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-      [guildId, userId, 'MODULE_TOGGLED', 'module', moduleName, JSON.stringify({ enabled, config: moduleConfig })]
-    );
+    await database.logAction(userId, 'MODULE_TOGGLED', { moduleName, enabled, config: moduleConfig }, guildId);
 
     res.json({
       success: true,
@@ -269,18 +240,16 @@ router.patch('/guilds/:guildId/modules/:moduleName', authMiddleware, rateLimitMi
 });
 
 // Get guild analytics
-router.get('/guilds/:guildId/analytics', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/analytics', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
+    const userId = (req as any).user.id;
+    const database: DatabaseManager = req.app.locals.database;
     const { days = 7 } = req.query;
 
     // Verify access
     const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
       [guildId, userId]
@@ -293,13 +262,16 @@ router.get('/guilds/:guildId/analytics', authMiddleware, rateLimitMiddleware, as
       });
     }
 
+    const intervalDays = Math.min(Math.max(parseInt(days as string) || 7, 1), 90);
+
     // Get analytics
     const analytics = await database.query(
-      `SELECT metric_type, metric_value, date 
-       FROM guild_analytics 
-       WHERE guild_id = $1 AND date >= NOW() - INTERVAL '${parseInt(days as string)} days'
+      `SELECT metric_type, metric_value, date
+       FROM guild_analytics
+       WHERE guild_id = $1
+         AND date >= CURRENT_DATE - ($2 * INTERVAL '1 day')
        ORDER BY date DESC`,
-      [guildId]
+      [guildId, intervalDays]
     );
 
     res.json({
@@ -311,137 +283,6 @@ router.get('/guilds/:guildId/analytics', authMiddleware, rateLimitMiddleware, as
     res.status(500).json({
       success: false,
       error: 'Failed to fetch analytics',
-    });
-  }
-});
-
-// Get audit logs
-router.get('/guilds/:guildId/audit', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { guildId } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
-    const { limit = 50, offset = 0 } = req.query;
-
-    // Verify access
-    const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
-       UNION
-       SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
-    );
-
-    if (hasAccess.length === 0) {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied',
-      });
-    }
-
-    // Get audit logs
-    const logs = await database.query(
-      `SELECT * FROM audit_logs 
-       WHERE guild_id = $1 
-       ORDER BY timestamp DESC 
-       LIMIT $2 OFFSET $3`,
-      [guildId, parseInt(limit as string), parseInt(offset as string)]
-    );
-
-    const total = await database.query(
-      'SELECT COUNT(*) as count FROM audit_logs WHERE guild_id = $1',
-      [guildId]
-    );
-
-    res.json({
-      success: true,
-      data: logs,
-      pagination: {
-        total: parseInt(total[0].count),
-        limit: parseInt(limit as string),
-        offset: parseInt(offset as string),
-      },
-    });
-  } catch (error: any) {
-    logger.error('Error fetching audit logs:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch audit logs',
-    });
-  }
-});
-
-// Sync guild data from Discord (force refresh)
-router.post('/guilds/:guildId/sync', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { guildId } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
-    const pubsub: PubSubManager = (req as any).pubsub;
-    const client = (req as any).client;
-
-    // Verify access
-    const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
-       UNION
-       SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
-    );
-
-    if (hasAccess.length === 0) {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied',
-      });
-    }
-
-    // Fetch guild from Discord
-    const guild = await client.guilds.fetch(guildId).catch(() => null);
-
-    if (!guild) {
-      return res.status(404).json({
-        success: false,
-        error: 'Bot is not in this guild',
-      });
-    }
-
-    // Update guild info
-    await database.query(
-      `UPDATE guilds 
-       SET settings = jsonb_set(settings, '{name}', $1),
-           settings = jsonb_set(settings, '{icon}', $2),
-           settings = jsonb_set(settings, '{member_count}', $3),
-           updated_at = NOW()
-       WHERE guild_id = $4`,
-      [
-        JSON.stringify(guild.name),
-        JSON.stringify(guild.iconURL()),
-        guild.memberCount.toString(),
-        guildId,
-      ]
-    );
-
-    // Publish guild reload event to Redis
-    await pubsub.publishGuildReload(guildId);
-
-    res.json({
-      success: true,
-      message: 'Guild data synchronized',
-      realtime: true,
-      data: {
-        name: guild.name,
-        icon: guild.iconURL(),
-        memberCount: guild.memberCount,
-      },
-    });
-  } catch (error: any) {
-    logger.error('Error syncing guild:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to sync guild data',
     });
   }
 });
