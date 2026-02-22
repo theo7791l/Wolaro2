@@ -25,7 +25,9 @@ export async function startAPI(
   redis: RedisManager
 ): Promise<Application> {
   // Create a minimal PubSubManager with no Discord client (panel-only pub/sub)
-  const pubsub = new PubSubManager(redis, null as any, database);
+  // FIX: suppression du cast `null as any` — PubSubManager accepte désormais
+  // Client | null, ce qui rend l'intention explicite et sûr côté TypeScript.
+  const pubsub = new PubSubManager(redis, null, database);
 
   // Initialize Pub/Sub (non-blocking — bot continues if Redis pub/sub fails)
   await pubsub.initialize().catch((_err) => {
