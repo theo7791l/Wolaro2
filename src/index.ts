@@ -69,7 +69,7 @@ class WolaroBot {
       await startAPI(this.database, this.redis, this.websocket);
       logger.info('✓ API server started');
 
-      // Login to Discord (fix: config.token, not config.discord.token)
+      // Login to Discord
       await this.client.login(config.token);
       logger.info('✓ Bot logged in successfully');
 
