@@ -279,6 +279,9 @@ export interface APIConfig {
   jwtSecret: string;
   corsOrigin: string[];
   wsPort: number;
+  wsEnabled: boolean;
+  panelUrl: string;
+  panelSessionDuration: number;
 }
 
 export interface ClusterConfig {
