@@ -19,15 +19,16 @@ authRouter.post('/discord', async (req, res) => {
     }
 
     // Exchange code for token
+    // FIX: utiliser config.clientId, config.clientSecret, config.redirectUri (pas config.discord.*)
     const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: config.discord.clientId,
-        client_secret: config.discord.clientSecret,
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
         code,
         grant_type: 'authorization_code',
-        redirect_uri: config.discord.redirectUri,
+        redirect_uri: config.redirectUri,
       }),
     });
 
@@ -88,8 +89,8 @@ authRouter.get('/me', async (req, res) => {
     }
 
     const decoded = jwt.verify(token, config.api.jwtSecret) as any;
+
     const database: DatabaseManager = req.app.locals.database;
-    
     const profile = await database.query(
       'SELECT * FROM global_profiles WHERE user_id = $1',
       [decoded.userId]
