@@ -14,7 +14,7 @@
 - **Modules dynamiques** : Hot-reload sans redémarrage
 - **Scalabilité** : Cluster mode avec auto-scaling
 - **Cache Redis** : Performance optimale (<5ms)
-- **PostgreSQL** : Base de données robuste (20 tables)
+- **PostgreSQL** : Base de données robuste (18 tables)
 - **API REST + WebSocket** : Interface complète
 
 ### 🛡️ Sécurité Militaire
@@ -25,7 +25,7 @@
 - **Encryption AES-256** : Données sensibles
 - **Audit Logs** : Traçabilité complète
 
-### 📦 9 Modules Complets (70+ Commandes)
+### 📦 9 Modules Complets (48 Commandes)
 
 #### 1️⃣ Moderation (8 commandes)
 ```
@@ -230,35 +230,113 @@ npm run pm2:logs
 ### Variables d'Environnement
 
 ```env
+# ==========================================
 # Discord
+# ==========================================
 DISCORD_TOKEN=your_token_here
 DISCORD_CLIENT_ID=your_client_id
 DISCORD_CLIENT_SECRET=your_client_secret
 
-# Database
+# ==========================================
+# Database (PostgreSQL)
+# ==========================================
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=wolaro
 DB_USER=wolaro
 DB_PASSWORD=your_password
+DB_MAX_CONNECTIONS=20
 
+# ==========================================
 # Redis
+# ==========================================
 REDIS_HOST=localhost
 REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
 
+# ==========================================
 # API
+# ==========================================
 API_PORT=3000
 API_JWT_SECRET=your_jwt_secret_min_32_chars
+API_CORS_ORIGIN=https://wolaro.fr,http://localhost:3001
 
+# Panel Configuration
+PANEL_URL=https://wolaro.fr/panel
+PANEL_SESSION_DURATION=604800
+
+# WebSocket
+WS_PORT=3001
+WS_ENABLED=true
+
+# ==========================================
 # Master Admins
+# ==========================================
 MASTER_ADMIN_IDS=123456789012345678,987654321098765432
 
+# ==========================================
 # AI Module (Gemini)
+# ==========================================
 GEMINI_API_KEY=your_gemini_api_key
 FEATURE_AI_ENABLED=true
 
+# ==========================================
+# Feature Flags
+# ==========================================
+FEATURE_MUSIC_ENABLED=true
+FEATURE_RPG_ENABLED=true
+FEATURE_TICKETS_ENABLED=true
+FEATURE_GIVEAWAYS_ENABLED=true
+
+# ==========================================
 # Security
+# ==========================================
 ENCRYPTION_KEY=your_32_char_encryption_key
+IP_WHITELIST=127.0.0.1,::1
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# ==========================================
+# Cluster Configuration
+# ==========================================
+CLUSTER_ENABLED=false
+CLUSTER_SHARD_COUNT=auto
+
+# ==========================================
+# Logging
+# ==========================================
+LOG_LEVEL=info
+LOG_FILE_ENABLED=true
+LOG_DIR=./logs
+
+# ==========================================
+# Environment
+# ==========================================
+NODE_ENV=production
+
+# ==========================================
+# Domain & SSL
+# ==========================================
+MAIN_DOMAIN=wolaro.fr
+API_DOMAIN=api.wolaro.fr
+SSL_ENABLED=true
+SSL_CERT_PATH=/etc/letsencrypt/live/wolaro.fr/fullchain.pem
+SSL_KEY_PATH=/etc/letsencrypt/live/wolaro.fr/privkey.pem
+
+# ==========================================
+# Backup
+# ==========================================
+BACKUP_ENABLED=true
+BACKUP_SCHEDULE=0 2 * * *
+BACKUP_RETENTION_DAYS=7
+
+# ==========================================
+# External Services (Optional)
+# ==========================================
+SENTRY_DSN=
+ANALYTICS_ENABLED=false
+ANALYTICS_ID=
 ```
 
 ### Configuration des Modules
@@ -283,7 +361,7 @@ VALUES (
 
 ## 📊 Base de Données
 
-### 20 Tables PostgreSQL
+### 18 Tables PostgreSQL
 
 ```
 ✓ guilds                    # Multi-tenant core
@@ -313,7 +391,7 @@ VALUES (
 psql -U wolaro -d wolaro -f src/database/schema.sql
 
 # Ou via script
-./scripts/migrate.sh
+bash scripts/migrate.sh
 ```
 
 ## 🔌 API REST
