@@ -37,6 +37,10 @@ const config: BotConfig = {
       'http://localhost:3001',
     ],
     wsPort: parseInt(process.env.WS_PORT || '3001'),
+    // Read WS_ENABLED and PANEL_URL from .env.example
+    wsEnabled: process.env.WS_ENABLED !== 'false',
+    panelUrl: process.env.PANEL_URL || 'https://wolaro.fr/panel',
+    panelSessionDuration: parseInt(process.env.PANEL_SESSION_DURATION || '604800'),
   },
 
   cluster: {
