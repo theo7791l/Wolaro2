@@ -65,7 +65,7 @@ export class PubSubManager {
   private async handleConfigUpdate(message: string): Promise<void> {
     try {
       const data = JSON.parse(message);
-      const { guildId, settings } = data;
+      const { guildId, _settings } = data;
 
       logger.info(`Config update received for guild ${guildId}`);
 
