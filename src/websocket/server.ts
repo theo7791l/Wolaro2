@@ -1,7 +1,8 @@
-import { Server as HTTPServer } from 'http';
+import { createServer, Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
-import config from '../config';
+// FIX: named import au lieu de default import (config.ts n'exporte qu'un named export)
+import { config } from '../config';
 import { DatabaseManager } from '../database/manager';
 import { RedisManager } from '../cache/redis';
 import { logger } from '../utils/logger';
@@ -13,18 +14,28 @@ import { logger } from '../utils/logger';
  */
 
 export class WebSocketServer {
-  private io: SocketIOServer;
+  private io!: SocketIOServer;
+  // FIX: httpServer créé en interne dans start() — suppression du paramètre constructeur
+  // qui créait une incompatibilité avec l'instanciation dans src/index.ts (new WebSocketServer())
+  private httpServer!: HTTPServer;
   private database: DatabaseManager;
   private redis: RedisManager;
   private redisSubscriber: any;
   private connectedUsers: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
 
-  constructor(httpServer: HTTPServer, database: DatabaseManager, redis: RedisManager) {
+  constructor(database: DatabaseManager, redis: RedisManager) {
     this.database = database;
     this.redis = redis;
+  }
 
-    // Initialize Socket.io with CORS
-    this.io = new SocketIOServer(httpServer, {
+  /**
+   * Start the WebSocket server on its own HTTP listener (wsPort)
+   * FIX: méthode start() ajoutée — absente de la version précédente alors qu'appelée dans index.ts
+   */
+  async start(): Promise<void> {
+    this.httpServer = createServer();
+
+    this.io = new SocketIOServer(this.httpServer, {
       cors: {
         origin: [
           'https://wolaro.fr',
@@ -38,8 +49,16 @@ export class WebSocketServer {
     });
 
     this.setupAuthentication();
-    this.setupRedisSubscriber();
+    await this.setupRedisSubscriber();
     this.setupEventHandlers();
+
+    await new Promise<void>((resolve, reject) => {
+      this.httpServer.listen(config.api.wsPort, () => {
+        logger.info(`WebSocket server listening on port ${config.api.wsPort}`);
+        resolve();
+      });
+      this.httpServer.on('error', reject);
+    });
   }
 
   /**
@@ -48,13 +67,14 @@ export class WebSocketServer {
   private setupAuthentication(): void {
     this.io.use(async (socket: Socket, next) => {
       try {
-        const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
+        const token =
+          socket.handshake.auth.token ||
+          socket.handshake.headers.authorization?.split(' ')[1];
 
         if (!token) {
           return next(new Error('Authentication token required'));
         }
 
-        // Verify JWT
         const decoded = jwt.verify(token, config.api.jwtSecret) as any;
         (socket as any).userId = decoded.userId;
         (socket as any).username = decoded.username;
@@ -73,11 +93,9 @@ export class WebSocketServer {
    */
   private async setupRedisSubscriber(): Promise<void> {
     try {
-      // Create dedicated subscriber client
       this.redisSubscriber = this.redis.getClient().duplicate();
       await this.redisSubscriber.connect();
 
-      // Subscribe to all relevant channels
       await this.redisSubscriber.subscribe('config:update', this.handleConfigUpdate.bind(this));
       await this.redisSubscriber.subscribe('module:toggle', this.handleModuleToggle.bind(this));
       await this.redisSubscriber.subscribe('guild:reload', this.handleGuildReload.bind(this));
@@ -101,16 +119,13 @@ export class WebSocketServer {
 
       logger.info(`WebSocket connected: ${username} (${userId})`);
 
-      // Track connected user
       if (!this.connectedUsers.has(userId)) {
         this.connectedUsers.set(userId, new Set());
       }
       this.connectedUsers.get(userId)!.add(socket.id);
 
-      // Join user's guilds rooms
       this.joinUserGuilds(socket, userId);
 
-      // Handle disconnect
       socket.on('disconnect', () => {
         logger.info(`WebSocket disconnected: ${username} (${userId})`);
         this.connectedUsers.get(userId)?.delete(socket.id);
@@ -119,7 +134,6 @@ export class WebSocketServer {
         }
       });
 
-      // Handle manual guild join (when user navigates to guild panel)
       socket.on('join:guild', (guildId: string) => {
         this.verifyGuildAccess(userId, guildId).then((hasAccess) => {
           if (hasAccess) {
@@ -131,13 +145,11 @@ export class WebSocketServer {
         });
       });
 
-      // Handle leave guild room
       socket.on('leave:guild', (guildId: string) => {
         socket.leave(`guild:${guildId}`);
         logger.info(`User ${userId} left guild room ${guildId}`);
       });
 
-      // Ping/pong for connection health
       socket.on('ping', () => {
         socket.emit('pong', { timestamp: Date.now() });
       });
@@ -187,16 +199,15 @@ export class WebSocketServer {
     }
   }
 
-  /**
-   * Redis Event Handlers - Forward to WebSocket clients
-   */
+  // ============================================================
+  // Redis Event Handlers — Forward to WebSocket clients
+  // ============================================================
 
   private async handleConfigUpdate(message: string): Promise<void> {
     try {
       const data = JSON.parse(message);
       const { guildId, settings } = data;
 
-      // Emit to all users in this guild room
       this.io.to(`guild:${guildId}`).emit('config:updated', {
         guildId,
         settings,
@@ -212,14 +223,14 @@ export class WebSocketServer {
   private async handleModuleToggle(message: string): Promise<void> {
     try {
       const data = JSON.parse(message);
-      const { guildId, moduleName, enabled, config } = data;
+      // FIX: renommage 'config' → 'moduleConfig' pour éviter le shadowing de l'import config
+      const { guildId, moduleName, enabled, config: moduleConfig } = data;
 
-      // Emit to all users in this guild room
       this.io.to(`guild:${guildId}`).emit('module:toggled', {
         guildId,
         moduleName,
         enabled,
-        config,
+        config: moduleConfig,
         timestamp: Date.now(),
       });
 
@@ -234,7 +245,6 @@ export class WebSocketServer {
       const data = JSON.parse(message);
       const { guildId } = data;
 
-      // Emit to all users in this guild room
       this.io.to(`guild:${guildId}`).emit('guild:reload', {
         guildId,
         timestamp: Date.now(),
@@ -251,16 +261,12 @@ export class WebSocketServer {
       const data = JSON.parse(message);
       const { guildId, userId, reason } = data;
 
-      // Get user's socket connections
       const userSockets = this.connectedUsers.get(userId);
       if (userSockets) {
         userSockets.forEach((socketId) => {
           const socket = this.io.sockets.sockets.get(socketId);
           if (socket) {
-            // Force leave guild room
             socket.leave(`guild:${guildId}`);
-
-            // Emit permission revoked event
             socket.emit('permission:revoked', {
               guildId,
               reason: reason || 'Your permissions have been revoked',
@@ -282,7 +288,6 @@ export class WebSocketServer {
       const data = JSON.parse(message);
       const { guildId, command, executor, result } = data;
 
-      // Emit to all users monitoring this guild
       this.io.to(`guild:${guildId}`).emit('command:executed', {
         guildId,
         command,
@@ -297,9 +302,10 @@ export class WebSocketServer {
     }
   }
 
-  /**
-   * Manual emit (for API routes)
-   */
+  // ============================================================
+  // Public API
+  // ============================================================
+
   public emitToGuild(guildId: string, event: string, data: any): void {
     this.io.to(`guild:${guildId}`).emit(event, data);
   }
@@ -313,15 +319,11 @@ export class WebSocketServer {
     }
   }
 
-  /**
-   * Get connected users count
-   */
   public getStats(): { connectedUsers: number; totalConnections: number } {
     let totalConnections = 0;
     this.connectedUsers.forEach((sockets) => {
       totalConnections += sockets.size;
     });
-
     return {
       connectedUsers: this.connectedUsers.size,
       totalConnections,
@@ -329,7 +331,8 @@ export class WebSocketServer {
   }
 
   /**
-   * Cleanup
+   * Graceful shutdown
+   * FIX: fermeture du httpServer sous-jacent ajoutée pour libérer le port wsPort
    */
   public async shutdown(): Promise<void> {
     if (this.redisSubscriber) {
@@ -337,6 +340,7 @@ export class WebSocketServer {
       await this.redisSubscriber.quit();
     }
     this.io.close();
+    await new Promise<void>((resolve) => this.httpServer.close(() => resolve()));
     logger.info('WebSocket server shutdown');
   }
 }

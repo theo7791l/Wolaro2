@@ -40,7 +40,8 @@ class WolaroBot {
     this.moduleLoader = new ModuleLoader(this.client, this.database, this.redis);
     this.commandHandler = new CommandHandler(this.client, this.database, this.redis);
     this.eventHandler = new EventHandler(this.client, this.database, this.redis);
-    this.websocket = new WebSocketServer();
+    // FIX: suppression du paramètre httpServer — WebSocketServer est désormais autonome
+    this.websocket = new WebSocketServer(this.database, this.redis);
   }
 
   async start(): Promise<void> {
@@ -64,12 +65,13 @@ class WolaroBot {
       await this.eventHandler.initialize(this.moduleLoader);
       logger.info('✓ Handlers initialized');
 
-      // Start WebSocket server
+      // Start WebSocket server (port wsPort, standalone)
       await this.websocket.start();
       logger.info('✓ WebSocket server started');
 
       // Start API server
-      await startAPI(this.database, this.redis, this.websocket);
+      // FIX: websocket retiré des arguments — il est désormais autonome
+      await startAPI(this.database, this.redis);
       logger.info('✓ API server started');
 
       // Login to Discord
@@ -96,6 +98,8 @@ class WolaroBot {
 
     this.client.on('guildDelete', async (guild) => {
       logger.info(`Left guild: ${guild.name} (${guild.id})`);
+      // TODO: appeler this.database.cleanupGuild(guild.id) pour purger
+      // les données résiduelles (guild_modules, guild_economy, etc.) si besoin
     });
 
     process.on('SIGINT', () => this.shutdown());
@@ -105,6 +109,8 @@ class WolaroBot {
   private async shutdown(): Promise<void> {
     logger.info('Shutting down gracefully...');
     this.client.destroy();
+    // FIX: arrêt du WebSocket ajouté — libère le port wsPort lors du shutdown
+    await this.websocket.shutdown();
     await this.database.disconnect();
     await this.redis.disconnect();
     process.exit(0);

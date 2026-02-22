@@ -209,13 +209,29 @@ export class DatabaseManager {
   // ECONOMY
   // ========================================
 
-  async getBalance(guildId: string, userId: string): Promise<number> {
-    const result = await this.query(
+  /**
+   * Ensures a guild_economy row exists for this user without modifying existing data.
+   * FIX: séparé de getBalance() pour éviter qu'une lecture effectue une écriture silencieuse.
+   */
+  async getOrCreateEconomyProfile(guildId: string, userId: string): Promise<void> {
+    await this.query(
       `INSERT INTO guild_economy (guild_id, user_id, balance)
        VALUES ($1, $2, 0)
-       ON CONFLICT (guild_id, user_id)
-       DO UPDATE SET updated_at = CURRENT_TIMESTAMP
-       RETURNING balance`,
+       ON CONFLICT (guild_id, user_id) DO NOTHING`,
+      [guildId, userId]
+    );
+  }
+
+  /**
+   * Returns the balance for a user, creating their profile if it doesn't exist.
+   * FIX: refactorisé pour séparer la création du profil (getOrCreateEconomyProfile)
+   * de la lecture pure. L'ancienne version faisait un UPDATE SET updated_at à chaque
+   * lecture, ce qui était trompeur et générait des écritures inutiles.
+   */
+  async getBalance(guildId: string, userId: string): Promise<number> {
+    await this.getOrCreateEconomyProfile(guildId, userId);
+    const result = await this.query(
+      `SELECT balance FROM guild_economy WHERE guild_id = $1 AND user_id = $2`,
       [guildId, userId]
     );
     return result[0]?.balance || 0;
