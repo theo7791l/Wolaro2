@@ -7,6 +7,7 @@ import { BlacklistCommand } from './commands/blacklist';
 import { StatsCommand } from './commands/stats';
 import { ReloadCommand } from './commands/reload';
 import { EvalCommand } from './commands/eval';
+import { UpdateCommand } from './commands/update';
 
 export default class AdminModule implements IModule {
   name = 'admin';
@@ -22,6 +23,7 @@ export default class AdminModule implements IModule {
     new StatsCommand(),
     new ReloadCommand(),
     new EvalCommand(),
+    new UpdateCommand(),
   ];
 
   events = [];
