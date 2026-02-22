@@ -32,7 +32,6 @@ class WolaroBot {
       partials: [Partials.Message, Partials.Channel, Partials.Reaction],
       shards: 'auto',
     });
-
     this.database = new DatabaseManager();
     this.redis = new RedisManager();
     this.moduleLoader = new ModuleLoader(this.client, this.database, this.redis);
@@ -70,8 +69,8 @@ class WolaroBot {
       await startAPI(this.database, this.redis, this.websocket);
       logger.info('✓ API server started');
 
-      // Login to Discord
-      await this.client.login(config.discord.token);
+      // Login to Discord (fix: config.token, not config.discord.token)
+      await this.client.login(config.token);
       logger.info('✓ Bot logged in successfully');
 
       this.setupEventListeners();
