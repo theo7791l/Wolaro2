@@ -70,8 +70,8 @@ class WolaroBot {
       logger.info('✓ WebSocket server started');
 
       // Start API server
-      // FIX: websocket retiré des arguments — il est désormais autonome
-      await startAPI(this.database, this.redis);
+      // FIX: this.client transmis à startAPI — requis pour app.locals.client dans les routes /api/discord
+      await startAPI(this.client, this.database, this.redis);
       logger.info('✓ API server started');
 
       // Login to Discord
@@ -98,8 +98,9 @@ class WolaroBot {
 
     this.client.on('guildDelete', async (guild) => {
       logger.info(`Left guild: ${guild.name} (${guild.id})`);
-      // TODO: appeler this.database.cleanupGuild(guild.id) pour purger
-      // les données résiduelles (guild_modules, guild_economy, etc.) si besoin
+      // FIX: appel de cleanupGuild() pour purger toutes les données résiduelles
+      // (guild_modules, guild_economy, moderation_cases, rpg_profiles, tickets, etc.)
+      await this.database.cleanupGuild(guild.id);
     });
 
     process.on('SIGINT', () => this.shutdown());

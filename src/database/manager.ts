@@ -97,6 +97,52 @@ export class DatabaseManager {
     }
   }
 
+  /**
+   * FIX: implémentation de cleanupGuild() — appelée sur l'événement guildDelete.
+   * Purge toutes les données résiduelles d'un serveur en deux passes :
+   *   1. Tables sans FK CASCADE vers guilds (suppression explicite requise)
+   *   2. Suppression de la ligne guilds (cascade vers guild_members, guild_modules,
+   *      guild_settings, guild_economy via ON DELETE CASCADE défini dans le schéma)
+   */
+  async cleanupGuild(guildId: string): Promise<void> {
+    const client = await this.getClient();
+    try {
+      await client.query('BEGIN');
+
+      // Tables sans FK CASCADE — suppression explicite dans l'ordre correct
+      // (giveaway_participants est supprimé automatiquement via FK CASCADE sur giveaways)
+      const orphanTables = [
+        'moderation_cases',
+        'rpg_profiles',
+        'tickets',
+        'giveaways',
+        'leveling_profiles',
+        'guild_analytics',
+        'custom_commands',
+      ];
+
+      for (const table of orphanTables) {
+        await client.query(`DELETE FROM ${table} WHERE guild_id = $1`, [guildId]);
+      }
+
+      // audit_logs : guild_id nullable, sans FK — nettoyage explicite
+      await client.query('DELETE FROM audit_logs WHERE guild_id = $1', [guildId]);
+
+      // Suppression de la guild (cascade automatique vers guild_members,
+      // guild_modules, guild_settings, guild_economy)
+      await client.query('DELETE FROM guilds WHERE guild_id = $1', [guildId]);
+
+      await client.query('COMMIT');
+      logger.info(`Guild ${guildId} data cleaned up successfully`);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error(`Failed to clean up guild ${guildId}:`, error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async getGuildConfig(guildId: string): Promise<any> {
     const result = await this.query(
       `SELECT g.*, json_agg(json_build_object(

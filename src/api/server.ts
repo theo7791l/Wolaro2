@@ -5,7 +5,8 @@ import { DatabaseManager } from '../database/manager';
 import { RedisManager } from '../cache/redis';
 import { PubSubManager } from '../cache/pubsub';
 import { Client } from 'discord.js';
-import config from '../config';
+// FIX: import nommé { config } — l'ancien 'import config from' causait config=undefined au runtime
+import { config } from '../config';
 import { logger } from '../utils/logger';
 
 // Routes

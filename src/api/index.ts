@@ -4,6 +4,7 @@
  * Delegates to APIServer (server.ts) which contains the full implementation
  */
 import { Application } from 'express';
+import { Client } from 'discord.js';
 import { DatabaseManager } from '../database/manager';
 import { RedisManager } from '../cache/redis';
 import { PubSubManager } from '../cache/pubsub';
@@ -14,10 +15,12 @@ export { APIServer } from './server';
 
 /**
  * Start the API server
- * FIX: suppression du paramètre 'websocket' (inutilisé et jamais transmis à APIServer).
- * Le serveur WebSocket est désormais autonome et démarré séparément dans src/index.ts.
+ * FIX: ajout du paramètre 'client: Client' — transmis à APIServer pour les routes /api/discord.
+ * Sans lui, app.locals.client était null, causant des TypeError sur toutes les routes
+ * qui tentaient d'accéder au client Discord (guilds, channels, members...).
  */
 export async function startAPI(
+  client: Client,
   database: DatabaseManager,
   redis: RedisManager
 ): Promise<Application> {
@@ -29,7 +32,7 @@ export async function startAPI(
     // Logged internally in PubSubManager — no crash
   });
 
-  const server = new APIServer(null as any, database, redis, pubsub);
+  const server = new APIServer(client, database, redis, pubsub);
   server.start();
 
   return server.getApp();
