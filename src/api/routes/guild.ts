@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware, guildAccessMiddleware, AuthRequest } from '../middleware/auth';
+import { standardRateLimiter } from '../middleware/rateLimiter';
 import { DatabaseManager } from '../../database/manager';
 import { RedisManager } from '../../cache/redis';
 import { WebSocketServer } from '../../websocket/server';
@@ -11,10 +12,10 @@ export const guildRouter = Router();
  * Get user's guilds
  * GET /api/guilds
  */
-guildRouter.get('/', authMiddleware, async (req: AuthRequest, res) => {
+guildRouter.get('/', standardRateLimiter, authMiddleware, async (req: AuthRequest, res) => {
   try {
     const database: DatabaseManager = req.app.locals.database;
-    
+
     const guilds = await database.query(
       'SELECT * FROM guilds WHERE owner_id = $1',
       [req.user!.id]
@@ -31,7 +32,7 @@ guildRouter.get('/', authMiddleware, async (req: AuthRequest, res) => {
  * Get guild configuration
  * GET /api/guilds/:guildId
  */
-guildRouter.get('/:guildId', authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
+guildRouter.get('/:guildId', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
   try {
     const { guildId } = req.params;
     const database: DatabaseManager = req.app.locals.database;
@@ -39,7 +40,6 @@ guildRouter.get('/:guildId', authMiddleware, guildAccessMiddleware, async (req: 
 
     // Check cache first
     let config = await redis.getGuildConfig(guildId);
-    
     if (!config) {
       config = await database.getGuildConfig(guildId);
       if (config) {
@@ -62,7 +62,7 @@ guildRouter.get('/:guildId', authMiddleware, guildAccessMiddleware, async (req: 
  * Update guild settings
  * PATCH /api/guilds/:guildId/settings
  */
-guildRouter.patch('/:guildId/settings', authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
+guildRouter.patch('/:guildId/settings', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
   try {
     const { guildId } = req.params;
     const { category, key, value } = req.body;
@@ -98,7 +98,6 @@ guildRouter.patch('/:guildId/settings', authMiddleware, guildAccessMiddleware, a
     });
 
     logger.info(`Settings updated for guild ${guildId} by ${req.user!.username}`);
-
     res.json({ success: true });
   } catch (error) {
     logger.error('Error updating guild settings:', error);
@@ -110,7 +109,7 @@ guildRouter.patch('/:guildId/settings', authMiddleware, guildAccessMiddleware, a
  * Get guild analytics
  * GET /api/guilds/:guildId/analytics
  */
-guildRouter.get('/:guildId/analytics', authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
+guildRouter.get('/:guildId/analytics', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
   try {
     const { guildId } = req.params;
     const { startDate, endDate, metricType } = req.query;
@@ -128,12 +127,10 @@ guildRouter.get('/:guildId/analytics', authMiddleware, guildAccessMiddleware, as
       query += ` AND date >= $${params.length + 1}`;
       params.push(startDate);
     }
-
     if (endDate) {
       query += ` AND date <= $${params.length + 1}`;
       params.push(endDate);
     }
-
     if (metricType) {
       query += ` AND metric_type = $${params.length + 1}`;
       params.push(metricType);
@@ -142,7 +139,6 @@ guildRouter.get('/:guildId/analytics', authMiddleware, guildAccessMiddleware, as
     query += ' ORDER BY recorded_at DESC LIMIT 1000';
 
     const analytics = await database.query(query, params);
-
     res.json({ analytics });
   } catch (error) {
     logger.error('Error fetching guild analytics:', error);
