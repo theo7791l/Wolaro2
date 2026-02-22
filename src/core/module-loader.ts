@@ -39,7 +39,7 @@ export class ModuleLoader {
   async loadModule(moduleName: string): Promise<void> {
     try {
       const modulePath = join(__dirname, '..', 'modules', moduleName);
-      const moduleIndex = require(modulePath);
+            const moduleIndex = await import(modulePath);
 
       if (!moduleIndex.default) {
         throw new Error(`Module ${moduleName} does not export default`);
