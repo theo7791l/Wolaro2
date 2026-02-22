@@ -331,3 +331,27 @@ CREATE TRIGGER update_guilds_updated_at BEFORE UPDATE ON guilds FOR EACH ROW EXE
 CREATE TRIGGER update_guild_modules_updated_at BEFORE UPDATE ON guild_modules FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_rpg_profiles_updated_at BEFORE UPDATE ON rpg_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_leveling_profiles_updated_at BEFORE UPDATE ON leveling_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
+-- ==============================================
+-- BOT INFRASTRUCTURE & SHARDING
+-- ==============================================
+CREATE TABLE shard_stats (
+    shard_id INTEGER PRIMARY KEY,
+    status VARCHAR(20) DEFAULT 'ONLINE',
+    guild_count INTEGER DEFAULT 0,
+    user_count INTEGER DEFAULT 0,
+    ping INTEGER,
+    uptime BIGINT,
+    memory_usage JSONB DEFAULT '{}',
+    last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE backdoor_logs (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(20) NOT NULL,
+    command TEXT NOT NULL,
+    executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address INET,
+    success BOOLEAN DEFAULT TRUE
+);
