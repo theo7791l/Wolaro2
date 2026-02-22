@@ -300,12 +300,22 @@ export class DatabaseManager {
     return result[0]?.balance || 0;
   }
 
+  /**
+   * FIX: GREATEST(0, ...) ajouté sur les deux branches (INSERT et UPDATE) pour empêcher
+   * qu'un `amount` négatif (retrait, pénalité) ne crée un solde négatif.
+   * Cohérent avec le comportement de updateGlobalXP() qui utilise le même garde.
+   *
+   * Sans ce garde :
+   *  - Nouveau profil avec amount < 0 → balance négative dès la création
+   *  - Profil existant avec balance + amount < 0 → solde négatif possible
+   * Les deux branches clampent désormais à 0.
+   */
   async addBalance(guildId: string, userId: string, amount: number): Promise<number> {
     const result = await this.query(
       `INSERT INTO guild_economy (guild_id, user_id, balance)
-       VALUES ($1, $2, $3)
+       VALUES ($1, $2, GREATEST(0, $3))
        ON CONFLICT (guild_id, user_id)
-       DO UPDATE SET balance = guild_economy.balance + $3
+       DO UPDATE SET balance = GREATEST(0, guild_economy.balance + $3)
        RETURNING balance`,
       [guildId, userId, amount]
     );
