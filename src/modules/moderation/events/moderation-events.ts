@@ -1,5 +1,5 @@
 import { IEvent } from '../../../types';
-import { Message, GuildMember } from 'discord.js';
+import { Message } from 'discord.js';
 import { SecurityManager } from '../../../utils/security';
 import { logger } from '../../../utils/logger';
 
