@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { DatabaseManager } from '../../database/manager';
 import { Client, ChannelType } from 'discord.js';
-import { authMiddleware } from '../middlewares/auth';
-import { rateLimitMiddleware } from '../middlewares/ratelimit';
+import { authMiddleware } from '../middleware/auth';
+import { standardRateLimiter } from '../middleware/rateLimiter';
 import { logger } from '../../utils/logger';
 
 const router = Router();
@@ -13,19 +13,20 @@ const router = Router();
  * Returns names instead of IDs for panel display
  */
 
+// Apply standard rate limiting
+router.use(standardRateLimiter);
+
 // Get guild channels with names
-router.get('/guilds/:guildId/channels', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/channels', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
-    const client: Client = (req as any).client;
+    const userId = (req as any).user.id;
+    const database: DatabaseManager = req.app.locals.database;
+    const client: Client = req.app.locals.client;
 
     // Verify user has access
     const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
       [guildId, userId]
@@ -53,17 +54,16 @@ router.get('/guilds/:guildId/channels', authMiddleware, rateLimitMiddleware, asy
 
     // Format channels by type
     const formattedChannels = {
-      text: [],
-      voice: [],
-      category: [],
-      announcement: [],
-      forum: [],
-      stage: [],
-    } as any;
+      text: [] as any[],
+      voice: [] as any[],
+      category: [] as any[],
+      announcement: [] as any[],
+      forum: [] as any[],
+      stage: [] as any[],
+    };
 
     channels.forEach((channel) => {
       if (!channel) return;
-
       const channelData = {
         id: channel.id,
         name: channel.name,
@@ -96,7 +96,7 @@ router.get('/guilds/:guildId/channels', authMiddleware, rateLimitMiddleware, asy
 
     // Sort by position
     Object.keys(formattedChannels).forEach((type) => {
-      formattedChannels[type].sort((a: any, b: any) => a.position - b.position);
+      (formattedChannels as any)[type].sort((a: any, b: any) => a.position - b.position);
     });
 
     res.json({
@@ -114,18 +114,16 @@ router.get('/guilds/:guildId/channels', authMiddleware, rateLimitMiddleware, asy
 });
 
 // Get guild roles with names
-router.get('/guilds/:guildId/roles', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/roles', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
-    const client: Client = (req as any).client;
+    const userId = (req as any).user.id;
+    const database: DatabaseManager = req.app.locals.database;
+    const client: Client = req.app.locals.client;
 
     // Verify user has access
     const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
       [guildId, userId]
@@ -181,20 +179,18 @@ router.get('/guilds/:guildId/roles', authMiddleware, rateLimitMiddleware, async 
   }
 });
 
-// Get guild members (with pagination)
-router.get('/guilds/:guildId/members', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
+// Get guild members (with search)
+router.get('/guilds/:guildId/members', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
-    const client: Client = (req as any).client;
+    const userId = (req as any).user.id;
+    const database: DatabaseManager = req.app.locals.database;
+    const client: Client = req.app.locals.client;
     const { limit = 100, search } = req.query;
 
     // Verify user has access
     const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
       [guildId, userId]
@@ -218,20 +214,15 @@ router.get('/guilds/:guildId/members', authMiddleware, rateLimitMiddleware, asyn
     }
 
     // Fetch members
-    const members = await guild.members.fetch({ limit: parseInt(limit as string) });
+    const members = await guild.members.fetch({ limit: Math.min(parseInt(limit as string) || 100, 1000) });
 
     // Format members
     let formattedMembers = members.map((member) => ({
       id: member.id,
       username: member.user.username,
-      discriminator: member.user.discriminator,
       displayName: member.displayName,
       avatar: member.user.displayAvatarURL(),
-      roles: member.roles.cache.map((r) => ({
-        id: r.id,
-        name: r.name,
-        color: r.hexColor,
-      })),
+      roles: member.roles.cache.map((r) => ({ id: r.id, name: r.name, color: r.hexColor })),
       joinedAt: member.joinedAt?.toISOString(),
       bot: member.user.bot,
     }));
@@ -240,9 +231,7 @@ router.get('/guilds/:guildId/members', authMiddleware, rateLimitMiddleware, asyn
     if (search) {
       const searchLower = (search as string).toLowerCase();
       formattedMembers = formattedMembers.filter(
-        (m) =>
-          m.username.toLowerCase().includes(searchLower) ||
-          m.displayName.toLowerCase().includes(searchLower)
+        (m) => m.username.toLowerCase().includes(searchLower) || m.displayName.toLowerCase().includes(searchLower)
       );
     }
 
@@ -257,131 +246,6 @@ router.get('/guilds/:guildId/members', authMiddleware, rateLimitMiddleware, asyn
     res.status(500).json({
       success: false,
       error: 'Failed to fetch members',
-    });
-  }
-});
-
-// Get guild emojis
-router.get('/guilds/:guildId/emojis', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { guildId } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
-    const client: Client = (req as any).client;
-
-    // Verify user has access
-    const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
-       UNION
-       SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
-    );
-
-    if (hasAccess.length === 0) {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied',
-      });
-    }
-
-    // Fetch guild from Discord
-    const guild = await client.guilds.fetch(guildId).catch(() => null);
-
-    if (!guild) {
-      return res.status(404).json({
-        success: false,
-        error: 'Bot is not in this guild',
-      });
-    }
-
-    // Fetch emojis
-    const emojis = await guild.emojis.fetch();
-
-    // Format emojis
-    const formattedEmojis = emojis.map((emoji) => ({
-      id: emoji.id,
-      name: emoji.name,
-      url: emoji.url,
-      animated: emoji.animated || false,
-      available: emoji.available,
-    }));
-
-    res.json({
-      success: true,
-      data: formattedEmojis,
-      total: emojis.size,
-    });
-  } catch (error: any) {
-    logger.error('Error fetching emojis:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch emojis',
-    });
-  }
-});
-
-// Get guild info (general data)
-router.get('/guilds/:guildId/info', authMiddleware, rateLimitMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { guildId } = req.params;
-    const userId = (req as any).user.userId;
-    const database: DatabaseManager = (req as any).database;
-    const client: Client = (req as any).client;
-
-    // Verify user has access
-    const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members 
-       WHERE guild_id = $1 AND user_id = $2 
-       AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
-       UNION
-       SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
-    );
-
-    if (hasAccess.length === 0) {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied',
-      });
-    }
-
-    // Fetch guild from Discord
-    const guild = await client.guilds.fetch(guildId).catch(() => null);
-
-    if (!guild) {
-      return res.status(404).json({
-        success: false,
-        error: 'Bot is not in this guild',
-      });
-    }
-
-    // Get guild info
-    const guildInfo = {
-      id: guild.id,
-      name: guild.name,
-      icon: guild.iconURL({ size: 256 }),
-      banner: guild.bannerURL({ size: 1024 }),
-      description: guild.description,
-      memberCount: guild.memberCount,
-      ownerId: guild.ownerId,
-      premiumTier: guild.premiumTier,
-      premiumSubscriptionCount: guild.premiumSubscriptionCount,
-      verificationLevel: guild.verificationLevel,
-      features: guild.features,
-      createdAt: guild.createdAt.toISOString(),
-    };
-
-    res.json({
-      success: true,
-      data: guildInfo,
-    });
-  } catch (error: any) {
-    logger.error('Error fetching guild info:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch guild info',
     });
   }
 });
