@@ -7,8 +7,9 @@ const config: BotConfig = {
   token: process.env.DISCORD_TOKEN || '',
   clientId: process.env.DISCORD_CLIENT_ID || '',
   clientSecret: process.env.DISCORD_CLIENT_SECRET || '',
-  // FIX: ajout de redirectUri manquant (utilisé par OAuth2)
   redirectUri: process.env.DISCORD_REDIRECT_URI || 'https://wolaro.fr/api/auth/callback',
+  // FIX: ajout de publicKey requis pour vérification des signatures Discord (SecurityManager.verifySignature)
+  publicKey: process.env.DISCORD_PUBLIC_KEY || '',
 
   // IDs des Master Admins (séparés par des virgules dans .env)
   masterAdmins: process.env.MASTER_ADMIN_IDS?.split(',').map((id) => id.trim()) || [],
@@ -85,6 +86,11 @@ if (!config.clientId) {
   throw new Error('DISCORD_CLIENT_ID est requis dans le fichier .env');
 }
 
+// FIX: validation ajoutée pour DISCORD_PUBLIC_KEY
+if (!config.publicKey) {
+  throw new Error('DISCORD_PUBLIC_KEY est requis dans le fichier .env');
+}
+
 if (!config.database.password) {
   console.warn('[Wolaro] Avertissement : DB_PASSWORD non défini');
 }
@@ -101,5 +107,5 @@ if (config.features.aiEnabled && !config.geminiApiKey) {
   console.warn('[Wolaro] Avertissement : GEMINI_API_KEY non défini mais module AI activé');
 }
 
-export default config;
+// FIX: suppression du double export (export default + export { config }) — gardé uniquement le named export
 export { config };

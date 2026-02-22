@@ -40,7 +40,15 @@ if (cluster.isPrimary) {
     process.exit(0);
   });
 } else {
-  // Worker process - start the bot
-  require('./index');
-  logger.info(`Worker ${process.pid} started`);
+  // FIX: require() synchrone remplacé par import() dynamique async.
+  // require('./index') retournait immédiatement avant que bot.start() (async) soit terminé,
+  // ce qui loggait "Worker started" avant l'initialisation réelle du bot.
+  import('./index')
+    .then(() => {
+      logger.info(`Worker ${process.pid} started`);
+    })
+    .catch((error) => {
+      logger.error(`Worker ${process.pid} failed to start:`, error);
+      process.exit(1);
+    });
 }

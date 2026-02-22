@@ -30,7 +30,10 @@ class WolaroBot {
         GatewayIntentBits.GuildMessageReactions,
       ],
       partials: [Partials.Message, Partials.Channel, Partials.Reaction],
-      shards: 'auto',
+      // FIX: shards:'auto' uniquement hors mode cluster.
+      // En mode cluster, chaque worker Node.js gère un seul processus bot ;
+      // activer shards:'auto' en parallèle créerait des conflits de sharding Discord.
+      ...(config.cluster.enabled ? {} : { shards: 'auto' }),
     });
     this.database = new DatabaseManager();
     this.redis = new RedisManager();
