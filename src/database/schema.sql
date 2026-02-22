@@ -1,5 +1,6 @@
 -- Wolaro Database Schema
 -- PostgreSQL 15+ Required
+-- ==============================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -26,7 +27,7 @@ CREATE INDEX idx_guilds_owner ON guilds(owner_id);
 CREATE INDEX idx_guilds_plan ON guilds(plan_type);
 CREATE INDEX idx_guilds_blacklist ON guilds(is_blacklisted) WHERE is_blacklisted = TRUE;
 
--- Guild members (for panel permissions)
+-- Guild members (for panel permissions & sync)
 CREATE TABLE guild_members (
     id SERIAL PRIMARY KEY,
     guild_id VARCHAR(20) REFERENCES guilds(guild_id) ON DELETE CASCADE,
@@ -55,7 +56,6 @@ CREATE TABLE guild_modules (
 
 CREATE INDEX idx_guild_modules_guild ON guild_modules(guild_id);
 CREATE INDEX idx_guild_modules_enabled ON guild_modules(guild_id, enabled);
-CREATE INDEX idx_guild_modules_config ON guild_modules USING GIN (config);
 
 -- Guild settings (per-server customization)
 CREATE TABLE guild_settings (
@@ -69,10 +69,6 @@ CREATE TABLE guild_settings (
     UNIQUE(guild_id, category, key)
 );
 
-CREATE INDEX idx_guild_settings_guild ON guild_settings(guild_id);
-CREATE INDEX idx_guild_settings_category ON guild_settings(guild_id, category);
-CREATE INDEX idx_guild_settings_value ON guild_settings USING GIN (value);
-
 -- Panel sessions (for wolaro.fr/panel)
 CREATE TABLE panel_sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -85,10 +81,6 @@ CREATE TABLE panel_sessions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_panel_sessions_user ON panel_sessions(user_id);
-CREATE INDEX idx_panel_sessions_token ON panel_sessions(session_token);
-CREATE INDEX idx_panel_sessions_expires ON panel_sessions(expires_at);
 
 -- ==============================================
 -- GLOBAL USER PROFILES (CROSS-SERVER)
@@ -108,10 +100,6 @@ CREATE TABLE global_profiles (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_global_profiles_xp ON global_profiles(global_xp DESC);
-CREATE INDEX idx_global_profiles_level ON global_profiles(global_level DESC);
-CREATE INDEX idx_global_profiles_badges ON global_profiles USING GIN (badges);
 
 -- ==============================================
 -- MASTER ADMIN SYSTEM
@@ -134,9 +122,6 @@ CREATE TABLE master_admins (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_master_admins_user ON master_admins(user_id);
-CREATE INDEX idx_master_admins_level ON master_admins(access_level);
-
 -- ==============================================
 -- SECURITY & AUDIT LOGS
 -- ==============================================
@@ -155,12 +140,6 @@ CREATE TABLE audit_logs (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_audit_logs_guild ON audit_logs(guild_id, timestamp DESC);
-CREATE INDEX idx_audit_logs_user ON audit_logs(user_id, timestamp DESC);
-CREATE INDEX idx_audit_logs_action ON audit_logs(action_type);
-CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
-
--- Rate limiting tracking
 CREATE TABLE rate_limits (
     id SERIAL PRIMARY KEY,
     identifier VARCHAR(100) NOT NULL,
@@ -173,11 +152,8 @@ CREATE TABLE rate_limits (
     UNIQUE(identifier, limit_type)
 );
 
-CREATE INDEX idx_rate_limits_identifier ON rate_limits(identifier, limit_type);
-CREATE INDEX idx_rate_limits_blocked ON rate_limits(is_blocked, blocked_until) WHERE is_blocked = TRUE;
-
 -- ==============================================
--- ECONOMY SYSTEM (MULTI-LEVEL)
+-- ECONOMY SYSTEM
 -- ==============================================
 
 CREATE TABLE guild_economy (
@@ -194,11 +170,6 @@ CREATE TABLE guild_economy (
     UNIQUE(guild_id, user_id)
 );
 
-CREATE INDEX idx_guild_economy_guild ON guild_economy(guild_id);
-CREATE INDEX idx_guild_economy_balance ON guild_economy(guild_id, balance DESC);
-CREATE INDEX idx_guild_economy_user ON guild_economy(user_id);
-
--- Global economy (cross-server)
 CREATE TABLE global_economy (
     user_id VARCHAR(20) PRIMARY KEY REFERENCES global_profiles(user_id) ON DELETE CASCADE,
     global_coins BIGINT DEFAULT 0,
@@ -208,8 +179,6 @@ CREATE TABLE global_economy (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_global_economy_coins ON global_economy(global_coins DESC);
 
 -- ==============================================
 -- MODERATION MODULE
@@ -230,28 +199,6 @@ CREATE TABLE moderation_cases (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(guild_id, case_number)
 );
-
-CREATE INDEX idx_moderation_cases_guild ON moderation_cases(guild_id, case_number DESC);
-CREATE INDEX idx_moderation_cases_user ON moderation_cases(guild_id, user_id);
-CREATE INDEX idx_moderation_cases_active ON moderation_cases(guild_id, is_active) WHERE is_active = TRUE;
-
--- Anti-raid detection
-CREATE TABLE raid_events (
-    id SERIAL PRIMARY KEY,
-    guild_id VARCHAR(20) NOT NULL,
-    event_type VARCHAR(50) NOT NULL,
-    severity VARCHAR(20) DEFAULT 'LOW' CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
-    join_count INTEGER DEFAULT 0,
-    message_count INTEGER DEFAULT 0,
-    user_ids JSONB DEFAULT '[]',
-    auto_actions JSONB DEFAULT '[]',
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ended_at TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE
-);
-
-CREATE INDEX idx_raid_events_guild ON raid_events(guild_id, started_at DESC);
-CREATE INDEX idx_raid_events_active ON raid_events(guild_id, is_active) WHERE is_active = TRUE;
 
 -- ==============================================
 -- RPG MODULE
@@ -279,10 +226,6 @@ CREATE TABLE rpg_profiles (
     UNIQUE(guild_id, user_id)
 );
 
-CREATE INDEX idx_rpg_profiles_guild ON rpg_profiles(guild_id);
-CREATE INDEX idx_rpg_profiles_level ON rpg_profiles(guild_id, level DESC);
-CREATE INDEX idx_rpg_profiles_user ON rpg_profiles(user_id);
-
 -- ==============================================
 -- TICKETS MODULE
 -- ==============================================
@@ -305,11 +248,6 @@ CREATE TABLE tickets (
     UNIQUE(guild_id, ticket_number)
 );
 
-CREATE INDEX idx_tickets_guild ON tickets(guild_id, ticket_number DESC);
-CREATE INDEX idx_tickets_user ON tickets(user_id);
-CREATE INDEX idx_tickets_status ON tickets(guild_id, status);
-CREATE INDEX idx_tickets_channel ON tickets(channel_id);
-
 -- ==============================================
 -- GIVEAWAYS MODULE
 -- ==============================================
@@ -328,10 +266,6 @@ CREATE TABLE giveaways (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_giveaways_guild ON giveaways(guild_id);
-CREATE INDEX idx_giveaways_status ON giveaways(status, end_time);
-CREATE INDEX idx_giveaways_message ON giveaways(message_id);
-
 CREATE TABLE giveaway_participants (
     id SERIAL PRIMARY KEY,
     giveaway_id UUID REFERENCES giveaways(id) ON DELETE CASCADE,
@@ -340,10 +274,6 @@ CREATE TABLE giveaway_participants (
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(giveaway_id, user_id)
 );
-
-CREATE INDEX idx_giveaway_participants_giveaway ON giveaway_participants(giveaway_id);
-CREATE INDEX idx_giveaway_participants_user ON giveaway_participants(user_id);
-CREATE INDEX idx_giveaway_participants_winner ON giveaway_participants(giveaway_id, is_winner) WHERE is_winner = TRUE;
 
 -- ==============================================
 -- LEVELING MODULE
@@ -362,57 +292,8 @@ CREATE TABLE leveling_profiles (
     UNIQUE(guild_id, user_id)
 );
 
-CREATE INDEX idx_leveling_profiles_guild ON leveling_profiles(guild_id);
-CREATE INDEX idx_leveling_profiles_level ON leveling_profiles(guild_id, level DESC, xp DESC);
-CREATE INDEX idx_leveling_profiles_user ON leveling_profiles(user_id);
-
 -- ==============================================
--- CUSTOM COMMANDS & TEMPLATES
--- ==============================================
-
-CREATE TABLE custom_commands (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    guild_id VARCHAR(20) NOT NULL,
-    command_name VARCHAR(32) NOT NULL,
-    description TEXT,
-    trigger_type VARCHAR(20) DEFAULT 'SLASH' CHECK (trigger_type IN ('SLASH', 'PREFIX', 'CONTEXT_MENU')),
-    response_type VARCHAR(20) DEFAULT 'EMBED' CHECK (response_type IN ('TEXT', 'EMBED', 'BUTTON', 'MODAL')),
-    response_content JSONB NOT NULL,
-    permissions JSONB DEFAULT '[]',
-    cooldown INTEGER DEFAULT 0,
-    usage_count BIGINT DEFAULT 0,
-    is_enabled BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(guild_id, command_name)
-);
-
-CREATE INDEX idx_custom_commands_guild ON custom_commands(guild_id);
-CREATE INDEX idx_custom_commands_enabled ON custom_commands(guild_id, is_enabled);
-
--- Template store
-CREATE TABLE server_templates (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    creator_id VARCHAR(20) NOT NULL,
-    category VARCHAR(50),
-    config_snapshot JSONB NOT NULL,
-    modules_included JSONB DEFAULT '[]',
-    download_count INTEGER DEFAULT 0,
-    rating DECIMAL(3,2) DEFAULT 0.00,
-    is_public BOOLEAN DEFAULT FALSE,
-    is_featured BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_server_templates_public ON server_templates(is_public, download_count DESC);
-CREATE INDEX idx_server_templates_category ON server_templates(category);
-CREATE INDEX idx_server_templates_rating ON server_templates(rating DESC);
-
--- ==============================================
--- ANALYTICS & BUSINESS INTELLIGENCE
+-- ANALYTICS & MISC
 -- ==============================================
 
 CREATE TABLE guild_analytics (
@@ -425,49 +306,28 @@ CREATE TABLE guild_analytics (
     date DATE DEFAULT CURRENT_DATE
 );
 
-CREATE INDEX idx_guild_analytics_guild ON guild_analytics(guild_id, date DESC);
-CREATE INDEX idx_guild_analytics_metric ON guild_analytics(guild_id, metric_type, date DESC);
+CREATE TABLE custom_commands (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    guild_id VARCHAR(20) NOT NULL,
+    command_name VARCHAR(32) NOT NULL,
+    response_content JSONB NOT NULL,
+    is_enabled BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(guild_id, command_name)
+);
 
 -- ==============================================
--- TRIGGERS FOR AUTO-UPDATE
+-- TRIGGERS & FUNCTIONS
 -- ==============================================
 
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION update_updated_at_column() RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_guilds_updated_at BEFORE UPDATE ON guilds
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_guild_modules_updated_at BEFORE UPDATE ON guild_modules
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_guild_settings_updated_at BEFORE UPDATE ON guild_settings
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_global_profiles_updated_at BEFORE UPDATE ON global_profiles
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_master_admins_updated_at BEFORE UPDATE ON master_admins
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_rpg_profiles_updated_at BEFORE UPDATE ON rpg_profiles
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_leveling_profiles_updated_at BEFORE UPDATE ON leveling_profiles
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- ==============================================
--- CLEANUP OLD SESSIONS (run periodically)
--- ==============================================
-
-CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
-RETURNS void AS $$
-BEGIN
-    DELETE FROM panel_sessions WHERE expires_at < NOW();
-END;
-$$ LANGUAGE plpgsql;
+CREATE TRIGGER update_guilds_updated_at BEFORE UPDATE ON guilds FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_guild_modules_updated_at BEFORE UPDATE ON guild_modules FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_rpg_profiles_updated_at BEFORE UPDATE ON rpg_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_leveling_profiles_updated_at BEFORE UPDATE ON leveling_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
