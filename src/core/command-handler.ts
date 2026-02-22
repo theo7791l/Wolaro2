@@ -39,12 +39,13 @@ export class CommandHandler {
       const commands = this.moduleLoader.getAllCommands();
       const commandData = commands.map((cmd) => cmd.data.toJSON());
 
-      const rest = new REST({ version: '10' }).setToken(config.discord.token);
+      // FIX: utiliser config.token et config.clientId (pas config.discord.*)
+      const rest = new REST({ version: '10' }).setToken(config.token);
 
       logger.info(`Started refreshing ${commandData.length} application (/) commands.`);
 
       // Register globally
-      await rest.put(Routes.applicationCommands(config.discord.clientId), {
+      await rest.put(Routes.applicationCommands(config.clientId), {
         body: commandData,
       });
 
@@ -109,7 +110,6 @@ export class CommandHandler {
       if (command.cooldown && guildId) {
         const cooldownKey = `${guildId}:${user.id}:${commandName}`;
         const hasCooldown = await this.redis.hasCooldown(cooldownKey);
-        
         if (hasCooldown && !SecurityManager.isMaster(user.id)) {
           const remaining = await this.redis.getCooldownTTL(cooldownKey);
           await interaction.reply({
@@ -118,7 +118,6 @@ export class CommandHandler {
           });
           return;
         }
-
         // Set cooldown
         await this.redis.setCooldown(cooldownKey, command.cooldown);
       }
@@ -126,8 +125,7 @@ export class CommandHandler {
       // Rate limiting
       if (guildId) {
         const rateLimitKey = SecurityManager.getRateLimitKey('user', user.id);
-        const { allowed, remaining } = await this.redis.checkRateLimit(rateLimitKey, 10, 60);
-        
+        const { allowed } = await this.redis.checkRateLimit(rateLimitKey, 10, 60);
         if (!allowed && !SecurityManager.isMaster(user.id)) {
           await interaction.reply({
             content: '⚠️ Vous envoyez trop de commandes. Ralentissez !',
@@ -155,9 +153,7 @@ export class CommandHandler {
       logger.info(`Command ${commandName} executed by ${user.tag} in guild ${guildId}`);
     } catch (error) {
       logger.error(`Error executing command ${commandName}:`, error);
-      
       const errorMessage = '❌ Une erreur est survenue lors de l\'exécution de la commande.';
-      
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp({ content: errorMessage, ephemeral: true });
       } else {
