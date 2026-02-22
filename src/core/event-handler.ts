@@ -25,10 +25,10 @@ export class EventHandler {
     this.client.on('guildMemberAdd', async (member) => {
       try {
         const { isSpike, joinCount } = AntiRaidManager.trackJoin(member.guild.id);
-        
+
         if (isSpike) {
           logger.warn(`Raid detected in guild ${member.guild.id}: ${joinCount} joins`);
-          
+
           // Log raid event
           await this.database.query(
             `INSERT INTO raid_events (guild_id, event_type, severity, join_count, user_ids, is_active)
@@ -39,7 +39,7 @@ export class EventHandler {
           // Check if auto-lockdown is enabled
           const config = await this.database.getGuildConfig(member.guild.id);
           const moderationModule = config?.modules?.find((m: any) => m.module_name === 'moderation');
-          
+
           if (moderationModule?.config?.autoLockdown) {
             // Auto-lockdown logic would go here
             logger.info(`Auto-lockdown triggered for guild ${member.guild.id}`);
@@ -65,11 +65,11 @@ export class EventHandler {
 
         if (isSpam) {
           logger.warn(`Spam detected from ${message.author.tag} in guild ${message.guild.id}`);
-          
+
           // Auto-timeout if configured
           const config = await this.database.getGuildConfig(message.guild.id);
           const moderationModule = config?.modules?.find((m: any) => m.module_name === 'moderation');
-          
+
           if (moderationModule?.config?.autoTimeout) {
             try {
               await message.member?.timeout(60000, 'Auto-modération: Spam détecté');
@@ -87,18 +87,27 @@ export class EventHandler {
       }
     });
 
+    // FIX: ajout de try/catch manquant sur guildCreate et guildDelete
     // Guild Create
     this.client.on('guildCreate', async (guild) => {
-      logger.info(`Bot joined guild: ${guild.name} (${guild.id})`);
-      await this.database.initializeGuild(guild.id, guild.ownerId);
-      await this.executeModuleEvents('guildCreate', guild);
+      try {
+        logger.info(`Bot joined guild: ${guild.name} (${guild.id})`);
+        await this.database.initializeGuild(guild.id, guild.ownerId);
+        await this.executeModuleEvents('guildCreate', guild);
+      } catch (error) {
+        logger.error(`Error in guildCreate event for guild ${guild.id}:`, error);
+      }
     });
 
     // Guild Delete
     this.client.on('guildDelete', async (guild) => {
-      logger.info(`Bot left guild: ${guild.name} (${guild.id})`);
-      await this.redis.invalidateGuildConfig(guild.id);
-      await this.executeModuleEvents('guildDelete', guild);
+      try {
+        logger.info(`Bot left guild: ${guild.name} (${guild.id})`);
+        await this.redis.invalidateGuildConfig(guild.id);
+        await this.executeModuleEvents('guildDelete', guild);
+      } catch (error) {
+        logger.error(`Error in guildDelete event for guild ${guild.id}:`, error);
+      }
     });
 
     // Interaction Create (for buttons, select menus, modals)
@@ -111,13 +120,13 @@ export class EventHandler {
 
   private async executeModuleEvents(eventName: string, ...args: any[]): Promise<void> {
     const events = this.moduleLoader.getEvents(eventName);
-    
+
     for (const event of events) {
       try {
         // Check if module is enabled for this guild (if applicable)
         const firstArg = args[0];
         const guildId = firstArg?.guild?.id || firstArg?.guildId;
-        
+
         if (guildId && event.module) {
           const isEnabled = await this.moduleLoader.isModuleEnabledForGuild(guildId, event.module);
           if (!isEnabled) continue;
