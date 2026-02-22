@@ -15,11 +15,8 @@ const router = Router();
  * With Redis Pub/Sub for real-time sync
  */
 
-// Use standard rate limiter for all panel routes
-router.use(standardRateLimiter);
-
 // Get user guilds with bot presence and permissions
-router.get('/guilds', authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const database: DatabaseManager = req.app.locals.database;
@@ -51,7 +48,7 @@ router.get('/guilds', authMiddleware, async (req: Request, res: Response) => {
 });
 
 // Get specific guild configuration
-router.get('/guilds/:guildId', authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -96,7 +93,7 @@ router.get('/guilds/:guildId', authMiddleware, async (req: Request, res: Respons
 });
 
 // Update guild settings
-router.patch('/guilds/:guildId', authMiddleware, async (req: Request, res: Response) => {
+router.patch('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -146,7 +143,7 @@ router.patch('/guilds/:guildId', authMiddleware, async (req: Request, res: Respo
 });
 
 // Get guild modules
-router.get('/guilds/:guildId/modules', authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/modules', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -187,7 +184,7 @@ router.get('/guilds/:guildId/modules', authMiddleware, async (req: Request, res:
 });
 
 // Toggle module
-router.patch('/guilds/:guildId/modules/:moduleName', authMiddleware, async (req: Request, res: Response) => {
+router.patch('/guilds/:guildId/modules/:moduleName', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId, moduleName } = req.params;
     const userId = (req as any).user.id;
@@ -240,7 +237,7 @@ router.patch('/guilds/:guildId/modules/:moduleName', authMiddleware, async (req:
 });
 
 // Get guild analytics
-router.get('/guilds/:guildId/analytics', authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/analytics', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -283,6 +280,130 @@ router.get('/guilds/:guildId/analytics', authMiddleware, async (req: Request, re
     res.status(500).json({
       success: false,
       error: 'Failed to fetch analytics',
+    });
+  }
+});
+
+// Get audit logs
+router.get('/guilds/:guildId/audit', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { guildId } = req.params;
+    const userId = (req as any).user.id;
+    const database: DatabaseManager = req.app.locals.database;
+    const { limit = 50, offset = 0 } = req.query;
+
+    // Verify access
+    const hasAccess = await database.query(
+      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+       UNION
+       SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
+      [guildId, userId]
+    );
+
+    if (hasAccess.length === 0) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied',
+      });
+    }
+
+    // Get audit logs
+    const logs = await database.query(
+      `SELECT * FROM audit_logs WHERE guild_id = $1 ORDER BY timestamp DESC LIMIT $2 OFFSET $3`,
+      [guildId, parseInt(limit as string) || 50, parseInt(offset as string) || 0]
+    );
+
+    const total = await database.query(
+      'SELECT COUNT(*) as count FROM audit_logs WHERE guild_id = $1',
+      [guildId]
+    );
+
+    res.json({
+      success: true,
+      data: logs,
+      pagination: {
+        total: parseInt(total[0].count),
+        limit: parseInt(limit as string) || 50,
+        offset: parseInt(offset as string) || 0,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Error fetching audit logs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch audit logs',
+    });
+  }
+});
+
+// Sync guild data from Discord
+router.post('/guilds/:guildId/sync', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { guildId } = req.params;
+    const userId = (req as any).user.id;
+    const database: DatabaseManager = req.app.locals.database;
+    const pubsub: PubSubManager = req.app.locals.pubsub;
+    const client = req.app.locals.client;
+
+    // Verify access
+    const hasAccess = await database.query(
+      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
+       UNION
+       SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
+      [guildId, userId]
+    );
+
+    if (hasAccess.length === 0) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied',
+      });
+    }
+
+    // Fetch guild from Discord
+    const guild = await client.guilds.fetch(guildId).catch(() => null);
+
+    if (!guild) {
+      return res.status(404).json({
+        success: false,
+        error: 'Bot is not in this guild',
+      });
+    }
+
+    // Update guild info
+    await database.query(
+      `UPDATE guilds SET
+        settings = jsonb_set(settings, '{name}', $1),
+        settings = jsonb_set(settings, '{icon}', $2),
+        settings = jsonb_set(settings, '{member_count}', $3),
+        updated_at = NOW()
+      WHERE guild_id = $4`,
+      [
+        JSON.stringify(guild.name),
+        JSON.stringify(guild.iconURL()),
+        guild.memberCount.toString(),
+        guildId,
+      ]
+    );
+
+    // Publish guild reload event to Redis
+    await pubsub.publishGuildReload(guildId);
+
+    res.json({
+      success: true,
+      message: 'Guild data synchronized',
+      realtime: true,
+      data: {
+        name: guild.name,
+        icon: guild.iconURL(),
+        memberCount: guild.memberCount,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Error syncing guild:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to sync guild data',
     });
   }
 });
