@@ -75,7 +75,7 @@ export class APIServer {
     this.app.locals.client = this.client;
 
     // Request logging
-    this.app.use((req: Request, res: Response, next: NextFunction) => {
+    this.app.use((req: Request, res: Response, _next: NextFunction) => {
       const start = Date.now();
       res.on('finish', () => {
         const duration = Date.now() - start;
@@ -142,7 +142,7 @@ export class APIServer {
   }
 
   private setupErrorHandling(): void {
-    this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    this.app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
       logger.error('API Error:', err);
       // Don't leak error details in production
       const isDevelopment = process.env.NODE_ENV === 'development';
