@@ -7,6 +7,8 @@ const config: BotConfig = {
   token: process.env.DISCORD_TOKEN || '',
   clientId: process.env.DISCORD_CLIENT_ID || '',
   clientSecret: process.env.DISCORD_CLIENT_SECRET || '',
+  // FIX: ajout de redirectUri manquant (utilisé par OAuth2)
+  redirectUri: process.env.DISCORD_REDIRECT_URI || 'https://wolaro.fr/api/auth/callback',
 
   // IDs des Master Admins (séparés par des virgules dans .env)
   masterAdmins: process.env.MASTER_ADMIN_IDS?.split(',').map((id) => id.trim()) || [],
