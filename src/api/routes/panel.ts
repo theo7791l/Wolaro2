@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { DatabaseManager } from '../../database/manager';
+import { PubSubManager } from '../../cache/pubsub';
 import { authMiddleware, masterAdminMiddleware } from '../middlewares/auth';
 import { rateLimitMiddleware } from '../middlewares/ratelimit';
 import jwt from 'jsonwebtoken';
@@ -11,6 +12,7 @@ const router = Router();
 /**
  * Panel API Routes for wolaro.fr/panel
  * Secure communication between web panel and bot
+ * With Redis Pub/Sub for real-time sync
  */
 
 // Get user guilds with bot presence and permissions
@@ -98,6 +100,7 @@ router.patch('/guilds/:guildId', authMiddleware, rateLimitMiddleware, async (req
     const { guildId } = req.params;
     const userId = (req as any).user.userId;
     const database: DatabaseManager = (req as any).database;
+    const pubsub: PubSubManager = (req as any).pubsub;
     const { settings } = req.body;
 
     // Verify access
@@ -123,6 +126,9 @@ router.patch('/guilds/:guildId', authMiddleware, rateLimitMiddleware, async (req
       [JSON.stringify(settings), guildId]
     );
 
+    // Publish config update event to Redis
+    await pubsub.publishConfigUpdate(guildId, settings);
+
     // Log action
     await database.query(
       `INSERT INTO audit_logs (guild_id, user_id, action_type, changes, timestamp)
@@ -133,6 +139,7 @@ router.patch('/guilds/:guildId', authMiddleware, rateLimitMiddleware, async (req
     res.json({
       success: true,
       message: 'Settings updated successfully',
+      realtime: true,
     });
   } catch (error: any) {
     logger.error('Error updating guild settings:', error);
@@ -192,6 +199,7 @@ router.patch('/guilds/:guildId/modules/:moduleName', authMiddleware, rateLimitMi
     const { guildId, moduleName } = req.params;
     const userId = (req as any).user.userId;
     const database: DatabaseManager = (req as any).database;
+    const pubsub: PubSubManager = (req as any).pubsub;
     const { enabled, config: moduleConfig } = req.body;
 
     // Verify access
@@ -236,6 +244,9 @@ router.patch('/guilds/:guildId/modules/:moduleName', authMiddleware, rateLimitMi
       updateValues
     );
 
+    // Publish module toggle event to Redis
+    await pubsub.publishModuleToggle(guildId, moduleName, enabled, moduleConfig);
+
     // Log action
     await database.query(
       `INSERT INTO audit_logs (guild_id, user_id, action_type, target_type, target_id, changes, timestamp)
@@ -246,6 +257,7 @@ router.patch('/guilds/:guildId/modules/:moduleName', authMiddleware, rateLimitMi
     res.json({
       success: true,
       message: 'Module updated successfully',
+      realtime: true,
     });
   } catch (error: any) {
     logger.error('Error updating module:', error);
@@ -366,6 +378,7 @@ router.post('/guilds/:guildId/sync', authMiddleware, rateLimitMiddleware, async 
     const { guildId } = req.params;
     const userId = (req as any).user.userId;
     const database: DatabaseManager = (req as any).database;
+    const pubsub: PubSubManager = (req as any).pubsub;
     const client = (req as any).client;
 
     // Verify access
@@ -411,9 +424,13 @@ router.post('/guilds/:guildId/sync', authMiddleware, rateLimitMiddleware, async 
       ]
     );
 
+    // Publish guild reload event to Redis
+    await pubsub.publishGuildReload(guildId);
+
     res.json({
       success: true,
       message: 'Guild data synchronized',
+      realtime: true,
       data: {
         name: guild.name,
         icon: guild.iconURL(),

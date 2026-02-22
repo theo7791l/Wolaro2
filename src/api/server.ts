@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { DatabaseManager } from '../database/manager';
 import { RedisManager } from '../cache/redis';
+import { PubSubManager } from '../cache/pubsub';
 import { Client } from 'discord.js';
 import config from '../config';
 import { logger } from '../utils/logger';
@@ -11,6 +12,7 @@ import { logger } from '../utils/logger';
 import authRoutes from './routes/auth';
 import guildRoutes from './routes/guilds';
 import panelRoutes from './routes/panel';
+import discordRoutes from './routes/discord';
 import adminRoutes from './routes/admin';
 import analyticsRoutes from './routes/analytics';
 
@@ -18,13 +20,15 @@ export class APIServer {
   private app: Application;
   private database: DatabaseManager;
   private redis: RedisManager;
+  private pubsub: PubSubManager;
   private client: Client;
 
-  constructor(client: Client, database: DatabaseManager, redis: RedisManager) {
+  constructor(client: Client, database: DatabaseManager, redis: RedisManager, pubsub: PubSubManager) {
     this.app = express();
     this.client = client;
     this.database = database;
     this.redis = redis;
+    this.pubsub = pubsub;
 
     this.setupMiddlewares();
     this.setupRoutes();
@@ -66,6 +70,7 @@ export class APIServer {
     this.app.use((req: Request, res: Response, next: NextFunction) => {
       (req as any).database = this.database;
       (req as any).redis = this.redis;
+      (req as any).pubsub = this.pubsub;
       (req as any).client = this.client;
       next();
     });
@@ -90,13 +95,15 @@ export class APIServer {
         timestamp: new Date().toISOString(),
         version: '1.0.0',
         uptime: process.uptime(),
+        pubsub: 'active',
       });
     });
 
     // API Routes
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/guilds', guildRoutes);
-    this.app.use('/api/panel', panelRoutes); // Panel routes for wolaro.fr/panel
+    this.app.use('/api/panel', panelRoutes);
+    this.app.use('/api/discord', discordRoutes); // Discord data enrichment
     this.app.use('/api/admin', adminRoutes);
     this.app.use('/api/analytics', analyticsRoutes);
 
@@ -107,10 +114,16 @@ export class APIServer {
         version: '1.0.0',
         documentation: 'https://wolaro.fr/docs',
         panel: 'https://wolaro.fr/panel',
+        features: {
+          realtime: true,
+          pubsub: true,
+          discord_enrichment: true,
+        },
         endpoints: {
           auth: '/api/auth',
           guilds: '/api/guilds',
           panel: '/api/panel',
+          discord: '/api/discord',
           admin: '/api/admin',
           analytics: '/api/analytics',
         },
@@ -148,8 +161,10 @@ export class APIServer {
 
     this.app.listen(port, () => {
       logger.info(`API Server started on port ${port}`);
-      logger.info(`Panel API available at: http://localhost:${port}/api/panel`);
-      logger.info(`Production URL: https://wolaro.fr/api/panel`);
+      logger.info(`Panel API: http://localhost:${port}/api/panel`);
+      logger.info(`Discord API: http://localhost:${port}/api/discord`);
+      logger.info(`Production URL: https://wolaro.fr`);
+      logger.info(`Redis Pub/Sub: ACTIVE`);
     });
   }
 
