@@ -63,22 +63,25 @@ export class SecurityManager {
   }
 
   /**
-   * Verify Discord interaction signature
+   * Verify Discord interaction signature (ed25519)
+   * FIX: utiliser DISCORD_PUBLIC_KEY depuis l'env (pas config.discord.clientSecret qui n'existe pas)
+   * La clé publique Discord (ed25519) est disponible dans le portail Discord Developer
    */
   static verifySignature(signature: string, timestamp: string, body: string): boolean {
     try {
-      const publicKey = config.discord.clientSecret;
-      const message = timestamp + body;
-      const isValid = crypto.verify(
-        'sha256',
-        Buffer.from(message),
-        {
-          key: publicKey,
-          padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-        },
-        Buffer.from(signature, 'hex')
+      const publicKey = process.env.DISCORD_PUBLIC_KEY;
+      if (!publicKey) {
+        return false;
+      }
+      const message = Buffer.from(timestamp + body);
+      const sig = Buffer.from(signature, 'hex');
+      const key = Buffer.from(publicKey, 'hex');
+      return crypto.verify(
+        null,
+        message,
+        { key, format: 'der', type: 'spki', dsaEncoding: 'ieee-p1363' } as any,
+        sig
       );
-      return isValid;
     } catch {
       return false;
     }
