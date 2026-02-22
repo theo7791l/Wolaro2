@@ -1,6 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
-import { GiveawayManager } from '../utils/manager';
 
 export class RerollCommand implements ICommand {
   data = new SlashCommandBuilder()
