@@ -5,17 +5,18 @@ import { config } from '../config';
  * Master Admin Security Module
  * Provides god-mode access control for super administrators
  */
-
 export class SecurityManager {
   /**
    * Check if a user is a Master Admin
+   * Uses config.masterAdmins (top-level array of Discord user IDs)
    */
   static isMaster(userId: string): boolean {
-    return config.security.masterAdminIds.includes(userId);
+    return config.masterAdmins.includes(userId);
   }
 
   /**
    * Check if IP is whitelisted for admin access
+   * Falls back to allow-all if whitelist is empty
    */
   static isIPWhitelisted(ip: string): boolean {
     if (config.security.ipWhitelist.length === 0) return true;
@@ -62,7 +63,7 @@ export class SecurityManager {
   }
 
   /**
-   * Validate webhook signature (for Discord interactions)
+   * Verify Discord interaction signature
    */
   static verifySignature(signature: string, timestamp: string, body: string): boolean {
     try {
@@ -88,12 +89,11 @@ export class SecurityManager {
    */
   static detectSuspiciousPattern(text: string): boolean {
     const suspiciousPatterns = [
-      /discord\.gg\/[a-zA-Z0-9]+/gi, // Discord invite links
-      /(http|https):\/\/[^\s]+/gi, // URLs
-      /@everyone|@here/gi, // Mass mentions
-      /[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe20-\ufe2f]/g, // Zalgo text
+      /discord\.gg\/[a-zA-Z0-9]+/gi,
+      /(http|https):\/\/[^\s]+/gi,
+      /@everyone|@here/gi,
+      /[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe20-\ufe2f]/g,
     ];
-
     return suspiciousPatterns.some((pattern) => pattern.test(text));
   }
 
@@ -154,11 +154,9 @@ export class AntiRaidManager {
     const joins = this.joinSpikes.get(guildId)!;
     joins.push(now);
 
-    // Remove old entries
     const recentJoins = joins.filter((time) => now - time < windowMs);
     this.joinSpikes.set(guildId, recentJoins);
 
-    // Detect spike (more than 10 joins in 10 seconds)
     return {
       isSpike: recentJoins.length > 10,
       joinCount: recentJoins.length,
@@ -190,7 +188,6 @@ export class AntiRaidManager {
       }
     }
 
-    // Detect spam (more than 5 messages in 5 seconds)
     return {
       isSpam: count > 5,
       count,
