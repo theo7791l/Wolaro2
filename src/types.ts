@@ -247,6 +247,8 @@ export interface BotConfig {
   token: string;
   clientId: string;
   clientSecret: string;
+  // FIX: ajout de redirectUri manquant pour OAuth2
+  redirectUri: string;
   masterAdmins: string[];
   geminiApiKey: string;
   database: DatabaseConfig;
