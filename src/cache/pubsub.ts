@@ -5,9 +5,9 @@ import { logger } from '../utils/logger';
 
 /**
  * Redis Pub/Sub System
- * Real-time synchronization between Panel and Bot
+ * Real-time synchronization between Panel, API, and Bot
  * 
- * When panel updates config → publishes message → bot receives → reloads cache
+ * Flow: Bot/Panel → Redis Publish → API subscribes → WebSocket → Panel UI
  */
 
 export class PubSubManager {
@@ -23,6 +23,13 @@ export class PubSubManager {
   }
 
   /**
+   * Get Redis instance (for external access)
+   */
+  public getRedis(): RedisManager {
+    return this.redis;
+  }
+
+  /**
    * Initialize Pub/Sub listener (Bot side)
    */
   async initialize(): Promise<void> {
@@ -35,10 +42,13 @@ export class PubSubManager {
       await this.subscriber.subscribe('config:update', this.handleConfigUpdate.bind(this));
       await this.subscriber.subscribe('module:toggle', this.handleModuleToggle.bind(this));
       await this.subscriber.subscribe('guild:reload', this.handleGuildReload.bind(this));
+      await this.subscriber.subscribe('permission:revoked', this.handlePermissionRevoked.bind(this));
+      await this.subscriber.subscribe('command:executed', this.handleCommandExecuted.bind(this));
 
       logger.info('Redis Pub/Sub initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize Pub/Sub:', error);
+      logger.warn('Bot will continue without real-time sync');
     }
   }
 
@@ -104,7 +114,7 @@ export class PubSubManager {
       logger.info(`Full reload requested for guild ${guildId}`);
 
       // Clear all caches for this guild
-      const keys = await this.redis.getClient().keys(`guild:*:${guildId}*`);
+      const keys = await this.redis.getClient().keys(`*:${guildId}*`);
       if (keys.length > 0) {
         await Promise.all(keys.map((key) => this.redis.delete(key)));
       }
@@ -120,7 +130,37 @@ export class PubSubManager {
   }
 
   /**
-   * Publish config update (Panel side)
+   * Handle permission revoked (no action needed on bot side)
+   */
+  private async handlePermissionRevoked(message: string): Promise<void> {
+    try {
+      const data = JSON.parse(message);
+      logger.info(`Permission revoked event received: ${JSON.stringify(data)}`);
+      // WebSocket server handles this, bot just logs it
+    } catch (error) {
+      logger.error('Error handling permission revoked:', error);
+    }
+  }
+
+  /**
+   * Handle command executed (for audit/logging)
+   */
+  private async handleCommandExecuted(message: string): Promise<void> {
+    try {
+      const data = JSON.parse(message);
+      logger.info(`Command executed event received: ${JSON.stringify(data)}`);
+      // Can be used for real-time command logs in panel
+    } catch (error) {
+      logger.error('Error handling command executed:', error);
+    }
+  }
+
+  /**
+   * PUBLISH METHODS (Panel/Bot side)
+   */
+
+  /**
+   * Publish config update (Panel/Bot side)
    */
   async publishConfigUpdate(guildId: string, settings: any): Promise<void> {
     try {
@@ -135,7 +175,7 @@ export class PubSubManager {
   }
 
   /**
-   * Publish module toggle (Panel side)
+   * Publish module toggle (Panel/Bot side)
    */
   async publishModuleToggle(guildId: string, moduleName: string, enabled: boolean, config?: any): Promise<void> {
     try {
@@ -150,7 +190,7 @@ export class PubSubManager {
   }
 
   /**
-   * Publish full guild reload (Panel side)
+   * Publish full guild reload (Panel/Bot side)
    */
   async publishGuildReload(guildId: string): Promise<void> {
     try {
@@ -161,6 +201,42 @@ export class PubSubManager {
       logger.info(`Published guild reload for ${guildId}`);
     } catch (error) {
       logger.error('Error publishing guild reload:', error);
+    }
+  }
+
+  /**
+   * Publish permission revoked (Bot side only)
+   */
+  async publishPermissionRevoked(guildId: string, userId: string, reason: string): Promise<void> {
+    try {
+      await this.redis.getClient().publish(
+        'permission:revoked',
+        JSON.stringify({ guildId, userId, reason, timestamp: Date.now() })
+      );
+      logger.warn(`Published permission revoked for user ${userId} in guild ${guildId}`);
+    } catch (error) {
+      logger.error('Error publishing permission revoked:', error);
+    }
+  }
+
+  /**
+   * Publish command executed (Bot side)
+   * Used for real-time command logs in panel
+   */
+  async publishCommandExecuted(
+    guildId: string,
+    command: string,
+    executor: string,
+    result: 'success' | 'error'
+  ): Promise<void> {
+    try {
+      await this.redis.getClient().publish(
+        'command:executed',
+        JSON.stringify({ guildId, command, executor, result, timestamp: Date.now() })
+      );
+      logger.info(`Published command executed: ${command} by ${executor} in guild ${guildId}`);
+    } catch (error) {
+      logger.error('Error publishing command executed:', error);
     }
   }
 
