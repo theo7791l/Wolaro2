@@ -2,7 +2,6 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   EmbedBuilder,
-  PermissionFlagsBits,
 } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 import { exec } from 'child_process';
@@ -26,7 +25,7 @@ export class UpdateCommand implements ICommand {
   ownerOnly = true;
   cooldown = 30;
 
-  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
+  async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
     // Double check master admin
     if (!config.masterAdmins.includes(interaction.user.id)) {
       const embed = new EmbedBuilder()
