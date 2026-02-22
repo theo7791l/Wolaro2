@@ -7,10 +7,12 @@ export class RedisManager {
   private isConnected = false;
 
   constructor() {
-    this.client = createClient({
-      url: config.redis.url,
-      password: config.redis.password,
-    });
+    // Construction de l'URL depuis host + port (pas de champ .url dans config)
+    const redisUrl = config.redis.password
+      ? `redis://:${config.redis.password}@${config.redis.host}:${config.redis.port}/${config.redis.db}`
+      : `redis://${config.redis.host}:${config.redis.port}/${config.redis.db}`;
+
+    this.client = createClient({ url: redisUrl }) as RedisClientType;
 
     this.client.on('error', (err) => {
       logger.error('Redis error:', err);
@@ -37,6 +39,13 @@ export class RedisManager {
       await this.client.quit();
       this.isConnected = false;
     }
+  }
+
+  /**
+   * Expose le client natif Redis (pour Pub/Sub duplicate, keys scan, etc.)
+   */
+  public getClient(): RedisClientType {
+    return this.client;
   }
 
   // ========================================
@@ -74,6 +83,11 @@ export class RedisManager {
     }
   }
 
+  /** Alias de del() pour compatibilité */
+  async delete(key: string): Promise<void> {
+    return this.del(key);
+  }
+
   async exists(key: string): Promise<boolean> {
     try {
       const result = await this.client.exists(key);
@@ -88,8 +102,8 @@ export class RedisManager {
   // GUILD CONFIG CACHE
   // ========================================
 
-  async cacheGuildConfig(guildId: string, config: any, ttl = 3600): Promise<void> {
-    await this.set(`guild:${guildId}:config`, config, ttl);
+  async cacheGuildConfig(guildId: string, guildConfig: any, ttl = 3600): Promise<void> {
+    await this.set(`guild:${guildId}:config`, guildConfig, ttl);
   }
 
   async getGuildConfig(guildId: string): Promise<any | null> {
@@ -112,15 +126,12 @@ export class RedisManager {
     const key = `ratelimit:${identifier}`;
     try {
       const current = await this.client.incr(key);
-      
       if (current === 1) {
         await this.client.expire(key, windowSeconds);
       }
-
       const ttl = await this.client.ttl(key);
       const remaining = Math.max(0, maxRequests - current);
       const resetAt = Date.now() + ttl * 1000;
-
       return {
         allowed: current <= maxRequests,
         remaining,
