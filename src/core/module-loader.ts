@@ -1,5 +1,5 @@
 import { Client } from 'discord.js';
-import { readdirSync } from 'fs';
+import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { DatabaseManager } from '../database/manager';
 import { RedisManager } from '../cache/redis';
@@ -40,7 +40,7 @@ export class ModuleLoader {
     try {
       const modulePath = join(__dirname, '..', 'modules', moduleName);
       const moduleIndex = require(modulePath);
-      
+
       if (!moduleIndex.default) {
         throw new Error(`Module ${moduleName} does not export default`);
       }
@@ -85,7 +85,7 @@ export class ModuleLoader {
 
   async reloadModule(moduleName: string): Promise<void> {
     logger.info(`Reloading module: ${moduleName}`);
-    
+
     // Remove old module data
     const oldModule = this.modules.get(moduleName);
     if (oldModule) {
@@ -95,6 +95,7 @@ export class ModuleLoader {
           this.commands.delete(command.data.name);
         }
       }
+
       // Remove events
       if (oldModule.events) {
         for (const event of oldModule.events) {
@@ -105,12 +106,23 @@ export class ModuleLoader {
           }
         }
       }
+
       this.modules.delete(moduleName);
     }
 
-    // Clear require cache
+    // Clear require cache safely (fix: guard require.resolve with existsSync)
     const modulePath = join(__dirname, '..', 'modules', moduleName);
-    delete require.cache[require.resolve(modulePath)];
+    try {
+      if (existsSync(modulePath) || existsSync(modulePath + '.js')) {
+        const resolvedPath = require.resolve(modulePath);
+        delete require.cache[resolvedPath];
+      } else {
+        throw new Error(`Module path does not exist: ${modulePath}`);
+      }
+    } catch (resolveError) {
+      logger.error(`Cannot resolve module path for ${moduleName}:`, resolveError);
+      throw resolveError;
+    }
 
     // Reload module
     await this.loadModule(moduleName);
@@ -139,15 +151,15 @@ export class ModuleLoader {
   async isModuleEnabledForGuild(guildId: string, moduleName: string): Promise<boolean> {
     // Check cache first
     const cacheKey = `module:${guildId}:${moduleName}`;
-    const cached = await this.redis.get<boolean>(cacheKey);
+    const cached = await this.redis.get(cacheKey);
     if (cached !== null) return cached;
 
     // Check database
     const enabled = await this.database.isModuleEnabled(guildId, moduleName);
-    
+
     // Cache result for 5 minutes
     await this.redis.set(cacheKey, enabled, 300);
-    
+
     return enabled;
   }
 }
