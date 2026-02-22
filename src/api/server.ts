@@ -10,7 +10,8 @@ import { logger } from '../utils/logger';
 
 // Routes
 import authRoutes from './routes/auth';
-import guildRoutes from './routes/guilds';
+import guildRoutes from './routes/guild';
+import moduleRoutes from './routes/module';
 import panelRoutes from './routes/panel';
 import discordRoutes from './routes/discord';
 import adminRoutes from './routes/admin';
@@ -66,14 +67,11 @@ export class APIServer {
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-    // Inject dependencies into requests
-    this.app.use((req: Request, res: Response, next: NextFunction) => {
-      (req as any).database = this.database;
-      (req as any).redis = this.redis;
-      (req as any).pubsub = this.pubsub;
-      (req as any).client = this.client;
-      next();
-    });
+    // Inject dependencies into app.locals (used by all route handlers)
+    this.app.locals.database = this.database;
+    this.app.locals.redis = this.redis;
+    this.app.locals.pubsub = this.pubsub;
+    this.app.locals.client = this.client;
 
     // Request logging
     this.app.use((req: Request, res: Response, next: NextFunction) => {
@@ -102,6 +100,7 @@ export class APIServer {
     // API Routes
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/guilds', guildRoutes);
+    this.app.use('/api/modules', moduleRoutes);
     this.app.use('/api/panel', panelRoutes);
     this.app.use('/api/discord', discordRoutes); // Discord data enrichment
     this.app.use('/api/admin', adminRoutes);
@@ -122,6 +121,7 @@ export class APIServer {
         endpoints: {
           auth: '/api/auth',
           guilds: '/api/guilds',
+          modules: '/api/modules',
           panel: '/api/panel',
           discord: '/api/discord',
           admin: '/api/admin',
@@ -143,10 +143,8 @@ export class APIServer {
   private setupErrorHandling(): void {
     this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
       logger.error('API Error:', err);
-
       // Don't leak error details in production
       const isDevelopment = process.env.NODE_ENV === 'development';
-
       res.status(500).json({
         success: false,
         error: 'Internal server error',
@@ -158,7 +156,6 @@ export class APIServer {
 
   public start(): void {
     const port = config.api.port;
-
     this.app.listen(port, () => {
       logger.info(`API Server started on port ${port}`);
       logger.info(`Panel API: http://localhost:${port}/api/panel`);
