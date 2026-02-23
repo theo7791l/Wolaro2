@@ -4,7 +4,7 @@ import { logger } from '../utils/logger';
 
 export class DatabaseManager {
   private pool: Pool;
-  private isConnected = false;
+public isConnected = false;
 
   constructor() {
     this.pool = new Pool({
