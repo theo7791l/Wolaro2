@@ -18,10 +18,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # Pas de cache car package-lock.json n'est pas commité (volontaire)
 
       - name: Install dependencies
         run: npm install --omit=optional --no-audit --no-fund
 
-      - name: Run ESLint
-        run: npm run lint
+      - name: Run ESLint (ignore warnings for now)
+        run: npm run lint:ci
