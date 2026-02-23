@@ -42,8 +42,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    # FIX: suppression de cache: 'npm' qui nécessite un package-lock.json absent du repo
-    # Utilisation de npm install au lieu de npm ci pour éviter l'erreur de lockfile manquant
+    # FIX: suppression de cache: 'npm' qui necessite un package-lock.json absent du repo
+    # Utilisation de npm install au lieu de npm ci pour eviter l'erreur de lockfile manquant
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
       with:
@@ -54,6 +54,9 @@ jobs:
 
     - name: Run linter
       run: npm run lint
+
+    - name: Initialize database schema
+      run: PGPASSWORD=test_password psql -h localhost -U wolaro -d wolaro_test -f src/database/schema.sql
 
     - name: Run tests
       run: npm test
@@ -77,10 +80,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: test
-
     steps:
     - uses: actions/checkout@v3
-
     # FIX: suppression de cache: 'npm' (lockfile manquant)
     - name: Use Node.js 20.x
       uses: actions/setup-node@v3
@@ -103,7 +104,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
     steps:
     - uses: actions/checkout@v3
 
