@@ -1,4 +1,6 @@
-FROM node:20-alpine
+# SECURITY UPDATE: Node.js 20.18.1 (January 2026 security release)
+# Fixes 8 CVEs including buffer memory leak, HTTP/2 DoS, and TLS vulnerabilities
+FROM node:20.18.1-alpine
 
 # Install dependencies for native modules (including canvas)
 RUN apk add --no-cache \
