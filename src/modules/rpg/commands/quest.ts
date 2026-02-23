@@ -37,7 +37,7 @@ export class QuestCommand implements ICommand {
     },
   ];
 
-  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
+    async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
     try {
       const embed = new EmbedBuilder()
         .setColor('#4A90E2')
