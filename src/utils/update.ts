@@ -1,6 +1,7 @@
 import { execSync, exec } from 'child_process';
 import { promisify } from 'util';
 import { logger } from './logger';
+import pkg from '../../package.json';
 
 const execAsync = promisify(exec);
 
@@ -42,7 +43,7 @@ export class UpdateManager {
    */
   static getVersion(): string {
     try {
-      const pkg = require('../../package.json');
+    
       return pkg.version || '1.0.0';
     } catch {
       return '1.0.0';
