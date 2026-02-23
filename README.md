@@ -4,25 +4,35 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/typescript-5.7.3-blue.svg)
-![Windows](https://img.shields.io/badge/Windows-compatible-blue.svg)
+![Status](https://img.shields.io/badge/status-production%20ready-brightgreen.svg)
 
 **Wolaro** est un bot Discord professionnel avec architecture multi-tenant, 9 modules complets, IA Gemini, système RPG, tickets de support et giveaways automatiques.
 
-## ⚠️ Correctifs Récents (23 Février 2026)
+## ⚠️ MISE À JOUR CRITIQUE - 23 Février 2026 18h30
 
-🎉 **Projet entièrement corrigé et testé !** Les erreurs d'installation npm et les bugs critiques ont été résolus.
+🎉 **TOUS LES BUGS CRITIQUES ONT ÉTÉ CORRIGÉS !**
 
-**👉 Voir le détail complet : [FIXES_APPLIED.md](FIXES_APPLIED.md)**
+### Dernières corrections (18h30)
+- ✅ Table `raid_events` ajoutée au schéma SQL
+- ✅ Bug regex dans `security.ts` corrigé
+- ✅ Variable shadowing dans WebSocket corrigée
+- ✅ Méthode `start()` WebSocket ajoutée
+- ✅ Shutdown WebSocket complet
+- ✅ Requête SQL WebSocket optimisée
 
-### Principales corrections
-- ✅ Script de build TypeScript corrigé (suppression du `|| true`)
-- ✅ Dépendances natives (`canvas`, `@discordjs/opus`) devenues optionnelles
-- ✅ Mode strict TypeScript activé pour plus de sécurité
-- ✅ 5 bugs critiques de base de données corrigés (XP négatifs, soldes négatifs, etc.)
+**👉 Voir tous les détails : [BUG_FIXES_CRITICAL.md](BUG_FIXES_CRITICAL.md)**
+
+### Corrections précédentes (16h00)
+- ✅ Script de build TypeScript corrigé
+- ✅ Dépendances natives optionnelles
+- ✅ Mode strict TypeScript activé
+- ✅ 5 bugs base de données corrigés
 - ✅ Tous les modules activés par défaut
-- ✅ Guide d'installation complet ajouté
 
-**📖 Guide d'installation : [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)**
+**📖 Documentation complète :**
+- [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md) - Guide d'installation pas à pas
+- [FIXES_APPLIED.md](FIXES_APPLIED.md) - Détail des premières corrections
+- [BUG_FIXES_CRITICAL.md](BUG_FIXES_CRITICAL.md) - Bugs critiques récents corrigés
 
 ---
 
@@ -33,13 +43,13 @@
 - **Modules dynamiques** : Hot-reload sans redémarrage
 - **Scalabilité** : Cluster mode avec auto-scaling
 - **Cache Redis** : Performance optimale (<5ms)
-- **PostgreSQL** : Base de données robuste (21 tables)
+- **PostgreSQL** : Base de données robuste (22 tables)
 - **API REST + WebSocket** : Interface complète
 
 ### 🛡️ Sécurité Militaire
 - **Master Admin System** : Contrôle total par owner
 - **Rate Limiting** : Triple couche (IP/User/Guild)
-- **Anti-Raid** : Détection automatique
+- **Anti-Raid** : Détection automatique avec logging
 - **Anti-Spam** : Protection temps réel
 - **Encryption AES-256** : Données sensibles
 - **Audit Logs** : Traçabilité complète
@@ -253,7 +263,7 @@ node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
 
 ## 📊 Base de Données
 
-### 21 Tables PostgreSQL
+### 22 Tables PostgreSQL
 
 ```
 ✓ guilds                    # Multi-tenant core
@@ -265,13 +275,14 @@ node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
 ✓ master_admins             # Super admins
 ✓ audit_logs                # Logs sécurité
 ✓ rate_limits               # Rate limiting
+✓ raid_events               # Anti-raid detection 🆕
 ✓ guild_economy             # Économie par serveur
 ✓ global_economy            # Économie globale
 ✓ moderation_cases          # Cas de modération
-✓ rpg_profiles              # Profils RPG 🆕
-✓ tickets                   # Système tickets 🆕
-✓ giveaways                 # Concours 🆕
-✓ giveaway_participants     # Participants 🆕
+✓ rpg_profiles              # Profils RPG
+✓ tickets                   # Système tickets
+✓ giveaways                 # Concours
+✓ giveaway_participants     # Participants
 ✓ leveling_profiles         # Profiles système leveling
 ✓ custom_commands           # Commandes custom
 ✓ guild_analytics           # Analytics
@@ -335,7 +346,8 @@ npm run test:coverage
 ## 📚 Documentation
 
 - **[INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)** - Guide d'installation complet avec troubleshooting 🆕
-- **[FIXES_APPLIED.md](FIXES_APPLIED.md)** - Détail de toutes les corrections appliquées 🆕
+- **[FIXES_APPLIED.md](FIXES_APPLIED.md)** - Détail des premières corrections (16h00) 🆕
+- **[BUG_FIXES_CRITICAL.md](BUG_FIXES_CRITICAL.md)** - Bugs critiques récents (18h30) 🆕
 - **[INSTALL_WINDOWS.md](INSTALL_WINDOWS.md)** - Guide installation Windows avec Docker
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Design patterns et diagrammes
 - **[MODULES.md](docs/MODULES.md)** - Guide création de modules
@@ -399,7 +411,8 @@ Ce projet est sous licence MIT - voir [LICENSE](LICENSE)
 ## 📞 Support
 
 - **Guide d'installation** : [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)
-- **Corrections appliquées** : [FIXES_APPLIED.md](FIXES_APPLIED.md)
+- **Corrections 16h00** : [FIXES_APPLIED.md](FIXES_APPLIED.md)
+- **Corrections 18h30** : [BUG_FIXES_CRITICAL.md](BUG_FIXES_CRITICAL.md)
 - **Documentation** : [docs/](docs/)
 - **Guide Windows** : [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md)
 - **Issues** : [GitHub Issues](https://github.com/theo7791l/Wolaro2/issues)
