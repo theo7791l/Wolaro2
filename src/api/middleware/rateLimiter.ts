@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { config } from '../../config';
+import config from '../../config';
 
 /**
  * In-memory rate limiter per IP (no external dep needed).
