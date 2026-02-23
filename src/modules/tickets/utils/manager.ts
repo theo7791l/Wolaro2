@@ -59,14 +59,14 @@ export class TicketManager {
   static async generateTranscript(
     channel: any,
     ticket: any,
-    context: any
+        _context: any
   ): Promise<string> {
     try {
       // Fetch all messages
       let messages: Collection<string, Message> = new Collection();
       let lastId: string | undefined;
 
-      while (true) {
+            for (;;) {
         const options: any = { limit: 100 };
         if (lastId) options.before = lastId;
 
