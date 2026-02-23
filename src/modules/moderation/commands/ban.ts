@@ -2,7 +2,7 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   PermissionFlagsBits,
-  from 'discord.js';
+}   from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 import { EmbedStyles } from '../../../utils/embeds';
 
