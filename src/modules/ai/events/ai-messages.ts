@@ -1,5 +1,5 @@
 import { IEvent } from '../../../types';
-import { Message } from 'discord.js';
+import { Message, TextChannel } from 'discord.js';
 import { GeminiClient } from '../utils/gemini';
 import { logger } from '../../../utils/logger';
 
@@ -40,9 +40,9 @@ export class AIMessageHandler implements IEvent {
         await message.delete();
 
         // Warn user
-        await message.channel.send(
+        await (message.channel as TextChannel).send(
           `⚠️ ${message.author}, votre message a été supprimé (contenu inapproprié détecté par l'IA).`
-        ).then((msg) => setTimeout(() => msg.delete(), 5000));
+        ).then((msg: Message) => setTimeout(() => msg.delete(), 5000));
 
         // Log
         await context.database.logAction(
