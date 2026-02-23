@@ -6,6 +6,7 @@ import { ProfileCommand } from './commands/profile';
 import { BattleCommand } from './commands/battle';
 import { InventoryCommand } from './commands/inventory';
 import { ShopCommand } from './commands/shop';
+import { BuyCommand } from './commands/buy';
 import { QuestCommand } from './commands/quest';
 import { DailyCommand } from './commands/daily';
 import { z } from 'zod';
@@ -43,6 +44,7 @@ export default class RPGModule implements IModule {
     new BattleCommand(),
     new InventoryCommand(),
     new ShopCommand(),
+    new BuyCommand(),
     new QuestCommand(),
     new DailyCommand(),
   ];
