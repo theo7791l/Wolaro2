@@ -9,12 +9,12 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { standardJsonValidator } from './middleware/json-depth-validator';
 
-// Routes - using named imports
+// Routes - mixed imports (named and default)
 import { authRouter } from './routes/auth';
 import { guildRouter } from './routes/guild';
 import { moduleRouter } from './routes/module';
-import { panelRouter } from './routes/panel';
-import { discordRouter } from './routes/discord';
+import panelRouter from './routes/panel';
+import discordRouter from './routes/discord';
 import { adminRouter } from './routes/admin';
 import { analyticsRouter } from './routes/analytics';
 
