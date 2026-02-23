@@ -8,9 +8,27 @@
 
 **Wolaro** est un bot Discord professionnel avec architecture multi-tenant, 9 modules complets, IA Gemini, système RPG, tickets de support et giveaways automatiques.
 
+## ⚠️ Correctifs Récents (23 Février 2026)
+
+🎉 **Projet entièrement corrigé et testé !** Les erreurs d'installation npm et les bugs critiques ont été résolus.
+
+**👉 Voir le détail complet : [FIXES_APPLIED.md](FIXES_APPLIED.md)**
+
+### Principales corrections
+- ✅ Script de build TypeScript corrigé (suppression du `|| true`)
+- ✅ Dépendances natives (`canvas`, `@discordjs/opus`) devenues optionnelles
+- ✅ Mode strict TypeScript activé pour plus de sécurité
+- ✅ 5 bugs critiques de base de données corrigés (XP négatifs, soldes négatifs, etc.)
+- ✅ Tous les modules activés par défaut
+- ✅ Guide d'installation complet ajouté
+
+**📖 Guide d'installation : [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)**
+
+---
+
 ## ✨ Fonctionnalités Principales
 
-### 🏗️ Architecture Enterprise
+### 🏭 Architecture Enterprise
 - **Multi-tenant** : Un seul bot pour des milliers de serveurs
 - **Modules dynamiques** : Hot-reload sans redémarrage
 - **Scalabilité** : Cluster mode avec auto-scaling
@@ -84,19 +102,6 @@
 - **Chat automatique** dans salons configurés (10% chance ou mention)
 - **Prompt système** personnalisable
 
-**Configuration requise** :
-```env
-GEMINI_API_KEY=your_api_key_here
-```
-
-**Utilisation** :
-```
-/ask question:"Explique-moi la théorie quantique"
-/aichat activer:true  # Dans le salon à activer
-/aiimage image:[fichier] question:"Que vois-tu?"
-/automod activer:true seuil:0.8  # 80% toxicité = suppression
-```
-
 #### 7️⃣ RPG (6 commandes) 🆕
 ```
 /rpgprofile, /battle, /rpginventory, /rpgshop, /quest, /rpgdaily
@@ -107,20 +112,6 @@ GEMINI_API_KEY=your_api_key_here
 - **Inventaire** : Armes, Armures, Potions, Accessoires
 - **Quêtes** : 3 quêtes avec récompenses
 - **Daily** : Récompense quotidienne + heal complet
-
-**Mécaniques de combat** :
-```
-Dégâts = max(1, ATK_attaquant - DEF_défenseur + random(-5, +5))
-Victoire PvE = Or + XP
-Victoire PvP = Win/Loss ratio
-```
-
-**Utilisation** :
-```
-/battle monstre:dragon  # PvE
-/battle adversaire:@User  # PvP
-/rpgdaily  # Heal + 50 or + 100 XP
-```
 
 #### 8️⃣ Tickets (5 commandes) 🆕
 ```
@@ -133,18 +124,6 @@ Victoire PvP = Win/Loss ratio
 - **Auto-close** : Inactivité configurable (24h par défaut)
 - **Max tickets** : Limite par utilisateur (3 par défaut)
 
-**Configuration** :
-```javascript
-{
-  categoryId: '123456789',  // Catégorie Discord
-  supportRoles: ['987654321'],  // Rôles staff
-  transcriptsChannel: '111222333',  // Salon logs
-  maxTicketsPerUser: 3,
-  autoCloseInactive: true,
-  inactivityTimeout: 86400  // 24h
-}
-```
-
 #### 9️⃣ Giveaways (4 commandes) 🆕
 ```
 /giveaway, /reroll, /gend, /glist
@@ -156,14 +135,15 @@ Victoire PvP = Win/Loss ratio
 - **Bouton interactif** : Participation 1-click
 - **Embed dynamique** : Mise à jour participants en temps réel
 
-**Utilisation** :
-```
-/giveaway prix:"Discord Nitro" durée:86400 gagnants:3
-/reroll message_id:123456789012345678
-/gend message_id:123456789012345678  # Fin anticipée
-```
+---
 
 ## 🚀 Installation Rapide
+
+### 📖 Guide Complet
+
+**Pour un guide d'installation détaillé avec toutes les étapes et la résolution des problèmes :**
+
+👉 **[INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)**
 
 ### Prérequis
 - Node.js 20+
@@ -172,38 +152,7 @@ Victoire PvP = Win/Loss ratio
 - Discord Bot Token
 - Gemini API Key (pour module AI)
 
-### 👨‍💻 Installation Windows
-
-**👉 Voir le guide complet : [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md)**
-
-Installation rapide avec Docker (recommandé) :
-
-```powershell
-# 1. Cloner le dépôt
-git clone https://github.com/theo7791l/Wolaro2.git
-cd Wolaro2
-
-# 2. Configuration
-copy .env.example .env
-notepad .env  # Remplissez vos tokens
-
-# 3. Démarrer avec Docker
-docker-compose up -d
-```
-
-Sans Docker (nécessite build tools) :
-
-```powershell
-# En tant qu'administrateur
-npm install --global windows-build-tools
-
-# Installation normale
-npm install
-npm run build
-npm start
-```
-
-### 🐧 Installation Linux/Mac
+### Installation Standard
 
 ```bash
 # 1. Cloner le dépôt
@@ -211,20 +160,37 @@ git clone https://github.com/theo7791l/Wolaro2.git
 cd Wolaro2
 
 # 2. Installer les dépendances
-npm install
+npm install --legacy-peer-deps
 
 # 3. Configuration
 cp .env.example .env
-nano .env
+nano .env  # Remplir toutes les variables requises
 
-# 4. Lancer les migrations
-npm run migrate
+# 4. Initialiser la base de données
+psql -U wolaro -d wolaro -f src/database/schema.sql
 
-# 5. Démarrer le bot
-npm run dev
+# 5. Compiler et démarrer
+npm run build
+npm start
 ```
 
-### 🐳 Installation Docker (Recommandé - Toutes plateformes)
+### 👨‍💻 Installation Windows
+
+**Sur Windows, il faut installer les outils de build :**
+
+```powershell
+# Exécuter en tant qu'Administrateur
+npm install --global windows-build-tools
+
+# Puis installation normale
+npm install --legacy-peer-deps
+npm run build
+npm start
+```
+
+**👉 Guide Windows complet : [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md)**
+
+### 🐳 Installation Docker (Recommandé)
 
 ```bash
 # 1. Cloner et configurer
@@ -240,158 +206,50 @@ docker-compose up -d
 docker-compose logs -f bot
 ```
 
-### Production (PM2 Cluster)
-
-```bash
-# Installation
-npm install
-npm run build
-
-# Lancer en cluster mode
-npm run pm2:start
-
-# Monitoring
-npm run pm2:monit
-
-# Logs temps réel
-npm run pm2:logs
-```
+---
 
 ## ⚙️ Configuration
 
-### Variables d'Environnement
+### Variables d'Environnement Obligatoires
 
 ```env
-# ==========================================
-# Discord
-# ==========================================
-DISCORD_TOKEN=your_token_here
-DISCORD_CLIENT_ID=your_client_id
-DISCORD_CLIENT_SECRET=your_client_secret
-DISCORD_PUBLIC_KEY=your_public_key  # Pour vérification signatures
-DISCORD_REDIRECT_URI=https://wolaro.fr/api/auth/callback  # OAuth2
+# Discord (requis)
+DISCORD_TOKEN=ton_token_discord_ici
+DISCORD_CLIENT_ID=ton_client_id_ici
+DISCORD_CLIENT_SECRET=ton_client_secret_ici
+DISCORD_PUBLIC_KEY=ta_public_key_ici  # ⚠️ OBLIGATOIRE maintenant
 
-# ==========================================
-# Database (PostgreSQL)
-# ==========================================
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=wolaro
-DB_USER=wolaro
-DB_PASSWORD=your_password
-DB_MAX_CONNECTIONS=20
+# Base de données (requis)
+DB_PASSWORD=ton_mot_de_passe_postgresql_ici
 
-# ==========================================
-# Redis
-# ==========================================
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-REDIS_DB=0
+# Sécurité (requis)
+API_JWT_SECRET=genere_une_chaine_aleatoire_de_32_caracteres_minimum
+ENCRYPTION_KEY=genere_exactement_32_caracteres_pour_AES256
 
-# ==========================================
-# API
-# ==========================================
-API_PORT=3000
-API_JWT_SECRET=your_jwt_secret_min_32_chars
-API_CORS_ORIGIN=https://wolaro.fr,http://localhost:3001
-
-# Panel Configuration
-PANEL_URL=https://wolaro.fr/panel
-PANEL_SESSION_DURATION=604800
-
-# WebSocket
-WS_PORT=3001
-WS_ENABLED=true
-
-# ==========================================
-# Master Admins
-# ==========================================
-MASTER_ADMIN_IDS=123456789012345678,987654321098765432
-
-# ==========================================
-# AI Module (Gemini)
-# ==========================================
-GEMINI_API_KEY=your_gemini_api_key
-FEATURE_AI_ENABLED=true
-
-# ==========================================
-# Feature Flags
-# ==========================================
-FEATURE_MUSIC_ENABLED=true
-FEATURE_RPG_ENABLED=true
-FEATURE_TICKETS_ENABLED=true
-FEATURE_GIVEAWAYS_ENABLED=true
-
-# ==========================================
-# Security
-# ==========================================
-ENCRYPTION_KEY=your_32_char_encryption_key
-IP_WHITELIST=127.0.0.1,::1
-RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX_REQUESTS=100
-
-# ==========================================
-# Cluster Configuration
-# ==========================================
-CLUSTER_ENABLED=false
-CLUSTER_SHARD_COUNT=auto
-
-# ==========================================
-# Logging
-# ==========================================
-LOG_LEVEL=info
-LOG_FILE_ENABLED=true
-LOG_DIR=./logs
-
-# ==========================================
-# Environment
-# ==========================================
-NODE_ENV=production
-
-# ==========================================
-# Domain & SSL
-# ==========================================
-MAIN_DOMAIN=wolaro.fr
-API_DOMAIN=api.wolaro.fr
-SSL_ENABLED=true
-SSL_CERT_PATH=/etc/letsencrypt/live/wolaro.fr/fullchain.pem
-SSL_KEY_PATH=/etc/letsencrypt/live/wolaro.fr/privkey.pem
-
-# ==========================================
-# Backup
-# ==========================================
-BACKUP_ENABLED=true
-BACKUP_SCHEDULE=0 2 * * *
-BACKUP_RETENTION_DAYS=7
-
-# ==========================================
-# External Services (Optional)
-# ==========================================
-SENTRY_DSN=
-ANALYTICS_ENABLED=false
-ANALYTICS_ID=
+# IA (optionnel mais recommandé)
+GEMINI_API_KEY=ta_cle_api_gemini_ici
 ```
 
-### Configuration des Modules
+**Comment obtenir les clés Discord :**
+1. Aller sur https://discord.com/developers/applications
+2. Créer une nouvelle application ou sélectionner une existante
+3. **Bot** > Token : `DISCORD_TOKEN`
+4. **OAuth2** > Client ID : `DISCORD_CLIENT_ID`
+5. **OAuth2** > Client Secret : `DISCORD_CLIENT_SECRET`
+6. **General Information** > Public Key : `DISCORD_PUBLIC_KEY`
 
-Chaque module peut être configuré via l'API ou la base de données :
+**Générer des clés aléatoires :**
+```bash
+# API_JWT_SECRET (32+ caractères)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
-```sql
--- Activer module AI
-INSERT INTO guild_modules (guild_id, module_name, enabled, config) 
-VALUES (
-  '123456789',
-  'ai',
-  true,
-  '{
-    "geminiApiKey": "your_key",
-    "chatEnabled": true,
-    "autoModEnabled": true,
-    "autoModThreshold": 0.8
-  }'
-);
+# ENCRYPTION_KEY (exactement 32 caractères)
+node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
 ```
+
+**👉 Voir `.env.example` pour toutes les variables disponibles**
+
+---
 
 ## 📊 Base de Données
 
@@ -421,15 +279,7 @@ VALUES (
 ✓ shard_stats               # Stats infrastructure sharding
 ```
 
-### Migrations
-
-```bash
-# Appliquer le schéma
-psql -U wolaro -d wolaro -f src/database/schema.sql
-
-# Ou via script
-bash scripts/migrate.sh
-```
+---
 
 ## 🔌 API REST
 
@@ -465,6 +315,8 @@ ws://localhost:3001
 'analytics:update'   // Metrics update
 ```
 
+---
+
 ## 🧪 Tests
 
 ```bash
@@ -478,31 +330,21 @@ npm run test:watch
 npm run test:coverage
 ```
 
-### Structure des Tests
-
-```
-tests/
-├── security.test.ts       # SecurityManager tests
-├── database.test.ts       # DatabaseManager tests
-├── commands/
-│   ├── moderation.test.ts
-│   ├── economy.test.ts
-│   └── rpg.test.ts
-└── integration/
-    └── api.test.ts
-```
+---
 
 ## 📚 Documentation
 
-- **[INSTALL_WINDOWS.md](INSTALL_WINDOWS.md)** - Guide installation Windows complet
+- **[INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)** - Guide d'installation complet avec troubleshooting 🆕
+- **[FIXES_APPLIED.md](FIXES_APPLIED.md)** - Détail de toutes les corrections appliquées 🆕
+- **[INSTALL_WINDOWS.md](INSTALL_WINDOWS.md)** - Guide installation Windows avec Docker
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Design patterns et diagrammes
 - **[MODULES.md](docs/MODULES.md)** - Guide création de modules
 - **[SECURITY.md](docs/SECURITY.md)** - Best practices sécurité
 - **[API.md](docs/API.md)** - Documentation API complète
 - **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Guide déploiement production
-- **[PANEL_INTEGRATION.md](docs/PANEL_INTEGRATION.md)** - Intégration panel web
-- **[REALTIME_SYNC.md](docs/REALTIME_SYNC.md)** - Synchronisation temps réel
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Guide contribution
+
+---
 
 ## 🎯 Roadmap
 
@@ -525,6 +367,8 @@ tests/
 - [ ] Kubernetes native
 - [ ] AI voice channels
 
+---
+
 ## 🤝 Contribution
 
 Les contributions sont les bienvenues ! Voir [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -535,9 +379,13 @@ Les contributions sont les bienvenues ! Voir [CONTRIBUTING.md](CONTRIBUTING.md)
 4. Push (`git push origin feature/amazing-feature`)
 5. Ouvrir une Pull Request
 
+---
+
 ## 📜 Licence
 
 Ce projet est sous licence MIT - voir [LICENSE](LICENSE)
+
+---
 
 ## 🙏 Remerciements
 
@@ -546,8 +394,12 @@ Ce projet est sous licence MIT - voir [LICENSE](LICENSE)
 - PostgreSQL & Redis pour la performance
 - La communauté open-source
 
+---
+
 ## 📞 Support
 
+- **Guide d'installation** : [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)
+- **Corrections appliquées** : [FIXES_APPLIED.md](FIXES_APPLIED.md)
 - **Documentation** : [docs/](docs/)
 - **Guide Windows** : [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md)
 - **Issues** : [GitHub Issues](https://github.com/theo7791l/Wolaro2/issues)
