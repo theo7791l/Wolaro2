@@ -1,8 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 import { config } from '../../config';
 import { SecurityManager } from '../../utils/security';
 import { DatabaseManager } from '../../database/manager';
+
+// Extended JWT payload interface for type safety
+interface WolaroJwtPayload extends JwtPayload {
+  userId: string;
+  username: string;
+  type: 'access' | 'refresh';
+}
 
 export interface AuthRequest extends Request {
   user?: {
@@ -20,7 +27,19 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, config.api.jwtSecret) as any;
+    // SECURITY FIX: Strict JWT validation with algorithm whitelist
+    // Prevents algorithm confusion attacks (CVE-2015-9235)
+    const decoded = jwt.verify(token, config.api.jwtSecret, {
+      algorithms: ['HS256'],      // Whitelist allowed algorithm only
+      audience: 'wolaro-api',     // Validate audience claim
+      issuer: 'wolaro-auth',      // Validate issuer claim
+      clockTolerance: 0,          // No clock tolerance
+    }) as WolaroJwtPayload;
+
+    // Validate token type (access tokens only for API routes)
+    if (decoded.type !== 'access') {
+      return res.status(401).json({ error: 'Invalid token type' });
+    }
     
     req.user = {
       id: decoded.userId,
@@ -30,7 +49,17 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
 
     next();
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
+    // Specific error handling for better security logging
+    if (error instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({ error: 'Token expired' });
+    }
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ error: 'Invalid token signature' });
+    }
+    if (error instanceof jwt.NotBeforeError) {
+      return res.status(401).json({ error: 'Token not yet valid' });
+    }
+    return res.status(401).json({ error: 'Token verification failed' });
   }
 }
 
