@@ -2,7 +2,7 @@
 # Fixes 8 CVEs including buffer memory leak, HTTP/2 DoS, and TLS vulnerabilities
 FROM node:20.18.1-alpine
 
-# Install dependencies for native modules (including canvas)
+# Install dependencies for native modules (including canvas and opus)
 RUN apk add --no-cache \
     python3 \
     make \
@@ -12,7 +12,12 @@ RUN apk add --no-cache \
     jpeg-dev \
     pango-dev \
     giflib-dev \
-    pixman-dev
+    pixman-dev \
+    libtool \
+    autoconf \
+    automake \
+    opus-dev \
+    pkgconfig
 
 # Create app directory
 WORKDIR /app
