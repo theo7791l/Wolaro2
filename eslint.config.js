@@ -81,8 +81,9 @@ module.exports = [
     ignores: [
       'node_modules/**',
       'dist/**',
-      '*.js', // Ignorer les fichiers JS (on veut seulement TypeScript)
-      '!eslint.config.js', // Sauf ce fichier de config
+      'tests/**',  // Ignorer tests/ car non inclus dans tsconfig.json
+      '*.js',
+      '!eslint.config.js',
       'scripts/**/*.sh',
       'coverage/**',
       '.git/**',
