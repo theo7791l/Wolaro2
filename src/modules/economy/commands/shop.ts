@@ -18,7 +18,7 @@ export class ShopCommand implements ICommand {
     { id: 'premium', name: '⭐ Statut Premium', price: 5000, description: 'Statut premium pendant 7 jours' },
   ];
 
-  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
+    async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
     try {
       const embed = new EmbedBuilder()
         .setColor('#3498DB')
