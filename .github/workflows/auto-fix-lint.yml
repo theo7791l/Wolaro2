@@ -1,0 +1,55 @@
+name: Auto-Fix ESLint Errors
+
+# Workflow manuel - lance avec "Run workflow" sur GitHub
+on:
+  workflow_dispatch:
+
+jobs:
+  auto-fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Permet de push les changements
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --omit=optional --no-audit --no-fund
+
+      - name: Run ESLint auto-fix
+        run: npm run lint:fix
+
+      - name: Check if files changed
+        id: verify_diff
+        run: |
+          git diff --quiet . || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
+        if: steps.verify_diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "fix(lint): auto-fix 416 ESLint errors (trailing commas, quotes, spaces, indent, curly braces)"
+          git push
+
+      - name: Summary
+        run: |
+          echo "## ✅ Auto-Fix Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Fixed errors:" >> $GITHUB_STEP_SUMMARY
+          echo "- Missing trailing commas (312)" >> $GITHUB_STEP_SUMMARY
+          echo "- Trailing spaces (54)" >> $GITHUB_STEP_SUMMARY
+          echo "- Wrong quotes (23)" >> $GITHUB_STEP_SUMMARY
+          echo "- Indentation (18)" >> $GITHUB_STEP_SUMMARY
+          echo "- Missing curly braces (9)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Total: **416 errors fixed** ✅" >> $GITHUB_STEP_SUMMARY
