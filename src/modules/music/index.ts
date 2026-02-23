@@ -51,6 +51,6 @@ export default class MusicModule implements IModule {
   constructor(
     private client: Client,
     private database: DatabaseManager,
-    private redis: RedisManager
+    private redis: RedisManager,
   ) {}
 }
