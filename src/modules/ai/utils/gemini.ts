@@ -44,14 +44,38 @@ export class GeminiClient {
       );
 
       if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        logger.error('Gemini API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+        
+        // Messages d'erreur plus clairs
+        if (response.status === 400) {
+          throw new Error('Clé API Gemini invalide ou requête mal formée. Vérifiez votre GEMINI_API_KEY dans .env');
+        } else if (response.status === 403) {
+          throw new Error('Accès refusé à l\'API Gemini. Vérifiez que votre clé API a les bonnes permissions.');
+        } else if (response.status === 429) {
+          throw new Error('Limite de requêtes atteinte. Attendez quelques minutes.');
+        } else {
+          throw new Error(`Erreur API Gemini: ${response.statusText}`);
+        }
       }
 
       const data = await response.json() as any;
+      
+      // Vérifier que la réponse contient bien le texte
+      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+        logger.error('Gemini response structure invalid:', data);
+        throw new Error('Réponse API Gemini invalide (pas de contenu)');
+      }
+      
       return data.candidates[0].content.parts[0].text;
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Gemini API error:', error);
-      throw new Error('Failed to generate text with Gemini');
+      // Propager l'erreur avec le message détaillé
+      throw error;
     }
   }
 
@@ -88,14 +112,16 @@ export class GeminiClient {
       );
 
       if (!response.ok) {
-        throw new Error(`Gemini Vision API error: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        logger.error('Gemini Vision API error:', errorData);
+        throw new Error(`Erreur API Gemini Vision: ${response.statusText}`);
       }
 
       const data = await response.json() as any;
       return data.candidates[0].content.parts[0].text;
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Gemini Vision API error:', error);
-      throw new Error('Failed to analyze image');
+      throw new Error('Impossible d\'analyser l\'image');
     }
   }
 
