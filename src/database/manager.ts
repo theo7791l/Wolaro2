@@ -297,7 +297,7 @@ public isConnected = false;
       `SELECT balance FROM guild_economy WHERE guild_id = $1 AND user_id = $2`,
       [guildId, userId]
     );
-    return result[0]?.balance || 0;
+    return Number(result[0]?.balance) || 0;
   }
 
   /**
@@ -319,6 +319,6 @@ public isConnected = false;
        RETURNING balance`,
       [guildId, userId, amount]
     );
-    return result[0].balance;
+    return Number(result[0].balance);
   }
 }
