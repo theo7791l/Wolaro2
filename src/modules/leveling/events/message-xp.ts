@@ -1,5 +1,5 @@
 import { IEvent } from '../../../types';
-import { Message, EmbedBuilder } from 'discord.js';
+import { Message, EmbedBuilder, TextChannel } from 'discord.js';
 import { logger } from '../../../utils/logger';
 
 export class MessageXPHandler implements IEvent {
@@ -89,7 +89,7 @@ export class MessageXPHandler implements IEvent {
           : message.channel;
 
         if (channel && channel.isTextBased()) {
-          await channel.send({ embeds: [embed] });
+          await (channel as TextChannel).send({ embeds: [embed] });
         }
       }
 
