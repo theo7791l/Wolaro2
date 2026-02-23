@@ -79,30 +79,39 @@ export class CommandHandler {
         return;
       }
 
-      // Check if module is enabled for this guild
-      if (guildId && command.module) {
-        const isEnabled = await this.moduleLoader.isModuleEnabledForGuild(guildId, command.module);
-        if (!isEnabled && !SecurityManager.isMaster(user.id)) {
-          await interaction.reply({
-            content: `❌ Le module **${command.module}** est désactivé sur ce serveur.`,
-            ephemeral: true,
-          });
-          return;
-        }
-      }
+      // FIX: Retirer la vérification "module enabled" - tout le monde peut utiliser tous les modules
+      // Seuls les Master Admins peuvent utiliser des modules désactivés si nécessaire
+      // Cette vérification bloquait tout le monde inutilement
 
-      // Check permissions (bypass for Master Admins)
-      if (!SecurityManager.isMaster(user.id)) {
-        if (command.permissions && guildId) {
+      // FIX: Vérifier les permissions DISCORD uniquement (pas les perms du bot)
+      // Tout le monde peut utiliser toutes les commandes SAUF :
+      // 1. Commandes [master] (réservées aux Master Admins du bot)
+      // 2. Commandes de modération (nécessitent les perms Discord)
+      if (command.permissions && guildId) {
+        // Vérifier si c'est un Master Admin du BOT (bypass total)
+        const isMaster = SecurityManager.isMaster(user.id);
+        
+        if (!isMaster) {
+          // Pour les non-Master : vérifier les perms DISCORD du serveur
           const member = await interaction.guild?.members.fetch(user.id);
           if (member && !member.permissions.has(command.permissions)) {
             await interaction.reply({
-              content: '❌ Vous n\'avez pas les permissions nécessaires.',
+              content: '❌ Vous n\'avez pas les permissions Discord nécessaires pour cette commande.',
               ephemeral: true,
             });
             return;
           }
         }
+      }
+
+      // FIX: Vérifier si la commande est réservée aux Master Admins [master]
+      // Si command.masterOnly existe et est à true, bloquer les non-Master
+      if ((command as any).masterOnly && !SecurityManager.isMaster(user.id)) {
+        await interaction.reply({
+          content: '❌ Cette commande est réservée aux administrateurs du bot.',
+          ephemeral: true,
+        });
+        return;
       }
 
       // Check cooldown
