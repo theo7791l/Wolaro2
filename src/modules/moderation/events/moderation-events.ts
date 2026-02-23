@@ -1,5 +1,5 @@
 import { IEvent } from '../../../types';
-import { Message } from 'discord.js';
+import { Message, TextChannel } from 'discord.js';
 import { SecurityManager } from '../../../utils/security';
 import { logger } from '../../../utils/logger';
 
@@ -25,9 +25,9 @@ export class ModerationEventHandler implements IEvent {
         if (moderationModule.config.autoTimeout) {
           try {
             await message.delete();
-            await message.channel.send(
+            await (message.channel as TextChannel).send(
               `⚠️ ${message.author}, votre message a été supprimé automatiquement (contenu suspect détecté).`
-            ).then((msg) => setTimeout(() => msg.delete(), 5000));
+            ).then((msg: Message) => setTimeout(() => msg.delete(), 5000));
 
             // Log the action
             await context.database.logAction(
