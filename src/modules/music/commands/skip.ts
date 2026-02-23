@@ -5,7 +5,7 @@ import { MusicQueue } from '../utils/queue';
 export class SkipCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('skip')
-    .setDescription('Passer à la musique suivante') as SlashCommandBuilder;
+    .setDescription('Passer \u00e0 la musique suivante') as SlashCommandBuilder;
 
   module = 'music';
   guildOnly = true;
@@ -17,7 +17,7 @@ export class SkipCommand implements ICommand {
 
     if (!voiceChannel) {
       await interaction.reply({
-        content: '❌ Vous devez être dans un salon vocal.',
+        content: '\u274c Vous devez \u00eatre dans un salon vocal.',
         ephemeral: true,
       });
       return;
@@ -27,7 +27,7 @@ export class SkipCommand implements ICommand {
 
     if (!queue || !queue.isPlaying()) {
       await interaction.reply({
-        content: '❌ Aucune musique en cours.',
+        content: '\u274c Aucune musique en cours.',
         ephemeral: true,
       });
       return;
@@ -37,9 +37,9 @@ export class SkipCommand implements ICommand {
     const skipped = queue.skip();
 
     if (skipped) {
-      await interaction.reply(`⏭️ **${currentTrack?.title || 'Musique'}** passée !`);
+      await interaction.reply(`\u23ed\ufe0f **${currentTrack?.title || 'Musique'}** pass\u00e9e !`);
     } else {
-      await interaction.reply('⏹️ Queue terminée.');
+      await interaction.reply('\u23f9\ufe0f Queue termin\u00e9e.');
     }
   }
 }
