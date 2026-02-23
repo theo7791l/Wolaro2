@@ -1,3 +1,4 @@
+import { validateEnvironmentOrExit, displayEnvironmentSummary } from './utils/validateEnv';
 import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import { config } from './config';
 import { logger } from './utils/logger';
@@ -8,6 +9,10 @@ import { CommandHandler } from './core/command-handler';
 import { EventHandler } from './core/event-handler';
 import { WebSocketServer } from './websocket/server';
 import { startAPI } from './api';
+
+// Validate environment variables before starting
+validateEnvironmentOrExit();
+displayEnvironmentSummary();
 
 class WolaroBot {
   public client: Client;
