@@ -35,9 +35,6 @@ class WolaroBot {
         GatewayIntentBits.GuildMessageReactions,
       ],
       partials: [Partials.Message, Partials.Channel, Partials.Reaction],
-      // FIX: shards:'auto' uniquement hors mode cluster.
-      // En mode cluster, chaque worker Node.js gère un seul processus bot ;
-      // activer shards:'auto' en parallèle créerait des conflits de sharding Discord.
       ...(config.cluster.enabled ? {} : { shards: 'auto' }),
     });
     this.database = new DatabaseManager();
@@ -45,7 +42,6 @@ class WolaroBot {
     this.moduleLoader = new ModuleLoader(this.client, this.database, this.redis);
     this.commandHandler = new CommandHandler(this.client, this.database, this.redis);
     this.eventHandler = new EventHandler(this.client, this.database, this.redis);
-    // FIX: suppression du paramètre httpServer — WebSocketServer est désormais autonome
     this.websocket = new WebSocketServer(this.database, this.redis);
   }
 
@@ -53,33 +49,25 @@ class WolaroBot {
     try {
       logger.info('Starting Wolaro Discord Cloud Engine...');
 
-      // Initialize database
       await this.database.connect();
       logger.info('✓ Database connected');
 
-      // Initialize Redis
       await this.redis.connect();
       logger.info('✓ Redis connected');
 
-      // Load all modules
       await this.moduleLoader.loadAll();
       logger.info('✓ Modules loaded');
 
-      // Initialize handlers
       await this.commandHandler.initialize(this.moduleLoader);
       await this.eventHandler.initialize(this.moduleLoader);
       logger.info('✓ Handlers initialized');
 
-      // Start WebSocket server (port wsPort, standalone)
       await this.websocket.start();
       logger.info('✓ WebSocket server started');
 
-      // Start API server
-      // FIX: this.client transmis à startAPI — requis pour app.locals.client dans les routes /api/discord
       await startAPI(this.client, this.database, this.redis);
       logger.info('✓ API server started');
 
-      // Login to Discord
       await this.client.login(config.token);
       logger.info('✓ Bot logged in successfully');
 
@@ -91,20 +79,42 @@ class WolaroBot {
   }
 
   private setupEventListeners(): void {
-    this.client.on('ready', () => {
-      logger.info(`Logged in as ${this.client.user?.tag}`);
+    // FIX CRITIQUE : synchronisation de TOUTES les guildes existantes au démarrage.
+    // Le event guildCreate ne se déclenche QUE pour les nouvelles guildes.
+    // Quand le bot redémarre, les guildes déjà présentes n'ont pas de ligne dans
+    // la table `guilds`, ce qui cause une FK constraint error sur TOUTES les commandes
+    // (guild_economy, guild_modules etc référencent guilds.guild_id).
+    // Sans cette sync, seuls les Master Admins (commandes sans accès guild_economy)
+    // pouvaient utiliser les commandes. Les utilisateurs normaux voyaient
+    // "❌ Une erreur est survenue" sur chaque commande.
+    this.client.on('ready', async () => {
+      logger.info(`Logged in as ${this.client.user?.username}`);
       logger.info(`Serving ${this.client.guilds.cache.size} guilds`);
+
+      logger.info('Syncing existing guilds to database...');
+      let syncCount = 0;
+      let errorCount = 0;
+
+      for (const [, guild] of this.client.guilds.cache) {
+        try {
+          await this.database.initializeGuild(guild.id, guild.ownerId);
+          syncCount++;
+        } catch (error) {
+          errorCount++;
+          logger.error(`Failed to sync guild ${guild.id} (${guild.name}):`, error);
+        }
+      }
+
+      logger.info(`✓ Guild sync complete: ${syncCount} guilds synced, ${errorCount} errors`);
     });
 
-    this.client.on('guildCreate', async (guild) => {
-      logger.info(`Joined new guild: ${guild.name} (${guild.id})`);
-      await this.database.initializeGuild(guild.id, guild.ownerId);
-    });
+    // NOTE: guildCreate est déjà géré dans event-handler.ts (registerCoreEvents)
+    // qui appelle initializeGuild() + executeModuleEvents('guildCreate').
+    // Pas besoin de le dupliquer ici.
 
+    // guildDelete : nettoyage des données de la guilde
     this.client.on('guildDelete', async (guild) => {
       logger.info(`Left guild: ${guild.name} (${guild.id})`);
-      // FIX: appel de cleanupGuild() pour purger toutes les données résiduelles
-      // (guild_modules, guild_economy, moderation_cases, rpg_profiles, tickets, etc.)
       await this.database.cleanupGuild(guild.id);
     });
 
@@ -115,7 +125,6 @@ class WolaroBot {
   private async shutdown(): Promise<void> {
     logger.info('Shutting down gracefully...');
     this.client.destroy();
-    // FIX: arrêt du WebSocket ajouté — libère le port wsPort lors du shutdown
     await this.websocket.shutdown();
     await this.database.disconnect();
     await this.redis.disconnect();
@@ -123,7 +132,6 @@ class WolaroBot {
   }
 }
 
-// Start the bot
 const bot = new WolaroBot();
 bot.start().catch((error) => {
   logger.error('Fatal error:', error);

@@ -4,7 +4,7 @@ import {
   ChatInputCommandInteraction,
   REST,
   Routes,
-  } from 'discord.js';
+} from 'discord.js';
 import { DatabaseManager } from '../database/manager';
 import { RedisManager } from '../cache/redis';
 import { ModuleLoader } from './module-loader';
@@ -23,13 +23,8 @@ export class CommandHandler {
 
   async initialize(moduleLoader: ModuleLoader): Promise<void> {
     this.moduleLoader = moduleLoader;
-
-    // Register slash commands
     await this.registerSlashCommands();
-
-    // Listen for interactions
     this.client.on('interactionCreate', (interaction) => this.handleInteraction(interaction));
-
     logger.info('Command handler initialized');
   }
 
@@ -37,17 +32,9 @@ export class CommandHandler {
     try {
       const commands = this.moduleLoader.getAllCommands();
       const commandData = commands.map((cmd) => cmd.data.toJSON());
-
-      // FIX: utiliser config.token et config.clientId (pas config.discord.*)
       const rest = new REST({ version: '10' }).setToken(config.token);
-
       logger.info(`Started refreshing ${commandData.length} application (/) commands.`);
-
-      // Register globally
-      await rest.put(Routes.applicationCommands(config.clientId), {
-        body: commandData,
-      });
-
+      await rest.put(Routes.applicationCommands(config.clientId), { body: commandData });
       logger.info(`Successfully registered ${commandData.length} application (/) commands.`);
     } catch (error) {
       logger.error('Failed to register slash commands:', error);
@@ -60,17 +47,14 @@ export class CommandHandler {
     const { commandName, guildId, user } = interaction;
 
     try {
-      // Get command
+      // 1. Commande existe ?
       const command = this.moduleLoader.getCommand(commandName);
       if (!command) {
-        await interaction.reply({
-          content: '❌ Cette commande n\'existe pas.',
-          ephemeral: true,
-        });
+        await interaction.reply({ content: '❌ Cette commande n\'existe pas.', ephemeral: true });
         return;
       }
 
-      // Check if guild only
+      // 2. Commande réservée aux serveurs ?
       if (command.guildOnly && !guildId) {
         await interaction.reply({
           content: '❌ Cette commande ne peut être utilisée que dans un serveur.',
@@ -79,20 +63,24 @@ export class CommandHandler {
         return;
       }
 
-      // FIX: Retirer la vérification "module enabled" - tout le monde peut utiliser tous les modules
-      // Seuls les Master Admins peuvent utiliser des modules désactivés si nécessaire
-      // Cette vérification bloquait tout le monde inutilement
+      // 3. FIX CRITIQUE - Vérification ownerOnly (admin bot seulement)
+      // Le check utilisait "masterOnly" mais ICommand déclare "ownerOnly" → personne n'était bloqué
+      // sur les commandes admin, ET tout le monde semblait bloqué car les commandes normales
+      // échouaient sur FK constraint (guild non initialisée). Fix double :
+      //   a) Utiliser command.ownerOnly (le bon nom de champ)
+      //   b) La sync des guildes dans ready() résout le FK constraint
+      if (command.ownerOnly && !SecurityManager.isMaster(user.id)) {
+        await interaction.reply({
+          content: '❌ Cette commande est réservée aux administrateurs du bot.',
+          ephemeral: true,
+        });
+        return;
+      }
 
-      // FIX: Vérifier les permissions DISCORD uniquement (pas les perms du bot)
-      // Tout le monde peut utiliser toutes les commandes SAUF :
-      // 1. Commandes [master] (réservées aux Master Admins du bot)
-      // 2. Commandes de modération (nécessitent les perms Discord)
-      if (command.permissions && guildId) {
-        // Vérifier si c'est un Master Admin du BOT (bypass total)
-        const isMaster = SecurityManager.isMaster(user.id);
-        
-        if (!isMaster) {
-          // Pour les non-Master : vérifier les perms DISCORD du serveur
+      // 4. Vérification des permissions Discord (modération, etc.)
+      // Seulement si la commande demande des permissions spécifiques
+      if (command.permissions && command.permissions.length > 0 && guildId) {
+        if (!SecurityManager.isMaster(user.id)) {
           const member = await interaction.guild?.members.fetch(user.id);
           if (member && !member.permissions.has(command.permissions)) {
             await interaction.reply({
@@ -104,33 +92,22 @@ export class CommandHandler {
         }
       }
 
-      // FIX: Vérifier si la commande est réservée aux Master Admins [master]
-      // Si command.masterOnly existe et est à true, bloquer les non-Master
-      if ((command as any).masterOnly && !SecurityManager.isMaster(user.id)) {
-        await interaction.reply({
-          content: '❌ Cette commande est réservée aux administrateurs du bot.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      // Check cooldown
+      // 5. Cooldown (anti-spam par commande)
       if (command.cooldown && guildId) {
         const cooldownKey = `${guildId}:${user.id}:${commandName}`;
         const hasCooldown = await this.redis.hasCooldown(cooldownKey);
         if (hasCooldown && !SecurityManager.isMaster(user.id)) {
           const remaining = await this.redis.getCooldownTTL(cooldownKey);
           await interaction.reply({
-            content: `⏱️ Veuillez attendre ${remaining}s avant de réutiliser cette commande.`,
+            content: `⏱️ Veuillez attendre **${remaining}s** avant de réutiliser cette commande.`,
             ephemeral: true,
           });
           return;
         }
-        // Set cooldown
         await this.redis.setCooldown(cooldownKey, command.cooldown);
       }
 
-      // Rate limiting
+      // 6. Rate limiting global (10 commandes par minute par user)
       if (guildId) {
         const rateLimitKey = SecurityManager.getRateLimitKey('user', user.id);
         const { allowed } = await this.redis.checkRateLimit(rateLimitKey, 10, 60);
@@ -143,29 +120,35 @@ export class CommandHandler {
         }
       }
 
-      // Execute command
+      // 7. Exécution de la commande
       await command.execute(interaction as ChatInputCommandInteraction, {
         database: this.database,
         redis: this.redis,
         client: this.client,
       });
 
-      // Log command usage
+      // 8. Log de l'exécution
+      // FIX: 'COMMAND_EXECUTE' → 'COMMAND_EXECUTED' (ActionType dans types.ts)
       if (guildId) {
-        await this.database.logAction(user.id, 'COMMAND_EXECUTE', {
+        await this.database.logAction(user.id, 'COMMAND_EXECUTED', {
           command: commandName,
           guildId,
         });
       }
 
-      logger.info(`Command ${commandName} executed by ${user.tag} in guild ${guildId}`);
+      // FIX: user.tag déprécié en discord.js v14 → user.username
+      logger.info(`Command /${commandName} executed by ${user.username} in guild ${guildId}`);
     } catch (error) {
-      logger.error(`Error executing command ${commandName}:`, error);
+      logger.error(`Error executing command /${commandName}:`, error);
       const errorMessage = '❌ Une erreur est survenue lors de l\'exécution de la commande.';
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: errorMessage, ephemeral: true });
-      } else {
-        await interaction.reply({ content: errorMessage, ephemeral: true });
+      try {
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({ content: errorMessage, ephemeral: true });
+        } else {
+          await interaction.reply({ content: errorMessage, ephemeral: true });
+        }
+      } catch (replyError) {
+        logger.error('Failed to send error reply:', replyError);
       }
     }
   }
