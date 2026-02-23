@@ -9,14 +9,14 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { standardJsonValidator } from './middleware/json-depth-validator';
 
-// Routes
-import authRoutes from './routes/auth';
-import guildRoutes from './routes/guild';
-import moduleRoutes from './routes/module';
-import panelRoutes from './routes/panel';
-import discordRoutes from './routes/discord';
-import adminRoutes from './routes/admin';
-import analyticsRoutes from './routes/analytics';
+// Routes - using named imports
+import { authRouter } from './routes/auth';
+import { guildRouter } from './routes/guild';
+import { moduleRouter } from './routes/module';
+import { panelRouter } from './routes/panel';
+import { discordRouter } from './routes/discord';
+import { adminRouter } from './routes/admin';
+import { analyticsRouter } from './routes/analytics';
 
 export class APIServer {
   private app: Application;
@@ -113,13 +113,13 @@ export class APIServer {
     });
 
     // API Routes
-    this.app.use('/api/auth', authRoutes);
-    this.app.use('/api/guilds', guildRoutes);
-    this.app.use('/api/modules', moduleRoutes);
-    this.app.use('/api/panel', panelRoutes);
-    this.app.use('/api/discord', discordRoutes); // Discord data enrichment
-    this.app.use('/api/admin', adminRoutes);
-    this.app.use('/api/analytics', analyticsRoutes);
+    this.app.use('/api/auth', authRouter);
+    this.app.use('/api/guilds', guildRouter);
+    this.app.use('/api/modules', moduleRouter);
+    this.app.use('/api/panel', panelRouter);
+    this.app.use('/api/discord', discordRouter); // Discord data enrichment
+    this.app.use('/api/admin', adminRouter);
+    this.app.use('/api/analytics', analyticsRouter);
 
     // Root endpoint
     this.app.get('/', (req: Request, res: Response) => {
