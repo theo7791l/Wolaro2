@@ -75,8 +75,22 @@ public isConnected = false;
         [guildId, ownerId]
       );
 
-      // Initialize default modules
-      const defaultModules = ['moderation', 'economy', 'leveling'];
+      // FIX: Activer TOUS les modules par défaut pour que tout le monde puisse utiliser toutes les commandes
+      const defaultModules = [
+        'moderation',
+        'economy',
+        'leveling',
+        'ai',
+        'music',
+        'rpg',
+        'tickets',
+        'giveaways',
+        'utility',
+        'fun',
+        'logs',
+        'automod'
+      ];
+      
       for (const module of defaultModules) {
         await client.query(
           `INSERT INTO guild_modules (guild_id, module_name, enabled, config)
@@ -87,7 +101,7 @@ public isConnected = false;
       }
 
       await client.query('COMMIT');
-      logger.info(`Guild ${guildId} initialized successfully`);
+      logger.info(`Guild ${guildId} initialized successfully with all modules enabled`);
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error(`Failed to initialize guild ${guildId}:`, error);
