@@ -1,23 +1,23 @@
 # SECURITY UPDATE: Node.js 20.18.1 (January 2026 security release)
 # Fixes 8 CVEs including buffer memory leak, HTTP/2 DoS, and TLS vulnerabilities
-FROM node:20.18.1-alpine
+# Using Debian instead of Alpine for better native module compatibility
+FROM node:20.18.1-slim
 
 # Install dependencies for native modules (including canvas and opus)
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
     git \
-    cairo-dev \
-    jpeg-dev \
-    pango-dev \
-    giflib-dev \
-    pixman-dev \
-    libtool \
-    autoconf \
-    automake \
-    opus-dev \
-    pkgconfig
+    libcairo2-dev \
+    libjpeg-dev \
+    libpango1.0-dev \
+    libgif-dev \
+    libpixman-1-dev \
+    libopus-dev \
+    pkg-config \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
 WORKDIR /app
