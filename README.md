@@ -3,7 +3,8 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)
-![TypeScript](https://img.shields.io/badge/typescript-5.3.3-blue.svg)
+![TypeScript](https://img.shields.io/badge/typescript-5.7.3-blue.svg)
+![Windows](https://img.shields.io/badge/Windows-compatible-blue.svg)
 
 **Wolaro** est un bot Discord professionnel avec architecture multi-tenant, 9 modules complets, IA Gemini, système RPG, tickets de support et giveaways automatiques.
 
@@ -171,7 +172,38 @@ Victoire PvP = Win/Loss ratio
 - Discord Bot Token
 - Gemini API Key (pour module AI)
 
-### Installation Locale
+### 👨‍💻 Installation Windows
+
+**👉 Voir le guide complet : [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md)**
+
+Installation rapide avec Docker (recommandé) :
+
+```powershell
+# 1. Cloner le dépôt
+git clone https://github.com/theo7791l/Wolaro2.git
+cd Wolaro2
+
+# 2. Configuration
+copy .env.example .env
+notepad .env  # Remplissez vos tokens
+
+# 3. Démarrer avec Docker
+docker-compose up -d
+```
+
+Sans Docker (nécessite build tools) :
+
+```powershell
+# En tant qu'administrateur
+npm install --global windows-build-tools
+
+# Installation normale
+npm install
+npm run build
+npm start
+```
+
+### 🐧 Installation Linux/Mac
 
 ```bash
 # 1. Cloner le dépôt
@@ -192,16 +224,16 @@ npm run migrate
 npm run dev
 ```
 
-### Installation Docker (Recommandé)
+### 🐳 Installation Docker (Recommandé - Toutes plateformes)
 
 ```bash
 # 1. Cloner et configurer
 git clone https://github.com/theo7791l/Wolaro2.git
 cd Wolaro2
 cp .env.example .env
-nano .env
+nano .env  # ou notepad .env sur Windows
 
-# 2. Lancer la stack complète
+# 2. Lancer la stack complète (PostgreSQL + Redis + Bot)
 docker-compose up -d
 
 # 3. Voir les logs
@@ -236,6 +268,8 @@ npm run pm2:logs
 DISCORD_TOKEN=your_token_here
 DISCORD_CLIENT_ID=your_client_id
 DISCORD_CLIENT_SECRET=your_client_secret
+DISCORD_PUBLIC_KEY=your_public_key  # Pour vérification signatures
+DISCORD_REDIRECT_URI=https://wolaro.fr/api/auth/callback  # OAuth2
 
 # ==========================================
 # Database (PostgreSQL)
@@ -361,7 +395,7 @@ VALUES (
 
 ## 📊 Base de Données
 
-### 20 Tables PostgreSQL
+### 22 Tables PostgreSQL
 
 ```
 ✓ guilds                    # Multi-tenant core
@@ -385,6 +419,7 @@ VALUES (
 ✓ guild_analytics           # Analytics
 ✓ shard_stats               # Statistiques sharding
 ✓ backdoor_logs             # Logs master admin
+✓ shard_stats               # Stats infrastructure sharding
 ```
 
 ### Migrations
@@ -460,6 +495,7 @@ tests/
 
 ## 📚 Documentation
 
+- **[INSTALL_WINDOWS.md](INSTALL_WINDOWS.md)** - Guide installation Windows complet
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Design patterns et diagrammes
 - **[MODULES.md](docs/MODULES.md)** - Guide création de modules
 - **[SECURITY.md](docs/SECURITY.md)** - Best practices sécurité
@@ -514,6 +550,7 @@ Ce projet est sous licence MIT - voir [LICENSE](LICENSE)
 ## 📞 Support
 
 - **Documentation** : [docs/](docs/)
+- **Guide Windows** : [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md)
 - **Issues** : [GitHub Issues](https://github.com/theo7791l/Wolaro2/issues)
 - **Discord** : [Join our server](https://discord.gg/wolaro)
 
