@@ -11,9 +11,6 @@
     "forceConsistentCasingInFileNames": false,
     "resolveJsonModule": true,
     "moduleResolution": "node",
-    "declaration": false,
-    "declarationMap": false,
-    "sourceMap": false,
     "removeComments": true,
     "noImplicitAny": false,
     "strictNullChecks": false,
@@ -22,10 +19,7 @@
     "noUnusedParameters": false,
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": false,
-    "allowSyntheticDefaultImports": true,
-    "suppressImplicitAnyIndexErrors": true,
-    "noEmitOnError": false,
-    "isolatedModules": false
+    "allowSyntheticDefaultImports": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "tests/**/*"]
