@@ -28,7 +28,7 @@ router.get('/guilds', standardRateLimiter, authMiddleware, async (req: Request, 
       WHERE gm.permissions @> ARRAY['ADMINISTRATOR']::varchar[]
          OR g.owner_id = $1
       ORDER BY g.joined_at DESC`,
-      [userId]
+      [userId],
     );
 
     res.json({
@@ -57,7 +57,7 @@ router.get('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: 
       `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
+      [guildId, userId],
     );
 
     if (hasAccess.length === 0) {
@@ -104,7 +104,7 @@ router.patch('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req
       `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
+      [guildId, userId],
     );
 
     if (hasAccess.length === 0) {
@@ -117,7 +117,7 @@ router.patch('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req
     // Update settings
     await database.query(
       'UPDATE guilds SET settings = $1, updated_at = NOW() WHERE guild_id = $2',
-      [JSON.stringify(settings), guildId]
+      [JSON.stringify(settings), guildId],
     );
 
     // Publish config update event to Redis
@@ -152,7 +152,7 @@ router.get('/guilds/:guildId/modules', standardRateLimiter, authMiddleware, asyn
       `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
+      [guildId, userId],
     );
 
     if (hasAccess.length === 0) {
@@ -165,7 +165,7 @@ router.get('/guilds/:guildId/modules', standardRateLimiter, authMiddleware, asyn
     // Get modules
     const modules = await database.query(
       'SELECT * FROM guild_modules WHERE guild_id = $1 ORDER BY module_name ASC',
-      [guildId]
+      [guildId],
     );
 
     res.json({
@@ -195,7 +195,7 @@ router.patch('/guilds/:guildId/modules/:moduleName', standardRateLimiter, authMi
       `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
+      [guildId, userId],
     );
 
     if (hasAccess.length === 0) {
@@ -247,7 +247,7 @@ router.get('/guilds/:guildId/analytics', standardRateLimiter, authMiddleware, as
       `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
+      [guildId, userId],
     );
 
     if (hasAccess.length === 0) {
@@ -266,7 +266,7 @@ router.get('/guilds/:guildId/analytics', standardRateLimiter, authMiddleware, as
        WHERE guild_id = $1
          AND date >= CURRENT_DATE - ($2 * INTERVAL '1 day')
        ORDER BY date DESC`,
-      [guildId, intervalDays]
+      [guildId, intervalDays],
     );
 
     res.json({
@@ -295,7 +295,7 @@ router.get('/guilds/:guildId/audit', standardRateLimiter, authMiddleware, async 
       `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
+      [guildId, userId],
     );
 
     if (hasAccess.length === 0) {
@@ -307,13 +307,13 @@ router.get('/guilds/:guildId/audit', standardRateLimiter, authMiddleware, async 
 
     // Get audit logs
     const logs = await database.query(
-      `SELECT * FROM audit_logs WHERE guild_id = $1 ORDER BY timestamp DESC LIMIT $2 OFFSET $3`,
-      [guildId, parseInt(limit as string) || 50, parseInt(offset as string) || 0]
+      'SELECT * FROM audit_logs WHERE guild_id = $1 ORDER BY timestamp DESC LIMIT $2 OFFSET $3',
+      [guildId, parseInt(limit as string) || 50, parseInt(offset as string) || 0],
     );
 
     const total = await database.query(
       'SELECT COUNT(*) as count FROM audit_logs WHERE guild_id = $1',
-      [guildId]
+      [guildId],
     );
 
     res.json({
@@ -348,7 +348,7 @@ router.post('/guilds/:guildId/sync', standardRateLimiter, authMiddleware, async 
       `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
        UNION
        SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
+      [guildId, userId],
     );
 
     if (hasAccess.length === 0) {
@@ -381,7 +381,7 @@ router.post('/guilds/:guildId/sync', standardRateLimiter, authMiddleware, async 
         JSON.stringify(guild.iconURL()),
         guild.memberCount.toString(),
         guildId,
-      ]
+      ],
     );
 
     // Publish guild reload event to Redis
