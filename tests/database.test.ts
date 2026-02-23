@@ -6,9 +6,16 @@ describe('DatabaseManager', () => {
   beforeAll(async () => {
     db = new DatabaseManager();
     await db.connect();
+    // Insert a test guild to satisfy guild_economy FK constraint
+    await db.query(
+      `INSERT INTO guilds (guild_id, owner_id) VALUES ('test_guild', 'test_owner') ON CONFLICT (guild_id) DO NOTHING`
+    );
   });
 
   afterAll(async () => {
+    // Clean up test data
+    await db.query(`DELETE FROM guild_economy WHERE guild_id = 'test_guild'`);
+    await db.query(`DELETE FROM guilds WHERE guild_id = 'test_guild'`);
     await db.disconnect();
   });
 
