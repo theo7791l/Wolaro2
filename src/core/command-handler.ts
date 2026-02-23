@@ -4,7 +4,7 @@ import {
   ChatInputCommandInteraction,
   REST,
   Routes,
-  from 'discord.js';
+  } from 'discord.js';
 import { DatabaseManager } from '../database/manager';
 import { RedisManager } from '../cache/redis';
 import { ModuleLoader } from './module-loader';
