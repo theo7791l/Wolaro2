@@ -47,7 +47,7 @@ export class GeminiClient {
         throw new Error(`Gemini API error: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as any;
       return data.candidates[0].content.parts[0].text;
     } catch (error) {
       logger.error('Gemini API error:', error);
@@ -91,7 +91,7 @@ export class GeminiClient {
         throw new Error(`Gemini Vision API error: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as any;
       return data.candidates[0].content.parts[0].text;
     } catch (error) {
       logger.error('Gemini Vision API error:', error);
