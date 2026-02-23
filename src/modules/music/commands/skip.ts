@@ -33,10 +33,11 @@ export class SkipCommand implements ICommand {
       return;
     }
 
+    const currentTrack = queue.currentTrack;
     const skipped = queue.skip();
 
     if (skipped) {
-      await interaction.reply('⏭️ Musique suivante !');
+      await interaction.reply(`⏭️ **${currentTrack?.title || 'Musique'}** passée !`);
     } else {
       await interaction.reply('⏹️ Queue terminée.');
     }
