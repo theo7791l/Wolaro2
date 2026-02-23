@@ -38,15 +38,15 @@ export class ImageCommand implements ICommand {
     await interaction.deferReply();
 
     try {
-      const config = await context.database.getGuildConfig(interaction.guildId!);
-      const aiModule = config?.modules?.find((m: any) => m.module_name === 'ai');
+      // Use global API key from environment
+      const apiKey = process.env.GEMINI_API_KEY;
 
-      if (!aiModule?.config?.geminiApiKey) {
+      if (!apiKey) {
         await interaction.editReply('❌ Le module IA n\'est pas configuré.');
         return;
       }
 
-      const gemini = new GeminiClient(aiModule.config.geminiApiKey);
+      const gemini = new GeminiClient(apiKey);
       const response = await gemini.analyzeImage(image.url, question);
 
       await interaction.editReply({
