@@ -1,8 +1,6 @@
 import { execSync, exec } from 'child_process';
 import { promisify } from 'util';
 import { logger } from './logger';
-import { config } from '../config';
-import { SecurityManager } from './security';
 
 const execAsync = promisify(exec);
 
