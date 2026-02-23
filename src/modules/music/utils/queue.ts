@@ -37,7 +37,7 @@ export class MusicQueue {
     public guildId: string,
     voiceChannelId: string,
     textChannelId: string,
-    client: Client
+    client: Client,
   ) {
     this.voiceChannelId = voiceChannelId;
     this.textChannelId = textChannelId;
@@ -48,13 +48,13 @@ export class MusicQueue {
     guildId: string,
     voiceChannelId: string,
     textChannelId: string,
-    client: Client
+    client: Client,
   ): Promise<MusicQueue> {
     const queue = new MusicQueue(guildId, voiceChannelId, textChannelId, client);
-    
+
     // Get the voice channel
     const channel = await client.channels.fetch(voiceChannelId) as VoiceBasedChannel;
-    
+
     // Join the voice channel
     const connection = joinVoiceChannel({
       channelId: voiceChannelId,
@@ -128,7 +128,7 @@ export class MusicQueue {
 
       // Get audio stream from play-dl
       const stream = await play.stream(this.currentTrack.url);
-      
+
       // Create audio resource
       const resource = createAudioResource(stream.stream, {
         inputType: stream.type,
@@ -157,7 +157,7 @@ export class MusicQueue {
     } else {
       this.playing = false;
       this.currentTrack = null;
-      
+
       // Auto-leave after timeout if configured
       setTimeout(() => {
         if (!this.isPlaying() && this.tracks.length === 0) {
@@ -179,7 +179,7 @@ export class MusicQueue {
     this.tracks = [];
     this.currentTrack = null;
     this.playing = false;
-    
+
     if (this.player) {
       this.player.stop();
     }
@@ -187,9 +187,10 @@ export class MusicQueue {
 
   setVolume(volume: number): void {
     this.volume = Math.max(1, Math.min(100, volume));
-    
+
     // Update current playing track volume if available
     if (this.player && this.player.state.status === AudioPlayerStatus.Playing) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const resource = (this.player.state as any).resource;
       if (resource && resource.volume) {
         resource.volume.setVolume(this.volume / 100);
@@ -203,17 +204,17 @@ export class MusicQueue {
 
   destroy(): void {
     this.stop();
-    
+
     if (this.connection) {
       this.connection.destroy();
       this.connection = null;
     }
-    
+
     if (this.player) {
       this.player.stop();
       this.player = null;
     }
-    
+
     MusicQueue.queues.delete(this.guildId);
     logger.info(`Destroyed queue for guild ${this.guildId}`);
   }
