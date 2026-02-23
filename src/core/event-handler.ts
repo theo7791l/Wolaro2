@@ -31,7 +31,7 @@ export class EventHandler {
 
           // Log raid event
           await this.database.query(
-            `INSERT INTO raid_events (guild_id, event_type, severity, join_count, user_ids, is_active)
+            `INSERT INTO raid_events (guild_id, event_type, severity, joincount, user_ids, is_active)
              VALUES ($1, 'JOIN_SPIKE', 'HIGH', $2, $3, true)`,
             [member.guild.id, joinCount, JSON.stringify([member.id])]
           );
@@ -58,7 +58,7 @@ export class EventHandler {
       if (message.author.bot || !message.guild) return;
 
       try {
-        const { isSpam, _count } = AntiRaidManager.trackMessage(
+        const { isSpam, count } = AntiRaidManager.trackMessage(
           message.guild.id,
           message.author.id
         );
