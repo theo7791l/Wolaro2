@@ -23,19 +23,22 @@ export class AskCommand implements ICommand {
     await interaction.deferReply();
 
     try {
-      // Get module config
-      const config = await context.database.getGuildConfig(interaction.guildId!);
-      const aiModule = config?.modules?.find((m: any) => m.module_name === 'ai');
+      // Use global API key from environment
+      const apiKey = process.env.GEMINI_API_KEY;
 
-      if (!aiModule?.config?.geminiApiKey) {
-        await interaction.editReply('❌ Le module IA n\'est pas configuré. Veuillez ajouter votre clé API Gemini.');
+      if (!apiKey) {
+        await interaction.editReply('❌ Le module IA n\'est pas configuré. Veuillez configurer GEMINI_API_KEY dans les variables d\'environnement.');
         return;
       }
 
-      const gemini = new GeminiClient(aiModule.config.geminiApiKey);
+      // Get module config for optional settings
+      const config = await context.database.getGuildConfig(interaction.guildId!);
+      const aiModule = config?.modules?.find((m: any) => m.module_name === 'ai');
+
+      const gemini = new GeminiClient(apiKey);
       const response = await gemini.generateText(question, {
-        maxTokens: aiModule.config.maxTokens || 2000,
-        temperature: aiModule.config.temperature || 0.7,
+        maxTokens: aiModule?.config?.maxTokens || 2000,
+        temperature: aiModule?.config?.temperature || 0.7,
       });
 
       // Split response if too long
