@@ -15,7 +15,7 @@
 - **Modules dynamiques** : Hot-reload sans redémarrage
 - **Scalabilité** : Cluster mode avec auto-scaling
 - **Cache Redis** : Performance optimale (<5ms)
-- **PostgreSQL** : Base de données robuste (20 tables)
+- **PostgreSQL** : Base de données robuste (21 tables)
 - **API REST + WebSocket** : Interface complète
 
 ### 🛡️ Sécurité Militaire
@@ -395,7 +395,7 @@ VALUES (
 
 ## 📊 Base de Données
 
-### 22 Tables PostgreSQL
+### 21 Tables PostgreSQL
 
 ```
 ✓ guilds                    # Multi-tenant core
@@ -417,7 +417,6 @@ VALUES (
 ✓ leveling_profiles         # Profiles système leveling
 ✓ custom_commands           # Commandes custom
 ✓ guild_analytics           # Analytics
-✓ shard_stats               # Statistiques sharding
 ✓ backdoor_logs             # Logs master admin
 ✓ shard_stats               # Stats infrastructure sharding
 ```
