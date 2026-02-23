@@ -95,11 +95,10 @@ export class SecurityManager {
       /discord\.gg\/[a-zA-Z0-9]+/gi,
       /(http|https):\/\/[^\s]+/gi,
       /@everyone|@here/gi,
-          // SQL injection detection
-    /('|"|;|--|\/\*|\*\/|xp_|select\s+.*\s+from\s+|insert\s+into\s+|delete\s+from\s+|drop\s+table\s+|union\s+select\s+|or\s+['"]?\d+['"]?\s*=\s*['"]?\d+['"]?)/gi,
-    // XSS detection
-    /(<script[\s>]|<\/script>|javascript:|onerror\s*=|onload\s*=|eval\s*\(|alert\s*\()/gi,
-              /\p{M}/gu,
+      // SQL injection detection
+      /('|"|;|--|\/\*|\*\/|xp_|select\s+.*\s+from\s+|insert\s+into\s+|delete\s+from\s+|drop\s+table\s+|union\s+select\s+|or\s+['"]?\d+['"]?\s*=\s*['"]?\d+['"]?)/gi,
+      // XSS detection
+      /(<script[\s>]|<\/script>|javascript:|onerror\s*=|onload\s*=|eval\s*\(|alert\s*\()/gi,
     ];
     return suspiciousPatterns.some((pattern) => pattern.test(text));
   }
