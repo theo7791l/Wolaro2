@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15-alpine
+    # SECURITY UPDATE: PostgreSQL 15.16 (February 2026 security release)
+    # Fixes CVE-2025-8714 (pg_dump injection) and 4 other CVEs
+    image: postgres:15.16-alpine
     container_name: wolaro-postgres
     environment:
       POSTGRES_DB: ${DB_NAME:-wolaro}
@@ -23,15 +25,35 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    # SECURITY UPDATE: Redis 7.4.2 (patches CVE-2025-49844 RediShell RCE)
+    # Critical vulnerability allowing Lua sandbox escape and arbitrary code execution
+    image: redis:7.4.2-alpine
     container_name: wolaro-redis
-    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
+    # SECURITY: Disable EVAL/EVALSHA commands to prevent Lua injection attacks
+    # If your application uses Lua scripts, remove the rename-command directives
+    command: >
+      redis-server
+      --appendonly yes
+      ${REDIS_PASSWORD:+--requirepass "${REDIS_PASSWORD}"}
+      --rename-command EVAL ""
+      --rename-command EVALSHA ""
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     ports:
+      # SECURITY: Bind to localhost only in production (uncomment next line)
+      # - "127.0.0.1:${REDIS_PORT:-6379}:6379"
       - "${REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: >
+        sh -c '
+        if [ -n "$REDIS_PASSWORD" ]; then
+          redis-cli -a "$REDIS_PASSWORD" ping;
+        else
+          redis-cli ping;
+        fi
+        '
       interval: 10s
       timeout: 3s
       retries: 5
