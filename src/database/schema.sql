@@ -140,6 +140,11 @@ CREATE TABLE audit_logs (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX idx_audit_logs_guild ON audit_logs(guild_id);
+CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_action ON audit_logs(action_type);
+CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+
 CREATE TABLE rate_limits (
     id SERIAL PRIMARY KEY,
     identifier VARCHAR(100) NOT NULL,
@@ -151,6 +156,24 @@ CREATE TABLE rate_limits (
     blocked_until TIMESTAMP,
     UNIQUE(identifier, limit_type)
 );
+
+-- Anti-Raid Detection Events
+CREATE TABLE raid_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    guild_id VARCHAR(20) NOT NULL,
+    event_type VARCHAR(50) NOT NULL,
+    severity VARCHAR(20) DEFAULT 'MEDIUM' CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+    joincount INTEGER DEFAULT 0,
+    user_ids JSONB DEFAULT '[]',
+    is_active BOOLEAN DEFAULT TRUE,
+    resolved_at TIMESTAMP,
+    resolved_by VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_raid_events_guild ON raid_events(guild_id);
+CREATE INDEX idx_raid_events_active ON raid_events(is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_raid_events_created ON raid_events(created_at DESC);
 
 -- ==============================================
 -- ECONOMY SYSTEM
