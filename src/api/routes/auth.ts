@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../../config';
 import { DatabaseManager } from '../../database/manager';
 import { logger } from '../../utils/logger';
+import { DiscordTokenResponse, DiscordUser } from '../../types/discord';
 
 export const authRouter = Router();
 
@@ -19,7 +20,6 @@ authRouter.post('/discord', async (req, res) => {
     }
 
     // Exchange code for token
-    // FIX: utiliser config.clientId, config.clientSecret, config.redirectUri (pas config.discord.*)
     const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -32,7 +32,7 @@ authRouter.post('/discord', async (req, res) => {
       }),
     });
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = await tokenResponse.json() as DiscordTokenResponse;
 
     if (!tokenResponse.ok) {
       return res.status(400).json({ error: 'Failed to exchange code for token' });
@@ -43,7 +43,7 @@ authRouter.post('/discord', async (req, res) => {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
 
-    const userData = await userResponse.json();
+    const userData = await userResponse.json() as DiscordUser;
 
     // Create or update user profile
     const database: DatabaseManager = req.app.locals.database;
