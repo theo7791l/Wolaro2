@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, TextChannel } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 
 export class AddUserCommand implements ICommand {
@@ -35,7 +35,7 @@ export class AddUserCommand implements ICommand {
     }
 
     try {
-      await interaction.channel?.permissionOverwrites.create(user.id, {
+      await (interaction.channel as TextChannel)?.permissionOverwrites.create(user.id, {
         ViewChannel: true,
         SendMessages: true,
         ReadMessageHistory: true,
