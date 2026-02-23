@@ -3,7 +3,7 @@ import { authMiddleware, guildAccessMiddleware, AuthRequest } from '../middlewar
 import { standardRateLimiter } from '../middleware/rateLimiter';
 import { DatabaseManager } from '../../database/manager';
 import { RedisManager } from '../../cache/redis';
-import { WebSocketServer } from '../../websocket/server';
+import { ExtendedWebSocketServer } from '../../types/websocket';
 import { logger } from '../../utils/logger';
 
 export const guildRouter = Router();
@@ -34,7 +34,7 @@ guildRouter.get('/', standardRateLimiter, authMiddleware, async (req: AuthReques
  */
 guildRouter.get('/:guildId', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
   try {
-    const { guildId } = req.params;
+    const guildId = String(req.params.guildId);
     const database: DatabaseManager = req.app.locals.database;
     const redis: RedisManager = req.app.locals.redis;
 
@@ -64,7 +64,7 @@ guildRouter.get('/:guildId', standardRateLimiter, authMiddleware, guildAccessMid
  */
 guildRouter.patch('/:guildId/settings', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
   try {
-    const { guildId } = req.params;
+    const guildId = String(req.params.guildId);
     const { category, key, value } = req.body;
 
     if (!category || !key || value === undefined) {
@@ -73,7 +73,7 @@ guildRouter.patch('/:guildId/settings', standardRateLimiter, authMiddleware, gui
 
     const database: DatabaseManager = req.app.locals.database;
     const redis: RedisManager = req.app.locals.redis;
-    const websocket: WebSocketServer = req.app.locals.websocket;
+    const websocket: ExtendedWebSocketServer = req.app.locals.websocket;
 
     await database.query(
       `INSERT INTO guild_settings (guild_id, category, key, value)
@@ -111,7 +111,7 @@ guildRouter.patch('/:guildId/settings', standardRateLimiter, authMiddleware, gui
  */
 guildRouter.get('/:guildId/analytics', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
   try {
-    const { guildId } = req.params;
+    const guildId = String(req.params.guildId);
     const { startDate, endDate, metricType } = req.query;
 
     const database: DatabaseManager = req.app.locals.database;
