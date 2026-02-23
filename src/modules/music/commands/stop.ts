@@ -5,7 +5,7 @@ import { MusicQueue } from '../utils/queue';
 export class StopCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('stop')
-    .setDescription('Arrêter la musique et vider la queue') as SlashCommandBuilder;
+    .setDescription('Arr\u00eater la musique et vider la queue') as SlashCommandBuilder;
 
   module = 'music';
   guildOnly = true;
@@ -17,7 +17,7 @@ export class StopCommand implements ICommand {
 
     if (!voiceChannel) {
       await interaction.reply({
-        content: '❌ Vous devez être dans un salon vocal.',
+        content: '\u274c Vous devez \u00eatre dans un salon vocal.',
         ephemeral: true,
       });
       return;
@@ -27,7 +27,7 @@ export class StopCommand implements ICommand {
 
     if (!queue) {
       await interaction.reply({
-        content: '❌ Aucune musique en cours.',
+        content: '\u274c Aucune musique en cours.',
         ephemeral: true,
       });
       return;
@@ -36,6 +36,6 @@ export class StopCommand implements ICommand {
     queue.stop();
     MusicQueue.delete(interaction.guildId!);
 
-    await interaction.reply('⏹️ Musique arrêtée et queue vidée.');
+    await interaction.reply('\u23f9\ufe0f Musique arr\u00eat\u00e9e et queue vid\u00e9e.');
   }
 }
