@@ -19,7 +19,7 @@ export class ShopCommand implements ICommand {
     { id: 'ring', name: '💍 Anneau de force', price: 500, attack: 15, defense: 5, type: 'accessory' },
   ];
 
-  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
+    async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
     const embed = new EmbedBuilder()
       .setColor('#FFD700')
       .setTitle('🏪 Boutique RPG')
