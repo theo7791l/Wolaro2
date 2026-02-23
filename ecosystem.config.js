@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'wolaro-bot',
+      name: 'wolaro',
       script: './dist/index.js',
       instances: 'max',
       exec_mode: 'cluster',
