@@ -95,7 +95,7 @@ export class SecurityManager {
       /discord\.gg\/[a-zA-Z0-9]+/gi,
       /(http|https):\/\/[^\s]+/gi,
       /@everyone|@here/gi,
-      /[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe20-\ufe2f]/g,
+              /\p{M}/gu,
     ];
     return suspiciousPatterns.some((pattern) => pattern.test(text));
   }
