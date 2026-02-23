@@ -4,6 +4,7 @@
   "description": "Advanced Discord bot with multi-tenant architecture, AI, RPG, tickets, and giveaways",
   "main": "dist/index.js",
   "scripts": {
+    "prepare": "npm run build || echo 'Build failed - continuing'",
     "postinstall": "node -e \"console.log('✅ Installation completed successfully!')\"",
     "dev": "ts-node src/index.ts",
     "build": "tsc",
