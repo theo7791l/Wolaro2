@@ -1,4 +1,15 @@
-import { Client } from 'discord.js';
+import { Client, VoiceBasedChannel } from 'discord.js';
+import {
+  joinVoiceChannel,
+  createAudioPlayer,
+  createAudioResource,
+  AudioPlayerStatus,
+  VoiceConnection,
+  AudioPlayer,
+  entersState,
+  VoiceConnectionStatus,
+} from '@discordjs/voice';
+import * as play from 'play-dl';
 import { logger } from '../../../utils/logger';
 
 interface Track {
@@ -19,6 +30,8 @@ export class MusicQueue {
   private voiceChannelId: string;
   private textChannelId: string;
   private client: Client;
+  private connection: VoiceConnection | null = null;
+  private player: AudioPlayer | null = null;
 
   private constructor(
     public guildId: string,
@@ -38,6 +51,48 @@ export class MusicQueue {
     client: Client
   ): Promise<MusicQueue> {
     const queue = new MusicQueue(guildId, voiceChannelId, textChannelId, client);
+    
+    // Get the voice channel
+    const channel = await client.channels.fetch(voiceChannelId) as VoiceBasedChannel;
+    
+    // Join the voice channel
+    const connection = joinVoiceChannel({
+      channelId: voiceChannelId,
+      guildId: guildId,
+      adapterCreator: channel.guild.voiceAdapterCreator,
+    });
+
+    // Create audio player
+    const player = createAudioPlayer();
+    connection.subscribe(player);
+
+    queue.connection = connection;
+    queue.player = player;
+
+    // Set up player event listeners
+    player.on(AudioPlayerStatus.Idle, () => {
+      logger.info(`Finished playing track in guild ${guildId}`);
+      queue.playNext();
+    });
+
+    player.on('error', (error) => {
+      logger.error('Audio player error:', error);
+      queue.playNext();
+    });
+
+    // Handle voice connection state changes
+    connection.on(VoiceConnectionStatus.Disconnected, async () => {
+      try {
+        await Promise.race([
+          entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+          entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+        ]);
+      } catch (error) {
+        logger.warn(`Voice connection lost for guild ${guildId}`);
+        queue.destroy();
+      }
+    });
+
     MusicQueue.queues.set(guildId, queue);
     return queue;
   }
@@ -47,6 +102,10 @@ export class MusicQueue {
   }
 
   static delete(guildId: string): void {
+    const queue = MusicQueue.queues.get(guildId);
+    if (queue) {
+      queue.destroy();
+    }
     MusicQueue.queues.delete(guildId);
   }
 
@@ -65,45 +124,97 @@ export class MusicQueue {
     this.playing = true;
 
     try {
-      // Mock implementation - Replace with actual voice connection and audio player
       logger.info(`Playing: ${this.currentTrack.title} in guild ${this.guildId}`);
 
-      // Simulate playback
-      setTimeout(() => {
-        if (this.tracks.length > 0) {
-          this.play();
-        } else {
-          this.playing = false;
-          this.currentTrack = null;
-        }
-      }, this.currentTrack.duration * 1000);
+      // Get audio stream from play-dl
+      const stream = await play.stream(this.currentTrack.url);
+      
+      // Create audio resource
+      const resource = createAudioResource(stream.stream, {
+        inputType: stream.type,
+        inlineVolume: true,
+      });
+
+      // Set volume
+      if (resource.volume) {
+        resource.volume.setVolume(this.volume / 100);
+      }
+
+      // Play the resource
+      if (this.player) {
+        this.player.play(resource);
+      }
     } catch (error) {
       logger.error('Error playing track:', error);
       this.playing = false;
+      this.playNext();
+    }
+  }
+
+  private playNext(): void {
+    if (this.tracks.length > 0) {
+      this.play();
+    } else {
+      this.playing = false;
+      this.currentTrack = null;
+      
+      // Auto-leave after timeout if configured
+      setTimeout(() => {
+        if (!this.isPlaying() && this.tracks.length === 0) {
+          this.destroy();
+        }
+      }, 300000); // 5 minutes
     }
   }
 
   skip(): boolean {
-    if (this.tracks.length === 0) {
-      this.stop();
-      return false;
+    if (this.player) {
+      this.player.stop();
+      return true;
     }
-
-    this.play();
-    return true;
+    return false;
   }
 
   stop(): void {
     this.tracks = [];
     this.currentTrack = null;
     this.playing = false;
+    
+    if (this.player) {
+      this.player.stop();
+    }
   }
 
   setVolume(volume: number): void {
     this.volume = Math.max(1, Math.min(100, volume));
+    
+    // Update current playing track volume if available
+    if (this.player && this.player.state.status === AudioPlayerStatus.Playing) {
+      const resource = (this.player.state as any).resource;
+      if (resource && resource.volume) {
+        resource.volume.setVolume(this.volume / 100);
+      }
+    }
   }
 
   isPlaying(): boolean {
     return this.playing;
+  }
+
+  destroy(): void {
+    this.stop();
+    
+    if (this.connection) {
+      this.connection.destroy();
+      this.connection = null;
+    }
+    
+    if (this.player) {
+      this.player.stop();
+      this.player = null;
+    }
+    
+    MusicQueue.queues.delete(this.guildId);
+    logger.info(`Destroyed queue for guild ${this.guildId}`);
   }
 }
