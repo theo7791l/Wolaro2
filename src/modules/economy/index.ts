@@ -7,6 +7,7 @@ import { DailyCommand } from './commands/daily';
 import { WorkCommand } from './commands/work';
 import { PayCommand } from './commands/pay';
 import { ShopCommand } from './commands/shop';
+import { BuyCommand } from './commands/buy';
 import { InventoryCommand } from './commands/inventory';
 import { LeaderboardCommand } from './commands/leaderboard';
 import { z } from 'zod';
@@ -51,6 +52,7 @@ export default class EconomyModule implements IModule {
     new WorkCommand(),
     new PayCommand(),
     new ShopCommand(),
+    new BuyCommand(),
     new InventoryCommand(),
     new LeaderboardCommand(),
   ];
