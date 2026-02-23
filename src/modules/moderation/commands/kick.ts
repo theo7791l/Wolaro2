@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, GuildMember } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 
 export class KickCommand implements ICommand {
@@ -30,7 +30,7 @@ export class KickCommand implements ICommand {
     try {
       const member = await interaction.guild!.members.fetch(target.id);
 
-      if (member.roles.highest.position >= interaction.member!.roles.highest.position) {
+      if (member.roles.highest.position >= (interaction.member as GuildMember).roles.highest.position) {
         await interaction.reply({
           content: '❌ Vous ne pouvez pas expulser ce membre (rôle supérieur ou égal).',
           ephemeral: true,
