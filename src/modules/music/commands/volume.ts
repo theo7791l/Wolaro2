@@ -12,20 +12,20 @@ export class VolumeCommand implements ICommand {
         .setDescription('Niveau de volume (1-100)')
         .setMinValue(1)
         .setMaxValue(100)
-        .setRequired(true)
+        .setRequired(true),
     ) as SlashCommandBuilder;
 
   module = 'music';
   guildOnly = true;
   cooldown = 3;
 
-    async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
+  async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
     const member = interaction.member as GuildMember;
     const voiceChannel = member.voice.channel;
 
     if (!voiceChannel) {
       await interaction.reply({
-        content: '❌ Vous devez être dans un salon vocal.',
+        content: '\u274c Vous devez \u00eatre dans un salon vocal.',
         ephemeral: true,
       });
       return;
@@ -35,7 +35,7 @@ export class VolumeCommand implements ICommand {
 
     if (!queue || !queue.isPlaying()) {
       await interaction.reply({
-        content: '❌ Aucune musique en cours.',
+        content: '\u274c Aucune musique en cours.',
         ephemeral: true,
       });
       return;
@@ -44,6 +44,6 @@ export class VolumeCommand implements ICommand {
     const volume = interaction.options.getInteger('niveau', true);
     queue.setVolume(volume);
 
-    await interaction.reply(`🔊 Volume réglé à **${volume}%**`);
+    await interaction.reply(`\ud83d\udd0a Volume r\u00e9gl\u00e9 \u00e0 **${volume}%**`);
   }
 }
