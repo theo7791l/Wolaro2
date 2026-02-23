@@ -16,7 +16,7 @@ export class NowPlayingCommand implements ICommand {
 
     if (!queue || !queue.isPlaying() || !queue.currentTrack) {
       await interaction.reply({
-        content: '❌ Aucune musique en cours.',
+        content: '\u274c Aucune musique en cours.',
         ephemeral: true,
       });
       return;
@@ -28,12 +28,12 @@ export class NowPlayingCommand implements ICommand {
 
     const embed = new EmbedBuilder()
       .setColor('#FF0000')
-      .setTitle('🎵 En cours de lecture')
+      .setTitle('\ud83c\udfb5 En cours de lecture')
       .setDescription(`[${track.title}](${track.url})`)
       .addFields(
-        { name: 'Durée', value: `${minutes}:${seconds.toString().padStart(2, '0')}`, inline: true },
-        { name: 'Demandé par', value: `<@${track.requester}>`, inline: true },
-        { name: 'Volume', value: `${queue.volume}%`, inline: true }
+        { name: 'Dur\u00e9e', value: `${minutes}:${seconds.toString().padStart(2, '0')}`, inline: true },
+        { name: 'Demand\u00e9 par', value: `<@${track.requester}>`, inline: true },
+        { name: 'Volume', value: `${queue.volume}%`, inline: true },
       )
       .setThumbnail(track.thumbnail || null)
       .setTimestamp();
