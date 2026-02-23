@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, TextChannel } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 
 export class ClearCommand implements ICommand {
@@ -40,14 +40,14 @@ export class ClearCommand implements ICommand {
         return isRecent && matchesUser;
       });
 
-      toDelete = toDelete.first(amount);
+      toDelete = toDelete.first(amount) as any;
 
       if (toDelete.size === 0) {
         await interaction.editReply('❌ Aucun message trouvé à supprimer.');
         return;
       }
 
-      await interaction.channel!.bulkDelete(toDelete, true);
+      await (interaction.channel! as TextChannel).bulkDelete(toDelete, true);
 
       await interaction.editReply(
         `✅ ${toDelete.size} message(s) supprimé(s)${targetUser ? ` de **${targetUser.tag}**` : ''}.`
