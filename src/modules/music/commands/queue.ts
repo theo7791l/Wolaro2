@@ -16,7 +16,7 @@ export class QueueCommand implements ICommand {
 
     if (!queue || queue.tracks.length === 0) {
       await interaction.reply({
-        content: '❌ La queue est vide.',
+        content: '\u274c La queue est vide.',
         ephemeral: true,
       });
       return;
@@ -27,13 +27,13 @@ export class QueueCommand implements ICommand {
 
     const embed = new EmbedBuilder()
       .setColor('#FF0000')
-      .setTitle('🎵 Queue de musique')
+      .setTitle('\ud83c\udfb5 Queue de musique')
       .setTimestamp();
 
     if (current) {
       embed.addFields({
-        name: '🎶 En cours',
-        value: `[${current.title}](${current.url})\nDemandé par: <@${current.requester}>`,
+        name: '\ud83c\udfb6 En cours',
+        value: `[${current.title}](${current.url})\nDemand\u00e9 par: <@${current.requester}>`,
         inline: false,
       });
     }
@@ -46,7 +46,7 @@ export class QueueCommand implements ICommand {
         .join('\n');
 
       embed.addFields({
-        name: `📋 À venir (${queue.tracks.length} total)`,
+        name: `\ud83d\udccb \u00c0 venir (${queue.tracks.length} total)`,
         value: queueList,
         inline: false,
       });
@@ -57,7 +57,7 @@ export class QueueCommand implements ICommand {
     const seconds = totalDuration % 60;
 
     embed.setFooter({
-      text: `Durée totale: ${minutes}m ${seconds}s | Volume: ${queue.volume}%`,
+      text: `Dur\u00e9e totale: ${minutes}m ${seconds}s | Volume: ${queue.volume}%`,
     });
 
     await interaction.reply({ embeds: [embed] });
