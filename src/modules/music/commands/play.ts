@@ -4,6 +4,13 @@ import { MusicQueue } from '../utils/queue';
 import * as play from 'play-dl';
 import { logger } from '../../../utils/logger';
 
+interface SearchResult {
+  title: string;
+  url: string;
+  duration: number;
+  thumbnail: string;
+}
+
 export class PlayCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('play')
@@ -12,7 +19,7 @@ export class PlayCommand implements ICommand {
       option
         .setName('recherche')
         .setDescription('URL ou terme de recherche')
-        .setRequired(true)
+        .setRequired(true),
     ) as SlashCommandBuilder;
 
   module = 'music';
@@ -25,7 +32,7 @@ export class PlayCommand implements ICommand {
 
     if (!voiceChannel) {
       await interaction.reply({
-        content: '❌ Vous devez être dans un salon vocal pour utiliser cette commande.',
+        content: '\u274c Vous devez \u00eatre dans un salon vocal pour utiliser cette commande.',
         ephemeral: true,
       });
       return;
@@ -46,7 +53,7 @@ export class PlayCommand implements ICommand {
           interaction.guildId!,
           voiceChannel.id,
           interaction.channel!.id,
-          context.client
+          context.client,
         );
       }
 
@@ -54,7 +61,7 @@ export class PlayCommand implements ICommand {
       const track = await this.searchTrack(query);
 
       if (!track) {
-        await interaction.editReply('❌ Aucun résultat trouvé.');
+        await interaction.editReply('\u274c Aucun r\u00e9sultat trouv\u00e9.');
         return;
       }
 
@@ -69,19 +76,19 @@ export class PlayCommand implements ICommand {
 
       if (queue.isPlaying()) {
         await interaction.editReply(
-          `✅ **${track.title}** ajouté à la queue (Position: ${queue.tracks.length})`
+          `\u2705 **${track.title}** ajout\u00e9 \u00e0 la queue (Position: ${queue.tracks.length})`,
         );
       } else {
-        await interaction.editReply(`🎵 Lecture en cours: **${track.title}**`);
+        await interaction.editReply(`\ud83c\udfb5 Lecture en cours: **${track.title}**`);
         await queue.play();
       }
     } catch (error) {
       logger.error('Error in play command:', error);
-      await interaction.editReply('❌ Erreur lors de la lecture de la musique.');
+      await interaction.editReply('\u274c Erreur lors de la lecture de la musique.');
     }
   }
 
-  private async searchTrack(query: string): Promise<any> {
+  private async searchTrack(query: string): Promise<SearchResult | null> {
     try {
       // Check if it's a URL
       if (play.yt_validate(query) === 'video') {
@@ -109,6 +116,7 @@ export class PlayCommand implements ICommand {
         const spotifyData = await play.spotify(query);
         if (spotifyData.type === 'track') {
           // Search for the track on YouTube
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const searchQuery = `${spotifyData.name} ${(spotifyData as any).artists?.map((a: any) => a.name).join(' ')}`;
           const searched = await play.search(searchQuery, { limit: 1 });
           if (searched.length > 0) {
