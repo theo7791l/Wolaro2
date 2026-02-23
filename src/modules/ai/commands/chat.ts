@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 
 export class ChatCommand implements ICommand {
@@ -13,7 +13,6 @@ export class ChatCommand implements ICommand {
     ) as SlashCommandBuilder;
 
   module = 'ai';
-  permissions = [PermissionFlagsBits.ManageChannels];
   guildOnly = true;
   cooldown = 5;
 
