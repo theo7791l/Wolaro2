@@ -1,5 +1,5 @@
 /**
- * Redis Cache Module with RedisManager
+ * Redis Cache Module - Complete Implementation
  */
 
 import { createClient } from 'redis';
@@ -31,13 +31,17 @@ try {
 export const redis = redisClient;
 
 /**
- * RedisManager class for compatibility with existing code
+ * RedisManager class - Complete implementation
  */
 export class RedisManager {
   private client: RedisClientType | null;
 
   constructor() {
     this.client = redisClient;
+  }
+
+  getClient(): RedisClientType | null {
+    return this.client;
   }
 
   async get(key: string): Promise<string | null> {
@@ -76,6 +80,10 @@ export class RedisManager {
     }
   }
 
+  async del(key: string): Promise<boolean> {
+    return this.delete(key);
+  }
+
   async exists(key: string): Promise<boolean> {
     if (!this.client) return false;
     try {
@@ -85,6 +93,68 @@ export class RedisManager {
       logger.error('Redis exists error:', error);
       return false;
     }
+  }
+
+  // Cooldown methods
+  async hasCooldown(key: string): Promise<boolean> {
+    return this.exists(key);
+  }
+
+  async getCooldownTTL(key: string): Promise<number> {
+    if (!this.client) return 0;
+    try {
+      return await this.client.ttl(key);
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  async setCooldown(key: string, seconds: number): Promise<boolean> {
+    return this.set(key, '1', seconds);
+  }
+
+  // Rate limiting
+  async checkRateLimit(key: string, limit: number, window: number): Promise<{ allowed: boolean; remaining: number }> {
+    if (!this.client) return { allowed: true, remaining: limit };
+    
+    try {
+      const count = await this.client.incr(key);
+      
+      if (count === 1) {
+        await this.client.expire(key, window);
+      }
+
+      const allowed = count <= limit;
+      const remaining = Math.max(0, limit - count);
+
+      return { allowed, remaining };
+    } catch (error) {
+      logger.error('Rate limit error:', error);
+      return { allowed: true, remaining: limit };
+    }
+  }
+
+  // Blocking
+  async isBlocked(identifier: string): Promise<boolean> {
+    return this.exists(`blocked:${identifier}`);
+  }
+
+  async blockIdentifier(identifier: string, duration: number): Promise<boolean> {
+    return this.set(`blocked:${identifier}`, '1', duration);
+  }
+
+  // Guild config caching
+  async getGuildConfig(guildId: string): Promise<any> {
+    const data = await this.get(`guild:${guildId}:config`);
+    return data ? JSON.parse(data) : null;
+  }
+
+  async cacheGuildConfig(guildId: string, config: any): Promise<boolean> {
+    return this.set(`guild:${guildId}:config`, JSON.stringify(config), 300);
+  }
+
+  async invalidateGuildConfig(guildId: string): Promise<boolean> {
+    return this.delete(`guild:${guildId}:config`);
   }
 
   isConnected(): boolean {

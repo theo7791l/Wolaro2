@@ -1,5 +1,5 @@
 /**
- * Global Types
+ * Global Types - Complete exports
  */
 
 import { Client } from 'discord.js';
@@ -10,4 +10,15 @@ export interface WolaroModule {
   shutdown?: () => Promise<void>;
 }
 
-export * from './commands';
+export interface Command {
+  data: any;
+  execute: (interaction: any) => Promise<void>;
+  cooldown?: number;
+}
+
+export interface BotConfig {
+  token: string;
+  clientId: string;
+  databaseUrl: string;
+  redisUrl?: string;
+}
