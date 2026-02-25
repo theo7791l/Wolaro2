@@ -12,7 +12,7 @@ export const moduleRouter = Router();
  * Get available modules
  * GET /api/modules
  */
-moduleRouter.get('/', lenientRateLimiter, async (req, res): Promise<void> => {
+moduleRouter.get('/', lenientRateLimiter, async (req, res) => {
   try {
     const modules = [
       {
@@ -58,10 +58,10 @@ moduleRouter.get('/', lenientRateLimiter, async (req, res): Promise<void> => {
         category: 'Divertissement',
       },
     ];
-    res.json({ modules });
+    return res.json({ modules });
   } catch (error) {
     logger.error('Error fetching modules:', error);
-    res.status(500).json({ error: 'Failed to fetch modules' });
+    return res.status(500).json({ error: 'Failed to fetch modules' });
   }
 });
 
@@ -69,7 +69,7 @@ moduleRouter.get('/', lenientRateLimiter, async (req, res): Promise<void> => {
  * Toggle module for guild
  * POST /api/modules/:guildId/:moduleName/toggle
  */
-moduleRouter.post('/:guildId/:moduleName/toggle', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res): Promise<void> => {
+moduleRouter.post('/:guildId/:moduleName/toggle', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
   try {
     const { guildId, moduleName } = req.params;
     const { enabled } = req.body;
@@ -99,10 +99,10 @@ moduleRouter.post('/:guildId/:moduleName/toggle', standardRateLimiter, authMiddl
     }, guildId);
 
     logger.info(`Module ${moduleName} ${enabled ? 'enabled' : 'disabled'} for guild ${guildId}`);
-    res.json({ success: true, moduleName, enabled });
+    return res.json({ success: true, moduleName, enabled });
   } catch (error) {
     logger.error('Error toggling module:', error);
-    res.status(500).json({ error: 'Failed to toggle module' });
+    return res.status(500).json({ error: 'Failed to toggle module' });
   }
 });
 
@@ -110,7 +110,7 @@ moduleRouter.post('/:guildId/:moduleName/toggle', standardRateLimiter, authMiddl
  * Update module configuration
  * PATCH /api/modules/:guildId/:moduleName/config
  */
-moduleRouter.patch('/:guildId/:moduleName/config', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res): Promise<void> => {
+moduleRouter.patch('/:guildId/:moduleName/config', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
   try {
     const { guildId, moduleName } = req.params;
     const { config } = req.body;
@@ -139,9 +139,9 @@ moduleRouter.patch('/:guildId/:moduleName/config', standardRateLimiter, authMidd
     }, guildId);
 
     logger.info(`Module ${moduleName} config updated for guild ${guildId}`);
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
     logger.error('Error updating module config:', error);
-    res.status(500).json({ error: 'Failed to update module configuration' });
+    return res.status(500).json({ error: 'Failed to update module configuration' });
   }
 });

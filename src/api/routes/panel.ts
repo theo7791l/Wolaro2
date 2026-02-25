@@ -14,7 +14,7 @@ const router = Router();
  */
 
 // Get user guilds with bot presence and permissions
-router.get('/guilds', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/guilds', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const database: DatabaseManager = req.app.locals.database;
@@ -31,14 +31,14 @@ router.get('/guilds', standardRateLimiter, authMiddleware, async (req: Request, 
       [userId],
     );
 
-    res.json({
+    return res.json({
       success: true,
       data: guilds,
       count: guilds.length,
     });
   } catch (error: any) {
     logger.error('Error fetching user guilds:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to fetch guilds',
     });
@@ -46,7 +46,7 @@ router.get('/guilds', standardRateLimiter, authMiddleware, async (req: Request, 
 });
 
 // Get specific guild configuration
-router.get('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -77,13 +77,13 @@ router.get('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: 
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: guild,
     });
   } catch (error: any) {
     logger.error('Error fetching guild config:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to fetch guild configuration',
     });
@@ -91,7 +91,7 @@ router.get('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: 
 });
 
 // Update guild settings
-router.patch('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.patch('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -126,14 +126,14 @@ router.patch('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req
     // Log action
     await database.logAction(userId, 'GUILD_SETTINGS_UPDATED', { settings }, guildId);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Settings updated successfully',
       realtime: true,
     });
   } catch (error: any) {
     logger.error('Error updating guild settings:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to update settings',
     });
@@ -141,7 +141,7 @@ router.patch('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req
 });
 
 // Get guild modules
-router.get('/guilds/:guildId/modules', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/guilds/:guildId/modules', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -168,13 +168,13 @@ router.get('/guilds/:guildId/modules', standardRateLimiter, authMiddleware, asyn
       [guildId],
     );
 
-    res.json({
+    return res.json({
       success: true,
       data: modules,
     });
   } catch (error: any) {
     logger.error('Error fetching modules:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to fetch modules',
     });
@@ -182,7 +182,7 @@ router.get('/guilds/:guildId/modules', standardRateLimiter, authMiddleware, asyn
 });
 
 // Toggle module
-router.patch('/guilds/:guildId/modules/:moduleName', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.patch('/guilds/:guildId/modules/:moduleName', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId, moduleName } = req.params;
     const userId = (req as any).user.id;
@@ -220,14 +220,14 @@ router.patch('/guilds/:guildId/modules/:moduleName', standardRateLimiter, authMi
     // Log action
     await database.logAction(userId, 'MODULE_TOGGLED', { moduleName, enabled, config: moduleConfig }, guildId);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Module updated successfully',
       realtime: true,
     });
   } catch (error: any) {
     logger.error('Error updating module:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to update module',
     });
@@ -235,7 +235,7 @@ router.patch('/guilds/:guildId/modules/:moduleName', standardRateLimiter, authMi
 });
 
 // Get guild analytics
-router.get('/guilds/:guildId/analytics', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/guilds/:guildId/analytics', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -269,13 +269,13 @@ router.get('/guilds/:guildId/analytics', standardRateLimiter, authMiddleware, as
       [guildId, intervalDays],
     );
 
-    res.json({
+    return res.json({
       success: true,
       data: analytics,
     });
   } catch (error: any) {
     logger.error('Error fetching analytics:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to fetch analytics',
     });
@@ -283,7 +283,7 @@ router.get('/guilds/:guildId/analytics', standardRateLimiter, authMiddleware, as
 });
 
 // Get audit logs
-router.get('/guilds/:guildId/audit', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/guilds/:guildId/audit', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -316,7 +316,7 @@ router.get('/guilds/:guildId/audit', standardRateLimiter, authMiddleware, async 
       [guildId],
     );
 
-    res.json({
+    return res.json({
       success: true,
       data: logs,
       pagination: {
@@ -327,7 +327,7 @@ router.get('/guilds/:guildId/audit', standardRateLimiter, authMiddleware, async 
     });
   } catch (error: any) {
     logger.error('Error fetching audit logs:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to fetch audit logs',
     });
@@ -335,7 +335,7 @@ router.get('/guilds/:guildId/audit', standardRateLimiter, authMiddleware, async 
 });
 
 // Sync guild data from Discord
-router.post('/guilds/:guildId/sync', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/guilds/:guildId/sync', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -387,7 +387,7 @@ router.post('/guilds/:guildId/sync', standardRateLimiter, authMiddleware, async 
     // Publish guild reload event to Redis
     await pubsub.publishGuildReload(guildId);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Guild data synchronized',
       realtime: true,
@@ -399,7 +399,7 @@ router.post('/guilds/:guildId/sync', standardRateLimiter, authMiddleware, async 
     });
   } catch (error: any) {
     logger.error('Error syncing guild:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to sync guild data',
     });
