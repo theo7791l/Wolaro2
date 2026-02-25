@@ -9,7 +9,7 @@ interface GenerateOptions {
 export class GeminiClient {
   private apiKey: string;
   private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-  private model = 'gemini-2.0-flash-exp'; // Modèle mis à jour (gemini-pro est déprécié)
+  private model = 'gemini-2.0-flash'; // Version stable GA (Generally Available) - Février 2026
 
   constructor(apiKey: string) {
     if (!apiKey || apiKey === 'your_gemini_api_key_here') {
@@ -48,7 +48,7 @@ export class GeminiClient {
           ],
           generationConfig: {
             maxOutputTokens: options.maxTokens || 2000,
-            temperature: options.temperature || 0.7,
+            temperature: options.temperature !== undefined ? options.temperature : 1.0, // Température par défaut recommandée pour Gemini 2.0
           },
         }),
       });
