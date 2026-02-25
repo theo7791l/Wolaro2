@@ -8,7 +8,6 @@ import {
   CategoryChannel,
 } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
-import { pool } from '../../../database/manager.js';
 import { logger } from '../../../utils/logger.js';
 
 export class ConfigCommand implements ICommand {
@@ -255,7 +254,7 @@ export class ConfigCommand implements ICommand {
     const subcommand = interaction.options.getSubcommand();
     const guildId = interaction.guildId!;
 
-    const client = await pool.connect();
+    const client = await context.database.getClient();
     try {
       await client.query('BEGIN');
 
@@ -621,7 +620,7 @@ export class ConfigCommand implements ICommand {
 
       // FIX BUG #4: Non-blocking audit log (runs after response)
       try {
-        await pool.query(
+        await context.database.query(
           'INSERT INTO audit_logs (guild_id, user_id, action, details) VALUES ($1, $2, $3, $4)',
           [guildId, interaction.user.id, 'config_update', JSON.stringify({ module: subcommand, updates })]
         );
