@@ -27,10 +27,10 @@ adminRouter.get('/guilds', async (req: AuthRequest, res) => {
         LIMIT 100`
     );
 
-    res.json({ guilds });
+    return res.json({ guilds });
   } catch (error) {
     logger.error('Error fetching all guilds:', error);
-    res.status(500).json({ error: 'Failed to fetch guilds' });
+    return res.status(500).json({ error: 'Failed to fetch guilds' });
   }
 });
 
@@ -56,10 +56,10 @@ adminRouter.get('/impersonate/:guildId', async (req: AuthRequest, res) => {
 
     logger.warn(`Master admin ${req.user!.username} impersonated guild ${guildId}`);
 
-    res.json({ config });
+    return res.json({ config });
   } catch (error) {
     logger.error('Error impersonating guild:', error);
-    res.status(500).json({ error: 'Failed to impersonate guild' });
+    return res.status(500).json({ error: 'Failed to impersonate guild' });
   }
 });
 
@@ -95,10 +95,10 @@ adminRouter.post('/blacklist/:guildId', async (req: AuthRequest, res) => {
 
     logger.warn(`Guild ${guildId} blacklisted by ${req.user!.username}: ${reason}`);
 
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
     logger.error('Error blacklisting guild:', error);
-    res.status(500).json({ error: 'Failed to blacklist guild' });
+    return res.status(500).json({ error: 'Failed to blacklist guild' });
   }
 });
 
@@ -131,10 +131,10 @@ adminRouter.get('/audit-logs', async (req: AuthRequest, res) => {
     params.push(Math.min(Number(limit), 1000));
 
     const logs = await database.query(query, params);
-    res.json({ logs });
+    return res.json({ logs });
   } catch (error) {
     logger.error('Error fetching audit logs:', error);
-    res.status(500).json({ error: 'Failed to fetch audit logs' });
+    return res.status(500).json({ error: 'Failed to fetch audit logs' });
   }
 });
 
@@ -155,9 +155,9 @@ adminRouter.get('/stats', async (req: AuthRequest, res) => {
         (SELECT COUNT(*) FROM audit_logs WHERE timestamp > NOW() - INTERVAL '24 hours') as actions_24h
     `);
 
-    res.json({ stats: stats[0] });
+    return res.json({ stats: stats[0] });
   } catch (error) {
     logger.error('Error fetching system stats:', error);
-    res.status(500).json({ error: 'Failed to fetch system statistics' });
+    return res.status(500).json({ error: 'Failed to fetch system statistics' });
   }
 });

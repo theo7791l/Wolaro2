@@ -61,7 +61,7 @@ authRouter.post('/discord', async (req, res) => {
 
     logger.info(`User ${userData.username} (${userData.id}) authenticated`);
 
-    res.json({
+    return res.json({
       token,
       user: {
         id: userData.id,
@@ -72,7 +72,7 @@ authRouter.post('/discord', async (req, res) => {
     });
   } catch (error) {
     logger.error('Auth error:', error);
-    res.status(500).json({ error: 'Authentication failed' });
+    return res.status(500).json({ error: 'Authentication failed' });
   }
 });
 
@@ -100,8 +100,8 @@ authRouter.get('/me', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(profile[0]);
+    return res.json(profile[0]);
   } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Invalid token' });
   }
 });

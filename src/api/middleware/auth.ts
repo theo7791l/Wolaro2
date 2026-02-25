@@ -47,7 +47,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       isMaster: SecurityManager.isMaster(decoded.userId),
     };
 
-    next();
+    return next();
   } catch (error) {
     // Specific error handling for better security logging
     if (error instanceof jwt.TokenExpiredError) {
@@ -75,7 +75,7 @@ export async function masterAdminMiddleware(req: AuthRequest, res: Response, nex
     return res.status(403).json({ error: 'Forbidden: Master admin access required' });
   }
 
-  next();
+  return next();
 }
 
 export async function guildAccessMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
@@ -103,5 +103,5 @@ export async function guildAccessMiddleware(req: AuthRequest, res: Response, nex
     return res.status(403).json({ error: 'You do not have access to this guild' });
   }
 
-  next();
+  return next();
 }

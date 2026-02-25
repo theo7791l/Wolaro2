@@ -21,10 +21,10 @@ guildRouter.get('/', standardRateLimiter, authMiddleware, async (req: AuthReques
       [req.user!.id]
     );
 
-    res.json({ guilds });
+    return res.json({ guilds });
   } catch (error) {
     logger.error('Error fetching guilds:', error);
-    res.status(500).json({ error: 'Failed to fetch guilds' });
+    return res.status(500).json({ error: 'Failed to fetch guilds' });
   }
 });
 
@@ -51,10 +51,10 @@ guildRouter.get('/:guildId', standardRateLimiter, authMiddleware, guildAccessMid
       return res.status(404).json({ error: 'Guild not found' });
     }
 
-    res.json(config);
+    return res.json(config);
   } catch (error) {
     logger.error('Error fetching guild config:', error);
-    res.status(500).json({ error: 'Failed to fetch guild configuration' });
+    return res.status(500).json({ error: 'Failed to fetch guild configuration' });
   }
 });
 
@@ -98,10 +98,10 @@ guildRouter.patch('/:guildId/settings', standardRateLimiter, authMiddleware, gui
     });
 
     logger.info(`Settings updated for guild ${guildId} by ${req.user!.username}`);
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
     logger.error('Error updating guild settings:', error);
-    res.status(500).json({ error: 'Failed to update settings' });
+    return res.status(500).json({ error: 'Failed to update settings' });
   }
 });
 
@@ -139,9 +139,9 @@ guildRouter.get('/:guildId/analytics', standardRateLimiter, authMiddleware, guil
     query += ' ORDER BY recorded_at DESC LIMIT 1000';
 
     const analytics = await database.query(query, params);
-    res.json({ analytics });
+    return res.json({ analytics });
   } catch (error) {
     logger.error('Error fetching guild analytics:', error);
-    res.status(500).json({ error: 'Failed to fetch analytics' });
+    return res.status(500).json({ error: 'Failed to fetch analytics' });
   }
 });

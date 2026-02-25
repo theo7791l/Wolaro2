@@ -96,14 +96,14 @@ router.get('/guilds/:guildId/channels', standardRateLimiter, authMiddleware, asy
       (formattedChannels as any)[type].sort((a: any, b: any) => a.position - b.position);
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: formattedChannels,
       total: channels.size,
     });
   } catch (error: any) {
     logger.error('Error fetching channels:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to fetch channels',
     });
@@ -162,14 +162,14 @@ router.get('/guilds/:guildId/roles', standardRateLimiter, authMiddleware, async 
     // Sort by position (highest first)
     formattedRoles.sort((a, b) => b.position - a.position);
 
-    res.json({
+    return res.json({
       success: true,
       data: formattedRoles,
       total: roles.size,
     });
   } catch (error: any) {
     logger.error('Error fetching roles:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to fetch roles',
     });
@@ -232,7 +232,7 @@ router.get('/guilds/:guildId/members', standardRateLimiter, authMiddleware, asyn
       );
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: formattedMembers,
       total: formattedMembers.length,
@@ -240,7 +240,7 @@ router.get('/guilds/:guildId/members', standardRateLimiter, authMiddleware, asyn
     });
   } catch (error: any) {
     logger.error('Error fetching members:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to fetch members',
     });
