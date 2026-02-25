@@ -24,10 +24,18 @@ export class RedisFallbackManager {
   private startHealthCheck(): void {
     this.healthCheckInterval = setInterval(async () => {
       try {
-        await this.redis.getClient().ping();
-        if (!this.isRedisAvailable) {
-          logger.info('Redis reconnected successfully');
-          this.isRedisAvailable = true;
+        const client = this.redis.getClient();
+        if (client) {
+          await client.ping();
+          if (!this.isRedisAvailable) {
+            logger.info('Redis reconnected successfully');
+            this.isRedisAvailable = true;
+          }
+        } else {
+          if (this.isRedisAvailable) {
+            logger.warn('Redis client not available');
+            this.isRedisAvailable = false;
+          }
         }
       } catch (error) {
         if (this.isRedisAvailable) {
