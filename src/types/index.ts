@@ -1,9 +1,13 @@
 /**
- * Global Types - Exports explicites pour Wolaro2
- * @module types
+ * Global Types - Consolidation de tous les exports
+ * Ce fichier centralise TOUS les types pour éviter les conflits
  */
 
-import { Client } from 'discord.js';
+import { Client, CommandInteraction, SlashCommandBuilder } from 'discord.js';
+
+// ============================================
+// MODULE TYPES
+// ============================================
 
 /**
  * Interface pour les modules Wolaro2
@@ -14,14 +18,30 @@ export interface WolaroModule {
   shutdown?: () => Promise<void>;
 }
 
+// ============================================
+// COMMAND TYPES
+// ============================================
+
 /**
- * Interface pour les commandes Discord
+ * Interface pour les commandes Discord (version générique)
  */
 export interface Command {
   data: any;
   execute: (interaction: any) => Promise<void>;
   cooldown?: number;
 }
+
+/**
+ * Interface pour les commandes Discord (version typeée stricte)
+ */
+export interface ICommand {
+  data: SlashCommandBuilder;
+  execute: (interaction: CommandInteraction) => Promise<void>;
+}
+
+// ============================================
+// CONFIG TYPES
+// ============================================
 
 /**
  * Configuration du bot
@@ -33,6 +53,12 @@ export interface BotConfig {
   redisUrl?: string;
 }
 
-// Alias pour compatibilité
+// ============================================
+// ALIAS POUR COMPATIBILITÉ
+// ============================================
+
 export type IModule = WolaroModule;
-export type ICommand = Command;
+
+// Re-export de tous les sous-modules
+export * from './discord';
+export * from './websocket';
