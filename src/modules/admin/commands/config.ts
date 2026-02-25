@@ -258,21 +258,21 @@ export class ConfigCommand implements ICommand {
     try {
       await client.query('BEGIN');
 
-      // FIX BUG #2: Ensure guild exists to avoid FK violation
+      // Ensure guild exists to avoid FK violation (only guild_id and owner_id columns exist)
       await client.query(
-        `INSERT INTO guilds (guild_id, guild_name, joined_at)
-         VALUES ($1, $2, NOW())
+        `INSERT INTO guilds (guild_id, owner_id)
+         VALUES ($1, $2)
          ON CONFLICT (guild_id) DO NOTHING`,
-        [guildId, interaction.guild!.name]
+        [guildId, interaction.guild!.ownerId]
       );
 
-      // FIX BUG #3: Lock row to prevent race conditions
+      // Lock row to prevent race conditions
       const currentConfig = await client.query(
-        'SELECT guild_settings FROM guild_modules WHERE guild_id = $1 AND module_name = $2 FOR UPDATE',
+        'SELECT config FROM guild_modules WHERE guild_id = $1 AND module_name = $2 FOR UPDATE',
         [guildId, subcommand]
       );
 
-      let settings = currentConfig.rows[0]?.guild_settings || {};
+      let settings = currentConfig.rows[0]?.config || {};
       const updates: string[] = [];
 
       // Process all options based on subcommand
@@ -283,7 +283,7 @@ export class ConfigCommand implements ICommand {
             updates.push(`Enabled: **${settings.enabled}**`);
           }
           
-          // FIX BUG #5: Verify channel permissions
+          // Verify channel permissions
           if (interaction.options.getChannel('log_channel')) {
             const logChannel = interaction.options.getChannel('log_channel') as TextChannel;
             const permissions = logChannel.permissionsFor(interaction.guild!.members.me!);
@@ -292,7 +292,7 @@ export class ConfigCommand implements ICommand {
               await client.query('ROLLBACK');
               await interaction.reply({
                 content: `❌ I don't have permission to send messages in <#${logChannel.id}>.`,
-                ephemeral: true,
+                flags: ['Ephemeral'],
               });
               return;
             }
@@ -337,7 +337,7 @@ export class ConfigCommand implements ICommand {
             updates.push(`Daily Amount: **${settings.daily_amount}**`);
           }
           
-          // FIX BUG #1: Validate work_min <= work_max
+          // Validate work_min <= work_max
           const workMin = interaction.options.getInteger('work_min');
           const workMax = interaction.options.getInteger('work_max');
           
@@ -345,7 +345,7 @@ export class ConfigCommand implements ICommand {
             await client.query('ROLLBACK');
             await interaction.reply({
               content: `❌ Work minimum (${workMin}) cannot be greater than work maximum (${workMax}).`,
-              ephemeral: true,
+              flags: ['Ephemeral'],
             });
             return;
           }
@@ -354,7 +354,7 @@ export class ConfigCommand implements ICommand {
             await client.query('ROLLBACK');
             await interaction.reply({
               content: `❌ Work minimum (${workMin}) cannot be greater than current work maximum (${settings.work_max}).`,
-              ephemeral: true,
+              flags: ['Ephemeral'],
             });
             return;
           }
@@ -363,7 +363,7 @@ export class ConfigCommand implements ICommand {
             await client.query('ROLLBACK');
             await interaction.reply({
               content: `❌ Work maximum (${workMax}) cannot be less than current work minimum (${settings.work_min}).`,
-              ephemeral: true,
+              flags: ['Ephemeral'],
             });
             return;
           }
@@ -400,7 +400,7 @@ export class ConfigCommand implements ICommand {
               await client.query('ROLLBACK');
               await interaction.reply({
                 content: `❌ I don't have permission to send messages in <#${levelUpChannel.id}>.`,
-                ephemeral: true,
+                flags: ['Ephemeral'],
               });
               return;
             }
@@ -452,7 +452,7 @@ export class ConfigCommand implements ICommand {
               await client.query('ROLLBACK');
               await interaction.reply({
                 content: `❌ I don't have permission to send messages in <#${chatChannel.id}>.`,
-                ephemeral: true,
+                flags: ['Ephemeral'],
               });
               return;
             }
@@ -465,7 +465,6 @@ export class ConfigCommand implements ICommand {
             settings.auto_moderate = interaction.options.getBoolean('auto_moderate');
             updates.push(`Auto-Moderate: **${settings.auto_moderate}**`);
           }
-          // FIX BUG #6: Documented as float for AI toxicity analysis
           if (interaction.options.getNumber('toxicity_threshold') !== null) {
             settings.toxicity_threshold = interaction.options.getNumber('toxicity_threshold');
             updates.push(`Toxicity Threshold: **${settings.toxicity_threshold}**`);
@@ -502,7 +501,7 @@ export class ConfigCommand implements ICommand {
               await client.query('ROLLBACK');
               await interaction.reply({
                 content: `❌ I don't have permission to send messages in <#${questChannel.id}>.`,
-                ephemeral: true,
+                flags: ['Ephemeral'],
               });
               return;
             }
@@ -526,7 +525,7 @@ export class ConfigCommand implements ICommand {
               await client.query('ROLLBACK');
               await interaction.reply({
                 content: `❌ I don't have permission to manage channels in category <#${category.id}>.`,
-                ephemeral: true,
+                flags: ['Ephemeral'],
               });
               return;
             }
@@ -548,7 +547,7 @@ export class ConfigCommand implements ICommand {
               await client.query('ROLLBACK');
               await interaction.reply({
                 content: `❌ I don't have permission to send files in <#${transcriptChannel.id}>.`,
-                ephemeral: true,
+                flags: ['Ephemeral'],
               });
               return;
             }
@@ -591,17 +590,17 @@ export class ConfigCommand implements ICommand {
         await client.query('ROLLBACK');
         await interaction.reply({
           content: '❌ No options provided. Please specify at least one option to update.',
-          ephemeral: true,
+          flags: ['Ephemeral'],
         });
         return;
       }
 
-      // Update database within transaction
+      // Update database within transaction (config column, not guild_settings)
       await client.query(
-        `INSERT INTO guild_modules (guild_id, module_name, guild_settings, updated_at)
+        `INSERT INTO guild_modules (guild_id, module_name, config, updated_at)
          VALUES ($1, $2, $3, NOW())
          ON CONFLICT (guild_id, module_name)
-         DO UPDATE SET guild_settings = $3, updated_at = NOW()`,
+         DO UPDATE SET config = $3, updated_at = NOW()`,
         [guildId, subcommand, JSON.stringify(settings)]
       );
 
@@ -618,11 +617,11 @@ export class ConfigCommand implements ICommand {
 
       logger.info(`Config updated for ${subcommand} in guild ${guildId} by ${interaction.user.tag}`);
 
-      // FIX BUG #4: Non-blocking audit log (runs after response)
+      // Non-blocking audit log (runs after response)
       try {
         await context.database.query(
-          'INSERT INTO audit_logs (guild_id, user_id, action, details) VALUES ($1, $2, $3, $4)',
-          [guildId, interaction.user.id, 'config_update', JSON.stringify({ module: subcommand, updates })]
+          'INSERT INTO audit_logs (guild_id, user_id, action_type, metadata) VALUES ($1, $2, $3, $4)',
+          [guildId, interaction.user.id, 'CONFIG_UPDATED', JSON.stringify({ module: subcommand, updates })]
         );
       } catch (auditError) {
         logger.warn('Failed to create audit log (non-critical):', auditError);
@@ -632,7 +631,7 @@ export class ConfigCommand implements ICommand {
       logger.error('Error updating config:', error);
       await interaction.reply({
         content: '❌ An error occurred while updating configuration.',
-        ephemeral: true,
+        flags: ['Ephemeral'],
       });
     } finally {
       client.release();
