@@ -114,8 +114,8 @@ export class RedisManager {
   }
 
   // Rate limiting
-  async checkRateLimit(key: string, limit: number, window: number): Promise<{ allowed: boolean; remaining: number }> {
-    if (!this.client) return { allowed: true, remaining: limit };
+  async checkRateLimit(key: string, limit: number, window: number): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+    if (!this.client) return { allowed: true, remaining: limit, resetAt: Date.now() + window * 1000 };
     
     try {
       const count = await this.client.incr(key);
@@ -124,13 +124,15 @@ export class RedisManager {
         await this.client.expire(key, window);
       }
 
+      const ttl = await this.client.ttl(key);
+      const resetAt = Date.now() + (ttl > 0 ? ttl * 1000 : window * 1000);
       const allowed = count <= limit;
       const remaining = Math.max(0, limit - count);
 
-      return { allowed, remaining };
+      return { allowed, remaining, resetAt };
     } catch (error) {
       logger.error('Rate limit error:', error);
-      return { allowed: true, remaining: limit };
+      return { allowed: true, remaining: limit, resetAt: Date.now() + window * 1000 };
     }
   }
 
