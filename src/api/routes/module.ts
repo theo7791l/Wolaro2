@@ -12,7 +12,7 @@ export const moduleRouter = Router();
  * Get available modules
  * GET /api/modules
  */
-moduleRouter.get('/', lenientRateLimiter, async (req, res) => {
+moduleRouter.get('/', lenientRateLimiter, async (req, res): Promise<void> => {
   try {
     const modules = [
       {
@@ -69,7 +69,7 @@ moduleRouter.get('/', lenientRateLimiter, async (req, res) => {
  * Toggle module for guild
  * POST /api/modules/:guildId/:moduleName/toggle
  */
-moduleRouter.post('/:guildId/:moduleName/toggle', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
+moduleRouter.post('/:guildId/:moduleName/toggle', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res): Promise<void> => {
   try {
     const { guildId, moduleName } = req.params;
     const { enabled } = req.body;
@@ -110,7 +110,7 @@ moduleRouter.post('/:guildId/:moduleName/toggle', standardRateLimiter, authMiddl
  * Update module configuration
  * PATCH /api/modules/:guildId/:moduleName/config
  */
-moduleRouter.patch('/:guildId/:moduleName/config', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
+moduleRouter.patch('/:guildId/:moduleName/config', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res): Promise<void> => {
   try {
     const { guildId, moduleName } = req.params;
     const { config } = req.body;
