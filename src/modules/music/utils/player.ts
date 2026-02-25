@@ -11,7 +11,6 @@ import {
 } from '@discordjs/voice';
 import { VoiceBasedChannel } from 'discord.js';
 import play from 'play-dl';
-import * as sodium from 'libsodium-wrappers';
 import { logger } from '../../../utils/logger';
 import { NewPipeAudioInfo, newpipe } from './newpipe';
 
@@ -19,19 +18,6 @@ export interface QueueItem {
   info: NewPipeAudioInfo;
   requestedBy: string;
 }
-
-// Initialiser libsodium dès le chargement du module
-let sodiumInitialized = false;
-const initSodium = async () => {
-  if (!sodiumInitialized) {
-    await sodium.ready;
-    sodiumInitialized = true;
-    logger.info('✅ libsodium-wrappers initialized successfully');
-  }
-};
-
-// Appel immédiat
-initSodium().catch(err => logger.error('Failed to initialize libsodium:', err));
 
 export class MusicPlayer {
   private player: AudioPlayer;
@@ -69,9 +55,6 @@ export class MusicPlayer {
    */
   async join(channel: VoiceBasedChannel): Promise<VoiceConnection> {
     try {
-      // ATTENDRE que libsodium soit prêt AVANT de rejoindre
-      await initSodium();
-      
       logger.info(`Attempting to join voice channel: ${channel.name}`);
 
       this.connection = joinVoiceChannel({
@@ -89,7 +72,7 @@ export class MusicPlayer {
         logger.error('Voice connection error:', error);
       });
 
-      // AUGMENTER le timeout à 60 secondes (d'après GitHub issue #10356)
+      // Augmenter le timeout à 60 secondes
       try {
         await entersState(this.connection, VoiceConnectionStatus.Ready, 60000);
         logger.info(`✅ Successfully joined voice channel: ${channel.name}`);
