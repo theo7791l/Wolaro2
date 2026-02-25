@@ -6,6 +6,7 @@ import { AskCommand } from './commands/ask';
 import { ChatCommand } from './commands/chat';
 import { ImageCommand } from './commands/image';
 import { AutoModCommand } from './commands/automod';
+import { SupportCommand } from './commands/support';
 import { AIMessageHandler } from './events/ai-messages';
 import { z } from 'zod';
 
@@ -24,8 +25,8 @@ export const AIConfigSchema = z.object({
 
 export default class AIModule implements IModule {
   name = 'ai';
-  description = 'Intelligence artificielle avec Gemini pour chatbot et auto-modération';
-  version = '1.0.0';
+  description = 'Intelligence artificielle avec Gemini pour chatbot, support et auto-modération';
+  version = '1.1.0';
   author = 'Wolaro';
   configSchema = AIConfigSchema;
   defaultConfig = {
@@ -44,6 +45,7 @@ export default class AIModule implements IModule {
     new ChatCommand(),
     new ImageCommand(),
     new AutoModCommand(),
+    new SupportCommand(), // 🆕 Assistant support Wolaro
   ];
 
   events = [
