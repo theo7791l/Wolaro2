@@ -9,20 +9,22 @@ interface GenerateOptions {
 export class GeminiClient {
   private apiKey: string;
   private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+  private model = 'gemini-2.0-flash-exp'; // Modèle mis à jour (gemini-pro est déprécié)
 
   constructor(apiKey: string) {
     if (!apiKey || apiKey === 'your_gemini_api_key_here') {
       throw new Error('GEMINI_API_KEY is not configured. Please set a valid API key in your .env file.');
     }
     this.apiKey = apiKey;
-    logger.info(`Gemini client initialized with API key: ${apiKey.substring(0, 8)}...`);
+    logger.info(`Gemini client initialized with model: ${this.model}, API key: ${apiKey.substring(0, 8)}...`);
   }
 
   async generateText(prompt: string, options: GenerateOptions = {}): Promise<string> {
     try {
-      const url = `${this.baseUrl}/models/gemini-pro:generateContent?key=${this.apiKey}`;
+      const url = `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`;
       
       logger.debug('Gemini API request:', {
+        model: this.model,
         url: url.replace(this.apiKey, 'REDACTED'),
         promptLength: prompt.length,
       });
@@ -57,6 +59,7 @@ export class GeminiClient {
           status: response.status,
           statusText: response.statusText,
           error: errorData,
+          model: this.model,
           url: url.replace(this.apiKey, 'REDACTED'),
         });
         
@@ -66,7 +69,7 @@ export class GeminiClient {
         } else if (response.status === 403) {
           throw new Error('❌ Accès refusé à l\'API Gemini. Vérifiez que votre clé API a les bonnes permissions.');
         } else if (response.status === 404) {
-          throw new Error('❌ API endpoint non trouvé. Votre clé API Gemini est peut-être invalide ou le modèle n\'est pas disponible.');
+          throw new Error(`❌ Modèle ${this.model} non trouvé. Votre clé API Gemini est peut-être invalide ou le modèle n\'est pas disponible.`);
         } else if (response.status === 429) {
           throw new Error('⏳ Limite de requêtes atteinte. Attendez quelques minutes.');
         } else {
@@ -102,30 +105,30 @@ export class GeminiClient {
       const imageBuffer = await imageResponse.arrayBuffer();
       const base64Image = Buffer.from(imageBuffer).toString('base64');
 
-      const response = await fetch(
-        `${this.baseUrl}/models/gemini-pro-vision:generateContent?key=${this.apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: prompt },
-                  {
-                    inlineData: {
-                      mimeType: 'image/jpeg',
-                      data: base64Image,
-                    },
+      // Utiliser le même modèle pour la vision (gemini-2.0-flash supporte les images)
+      const url = `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                {
+                  inlineData: {
+                    mimeType: 'image/jpeg',
+                    data: base64Image,
                   },
-                ],
-              },
-            ],
-          }),
-        }
-      );
+                },
+              ],
+            },
+          ],
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
