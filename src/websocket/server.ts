@@ -330,6 +330,29 @@ export class WebSocketServer {
     }
   }
 
+  /**
+   * Notify clients about module toggle
+   */
+  public notifyModuleToggle(guildId: string, moduleName: string, enabled: boolean): void {
+    this.io.to(`guild:${guildId}`).emit('module:toggled', {
+      guildId,
+      moduleName,
+      enabled,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Notify clients about config update
+   */
+  public notifyConfigUpdate(guildId: string, settings: any): void {
+    this.io.to(`guild:${guildId}`).emit('config:updated', {
+      guildId,
+      settings,
+      timestamp: Date.now(),
+    });
+  }
+
   public getStats(): { connectedUsers: number; totalConnections: number } {
     let totalConnections = 0;
     this.connectedUsers.forEach((sockets) => {
