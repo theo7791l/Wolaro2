@@ -65,13 +65,19 @@ class WolaroBot {
       await this.websocket.start();
       logger.info('✓ WebSocket server started');
 
-      await startAPI(this.client, this.database, this.redis);
-      logger.info('✓ API server started');
-
+      // CRITIQUE: Déplacer client.login() AVANT startAPI()
+      // startAPI() démarre un serveur HTTP qui s'exécute en continu,
+      // mais ne bloque PAS le thread (app.listen est non-bloquant).
+      // Cependant, pour éviter toute confusion dans les logs,
+      // on se connecte à Discord EN PREMIER.
       await this.client.login(config.token);
       logger.info('✓ Bot logged in successfully');
 
       this.setupEventListeners();
+
+      // Démarrer l'API après la connexion Discord
+      await startAPI(this.client, this.database, this.redis);
+      logger.info('✓ API server started');
     } catch (error) {
       logger.error('Failed to start bot:', error);
       process.exit(1);
