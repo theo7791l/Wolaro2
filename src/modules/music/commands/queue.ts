@@ -1,64 +1,87 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, GuildMember } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
-import { MusicQueue } from '../utils/queue';
+import { getPlayer } from '../utils/player';
+import { logger } from '../../../utils/logger';
 
 export class QueueCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('queue')
-    .setDescription('Voir la queue de musique') as SlashCommandBuilder;
+    .setDescription('Afficher la file d\'attente de musique') as SlashCommandBuilder;
 
   module = 'music';
   guildOnly = true;
-  cooldown = 5;
+  cooldown = 3;
 
-  async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
-    const queue = MusicQueue.get(interaction.guildId!);
+  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
+    const member = interaction.member as GuildMember;
+    const voiceChannel = member.voice.channel;
 
-    if (!queue || queue.tracks.length === 0) {
+    if (!voiceChannel) {
       await interaction.reply({
-        content: '\u274c La queue est vide.'
+        content: '❌ Vous devez être dans un salon vocal.',
+        ephemeral: true,
       });
       return;
     }
 
-    const current = queue.currentTrack;
-    const upcoming = queue.tracks.slice(0, 10);
+    try {
+      const player = getPlayer(interaction.guildId!);
 
-    const embed = new EmbedBuilder()
-      .setColor('#FF0000')
-      .setTitle('\ud83c\udfb5 Queue de musique')
-      .setTimestamp();
+      if (!player.isConnected()) {
+        await interaction.reply({
+          content: '❌ Aucune musique en cours de lecture.',
+          ephemeral: true,
+        });
+        return;
+      }
 
-    if (current) {
-      embed.addFields({
-        name: '\ud83c\udfb6 En cours',
-        value: `[${current.title}](${current.url})\nDemand\u00e9 par: <@${current.requester}>`,
-        inline: false,
+      const current = player.getCurrentTrack();
+      const queue = player.getQueue();
+
+      const embed = new EmbedBuilder()
+        .setColor(0x1DB954)
+        .setTitle('🎵 File d\'attente de musique')
+        .setTimestamp();
+
+      // Musique actuelle
+      if (current) {
+        embed.addFields({
+          name: '🎶 En cours de lecture',
+          value: `**${current.info.title}**\n⏱️ ${current.info.duration} | 👤 <@${current.requestedBy}>`,
+        });
+      }
+
+      // File d'attente
+      if (queue.length > 0) {
+        const queueList = queue
+          .slice(0, 10) // Limiter à 10 pour ne pas surcharger l'embed
+          .map((track, index) => 
+            `**${index + 1}.** ${track.info.title}\n⏱️ ${track.info.duration} | 👤 <@${track.requestedBy}>`
+          )
+          .join('\n\n');
+
+        embed.addFields({
+          name: `📋 Suivant (${queue.length} titre${queue.length > 1 ? 's' : ''})`,
+          value: queueList,
+        });
+
+        if (queue.length > 10) {
+          embed.setFooter({ text: `Et ${queue.length - 10} autre(s) titre(s)...` });
+        }
+      } else {
+        embed.addFields({
+          name: '📋 File d\'attente',
+          value: 'Aucune musique en attente',
+        });
+      }
+
+      await interaction.reply({ embeds: [embed] });
+    } catch (error: any) {
+      logger.error('Error in queue command:', error);
+      await interaction.reply({
+        content: '❌ Erreur lors de l\'affichage de la file d\'attente.',
+        ephemeral: true,
       });
     }
-
-    if (upcoming.length > 0) {
-      const queueList = upcoming
-        .map((track, index) => {
-          return `${index + 1}. [${track.title}](${track.url}) - <@${track.requester}>`;
-        })
-        .join('\n');
-
-      embed.addFields({
-        name: `\ud83d\udccb \u00c0 venir (${queue.tracks.length} total)`,
-        value: queueList,
-        inline: false,
-      });
-    }
-
-    const totalDuration = queue.tracks.reduce((acc, track) => acc + track.duration, 0);
-    const minutes = Math.floor(totalDuration / 60);
-    const seconds = totalDuration % 60;
-
-    embed.setFooter({
-      text: `Dur\u00e9e totale: ${minutes}m ${seconds}s | Volume: ${queue.volume}%`,
-    });
-
-    await interaction.reply({ embeds: [embed] });
   }
 }

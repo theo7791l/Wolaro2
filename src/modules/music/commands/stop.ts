@@ -1,41 +1,50 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, GuildMember } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
-import { MusicQueue } from '../utils/queue';
+import { getPlayer, deletePlayer } from '../utils/player';
+import { logger } from '../../../utils/logger';
 
 export class StopCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('stop')
-    .setDescription('Arr\u00eater la musique et vider la queue') as SlashCommandBuilder;
+    .setDescription('Arrêter la musique et quitter le salon vocal') as SlashCommandBuilder;
 
   module = 'music';
   guildOnly = true;
-  cooldown = 3;
+  cooldown = 2;
 
-  async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
+  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
     const member = interaction.member as GuildMember;
     const voiceChannel = member.voice.channel;
 
     if (!voiceChannel) {
       await interaction.reply({
-        content: '\u274c Vous devez \u00eatre dans un salon vocal.',
+        content: '❌ Vous devez être dans un salon vocal.',
         ephemeral: true,
       });
       return;
     }
 
-    const queue = MusicQueue.get(interaction.guildId!);
+    try {
+      const player = getPlayer(interaction.guildId!);
 
-    if (!queue) {
+      if (!player.isConnected()) {
+        await interaction.reply({
+          content: '❌ Aucune musique en cours de lecture.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      player.disconnect();
+      deletePlayer(interaction.guildId!);
+
+      await interaction.reply('⏹️ Musique arrêtée et déconnecté du salon vocal.');
+    } catch (error: any) {
+      logger.error('Error in stop command:', error);
       await interaction.reply({
-        content: '\u274c Aucune musique en cours.',
+        content: '❌ Erreur lors de l\'arrêt de la musique.',
         ephemeral: true,
       });
-      return;
     }
-
-    queue.stop();
-    MusicQueue.delete(interaction.guildId!);
-
-    await interaction.reply('\u23f9\ufe0f Musique arr\u00eat\u00e9e et queue vid\u00e9e.');
   }
 }

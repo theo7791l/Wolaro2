@@ -1,43 +1,75 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, GuildMember } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
-import { MusicQueue } from '../utils/queue';
+import { getPlayer } from '../utils/player';
+import { logger } from '../../../utils/logger';
 
 export class NowPlayingCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('nowplaying')
-    .setDescription('Voir la musique en cours') as SlashCommandBuilder;
+    .setDescription('Afficher la musique en cours de lecture')
+    .setName('np')
+    .setDescription('Afficher la musique en cours de lecture') as SlashCommandBuilder;
 
   module = 'music';
   guildOnly = true;
-  cooldown = 5;
+  cooldown = 3;
 
-  async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
-    const queue = MusicQueue.get(interaction.guildId!);
+  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
+    const member = interaction.member as GuildMember;
+    const voiceChannel = member.voice.channel;
 
-    if (!queue || !queue.isPlaying() || !queue.currentTrack) {
+    if (!voiceChannel) {
       await interaction.reply({
-        content: '\u274c Aucune musique en cours.',
+        content: '❌ Vous devez être dans un salon vocal.',
         ephemeral: true,
       });
       return;
     }
 
-    const track = queue.currentTrack;
-    const minutes = Math.floor(track.duration / 60);
-    const seconds = track.duration % 60;
+    try {
+      const player = getPlayer(interaction.guildId!);
 
-    const embed = new EmbedBuilder()
-      .setColor('#FF0000')
-      .setTitle('\ud83c\udfb5 En cours de lecture')
-      .setDescription(`[${track.title}](${track.url})`)
-      .addFields(
-        { name: 'Dur\u00e9e', value: `${minutes}:${seconds.toString().padStart(2, '0')}`, inline: true },
-        { name: 'Demand\u00e9 par', value: `<@${track.requester}>`, inline: true },
-        { name: 'Volume', value: `${queue.volume}%`, inline: true },
-      )
-      .setThumbnail(track.thumbnail || null)
-      .setTimestamp();
+      if (!player.isConnected()) {
+        await interaction.reply({
+          content: '❌ Aucune musique en cours de lecture.',
+          ephemeral: true,
+        });
+        return;
+      }
 
-    await interaction.reply({ embeds: [embed] });
+      const current = player.getCurrentTrack();
+
+      if (!current) {
+        await interaction.reply({
+          content: '❌ Aucune musique en cours de lecture.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(0x1DB954)
+        .setTitle('🎵 Lecture en cours')
+        .setDescription(`**${current.info.title}**`)
+        .addFields(
+          { name: '⏱️ Durée', value: current.info.duration, inline: true },
+          { name: '👤 Chaîne', value: current.info.uploader, inline: true },
+          { name: '🎶 Demandé par', value: `<@${current.requestedBy}>`, inline: true }
+        )
+        .setTimestamp();
+
+      const queue = player.getQueue();
+      if (queue.length > 0) {
+        embed.setFooter({ text: `${queue.length} titre(s) en attente` });
+      }
+
+      await interaction.reply({ embeds: [embed] });
+    } catch (error: any) {
+      logger.error('Error in nowplaying command:', error);
+      await interaction.reply({
+        content: '❌ Erreur lors de l\'affichage de la musique en cours.',
+        ephemeral: true,
+      });
+    }
   }
 }
