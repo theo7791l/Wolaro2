@@ -9,11 +9,11 @@ import { Pool } from 'pg';
 import { RedisManager } from '../cache/redis';
 import { PubSubManager } from '../cache/pubsub';
 import { logger } from '../utils/logger';
-import adminRoutes from './routes/admin';
-import guildRoutes from './routes/guild';
-import moduleRoutes from './routes/module';
+import { adminRouter as adminRoutes } from './routes/admin';
+import { guildRouter as guildRoutes } from './routes/guild';
+import { moduleRouter as moduleRoutes } from './routes/module';
 import panelRoutes from './routes/panel';
-import rateLimitMiddleware from './middleware/rate-limit';
+import { rateLimitMiddleware } from './middleware/rate-limit';
 
 const app = express();
 const PORT = process.env.API_PORT || 3001;
