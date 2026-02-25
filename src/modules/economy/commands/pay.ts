@@ -49,7 +49,7 @@ export class PayCommand implements ICommand {
       
       if (senderBalance < amount) {
         await interaction.reply({
-          content: `❌ Vous n'avez pas assez d'argent. Solde actuel : **${senderBalance} coins**.,
+          content: `❌ Vous n'avez pas assez d'argent. Solde actuel : **${senderBalance} coins**.`,
           flags: MessageFlags.Ephemeral,
         });
         return;
