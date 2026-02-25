@@ -11,6 +11,7 @@ import {
 } from '@discordjs/voice';
 import { VoiceBasedChannel } from 'discord.js';
 import play from 'play-dl';
+import * as sodium from 'libsodium-wrappers';
 import { logger } from '../../../utils/logger';
 import { NewPipeAudioInfo, newpipe } from './newpipe';
 
@@ -18,6 +19,19 @@ export interface QueueItem {
   info: NewPipeAudioInfo;
   requestedBy: string;
 }
+
+// Initialiser libsodium dès le chargement du module
+let sodiumInitialized = false;
+const initSodium = async () => {
+  if (!sodiumInitialized) {
+    await sodium.ready;
+    sodiumInitialized = true;
+    logger.info('✅ libsodium-wrappers initialized successfully');
+  }
+};
+
+// Appel immédiat
+initSodium().catch(err => logger.error('Failed to initialize libsodium:', err));
 
 export class MusicPlayer {
   private player: AudioPlayer;
@@ -55,6 +69,11 @@ export class MusicPlayer {
    */
   async join(channel: VoiceBasedChannel): Promise<VoiceConnection> {
     try {
+      // ATTENDRE que libsodium soit prêt AVANT de rejoindre
+      await initSodium();
+      
+      logger.info(`Attempting to join voice channel: ${channel.name}`);
+
       this.connection = joinVoiceChannel({
         channelId: channel.id,
         guildId: channel.guild.id,
@@ -63,38 +82,37 @@ export class MusicPlayer {
 
       // Gérer les événements de connexion
       this.connection.on('stateChange', (oldState, newState) => {
-        logger.debug(`Voice connection state changed: ${oldState.status} -> ${newState.status}`);
+        logger.debug(`Voice connection state: ${oldState.status} -> ${newState.status}`);
       });
 
       this.connection.on('error', (error) => {
         logger.error('Voice connection error:', error);
       });
 
-      // Attendre que la connexion soit prête
+      // AUGMENTER le timeout à 60 secondes (d'après GitHub issue #10356)
       try {
-        await entersState(this.connection, VoiceConnectionStatus.Ready, 30000);
+        await entersState(this.connection, VoiceConnectionStatus.Ready, 60000);
+        logger.info(`✅ Successfully joined voice channel: ${channel.name}`);
       } catch (error) {
-        logger.error('Failed to enter Ready state:', error);
-        throw new Error('Timeout lors de la connexion au salon vocal');
+        logger.error('Failed to enter Ready state after 60s:', error);
+        throw new Error('Timeout lors de la connexion au salon vocal (60s)');
       }
 
       // S'abonner au player
       this.connection.subscribe(this.player);
 
-      logger.info(`Joined voice channel: ${channel.name}`);
       return this.connection;
     } catch (error: any) {
       logger.error('Failed to join voice channel:', error);
       
       // Nettoyer la connexion en cas d'erreur
       if (this.connection) {
-        this.connection.destroy();
+        try {
+          this.connection.destroy();
+        } catch (e) {
+          // Ignorer les erreurs de destruction
+        }
         this.connection = null;
-      }
-      
-      // Message d'erreur plus détaillé
-      if (error.message?.includes('encryption')) {
-        throw new Error('Erreur de chiffrement vocal. Installez sodium ou libsodium-wrappers.');
       }
       
       throw new Error(`Impossible de rejoindre le salon vocal: ${error.message}`);
