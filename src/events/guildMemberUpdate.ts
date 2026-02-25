@@ -78,7 +78,13 @@ export class GuildMemberUpdateEvent {
     reason: string
   ): Promise<void> {
     try {
-      await this.pubsub.getRedis().getClient().publish(
+      const redisClient = this.pubsub.getRedis()?.getClient();
+      if (!redisClient) {
+        logger.warn('Redis client not available, cannot publish permission revoked event');
+        return;
+      }
+      
+      await redisClient.publish(
         'permission:revoked',
         JSON.stringify({
           guildId,
