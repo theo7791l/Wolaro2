@@ -24,46 +24,22 @@ export class CommandHandler {
 
   async initialize(moduleLoader: ModuleLoader): Promise<void> {
     this.moduleLoader = moduleLoader;
-    
-    // CRITIQUE: Lancer l'enregistrement en arrière-plan sans attendre
-    // pour ne PAS bloquer le login du bot
-    this.registerSlashCommandsAsync();
-    
+    await this.registerSlashCommands();
     this.client.on('interactionCreate', (interaction) => this.handleInteraction(interaction));
     logger.info('Command handler initialized');
   }
 
-  // Exécution asynchrone en arrière-plan
-  private registerSlashCommandsAsync(): void {
-    (async () => {
-      try {
-        const commands = this.moduleLoader.getAllCommands();
-        const commandData = commands.map((cmd) => cmd.data.toJSON());
-        
-        const rest = new REST({ version: '10', timeout: 30000 }).setToken(config.token);
-        
-        logger.info(`Started refreshing ${commandData.length} application (/) commands.`);
-        
-        // Wrapper avec timeout pour éviter le blocage infini
-        const registrationPromise = rest.put(
-          Routes.applicationCommands(config.clientId), 
-          { body: commandData }
-        );
-        
-        // Timeout de 30 secondes
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Command registration timeout after 30s')), 30000)
-        );
-        
-        await Promise.race([registrationPromise, timeoutPromise]);
-        
-        logger.info(`✅ Successfully registered ${commandData.length} application (/) commands.`);
-      } catch (error: any) {
-        logger.error('Failed to register slash commands:', error);
-        logger.warn('⚠️ Bot will continue without updating commands. Existing commands will still work.');
-        // Ne pas crash le bot, continuer sans mettre à jour les commandes
-      }
-    })();
+  private async registerSlashCommands(): Promise<void> {
+    try {
+      const commands = this.moduleLoader.getAllCommands();
+      const commandData = commands.map((cmd) => cmd.data.toJSON());
+      const rest = new REST({ version: '10' }).setToken(config.token);
+      logger.info(`Started refreshing ${commandData.length} application (/) commands.`);
+      await rest.put(Routes.applicationCommands(config.clientId), { body: commandData });
+      logger.info(`Successfully registered ${commandData.length} application (/) commands.`);
+    } catch (error) {
+      logger.error('Failed to register slash commands:', error);
+    }
   }
 
   private async handleInteraction(interaction: Interaction): Promise<void> {
