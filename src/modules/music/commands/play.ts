@@ -47,21 +47,6 @@ export class PlayCommand implements ICommand {
     await interaction.deferReply();
 
     try {
-      // Vérifier si yt-dlp est installé
-      const isInstalled = await newpipe.checkInstallation();
-      if (!isInstalled) {
-        await interaction.editReply(
-          '❌ **yt-dlp n\'est pas installé !**\n\n' +
-          'Installez-le avec:\n' +
-          '```bash\n' +
-          'pip install -U yt-dlp\n' +
-          '# ou\n' +
-          'sudo apt install yt-dlp\n' +
-          '```'
-        );
-        return;
-      }
-
       // Rechercher sur YouTube
       await interaction.editReply(`🔍 Recherche de "**${query}**" sur YouTube...`);
       const results = await newpipe.search(query, 10);
