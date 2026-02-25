@@ -52,12 +52,52 @@ export interface ProtectionConfig {
   updated_at: Date;
 }
 
-export interface ActionLog {
+export const DEFAULT_PROTECTION_CONFIG: Omit<ProtectionConfig, 'guild_id' | 'created_at' | 'updated_at'> = {
+  antispam_enabled: true,
+  antispam_level: 'medium',
+  antispam_message_limit: 5,
+  antispam_time_window: 5000,
+  badwords_enabled: true,
+  badwords_action: 'delete',
+  badwords_strict_mode: false,
+  badwords_whitelist: [],
+  antiraid_enabled: true,
+  antiraid_captcha_enabled: false,
+  antiraid_auto_lockdown: false,
+  antiraid_join_threshold: 5,
+  antiphishing_enabled: true,
+  antiphishing_check_urls: true,
+  antiphishing_trusted_domains: [],
+  antinuke_enabled: true,
+  antinuke_protect_admins: true,
+  antinuke_channel_delete_limit: 3,
+  antinuke_role_delete_limit: 3,
+  nsfw_detection_enabled: false,
+  nsfw_threshold: 0.7,
+  lockdown_enabled: true,
+  lockdown_auto_trigger: false,
+  log_channel_id: null,
+  whitelist_users: [],
+  whitelist_roles: [],
+};
+
+export interface ProtectionLog {
   id: number;
   guild_id: string;
   user_id: string;
   type: 'spam_detected' | 'raid_detected' | 'phishing_detected' | 'nuke_attempt' | 'nsfw_detected' | 'lockdown_triggered';
   action: 'none' | 'warn' | 'timeout' | 'kick' | 'ban' | 'quarantine' | 'lockdown' | 'message_deleted';
+  reason: string;
+  details: any;
+  timestamp: Date;
+}
+
+export interface ActionLog {
+  id: number;
+  guild_id: string;
+  user_id: string;
+  type: string;
+  action: string;
   reason: string;
   details: any;
   timestamp: Date;
@@ -73,6 +113,35 @@ export interface ProtectionStats {
   nsfw_detected: number;
   lockdowns: number;
   last_reset: Date;
+}
+
+export interface MessageCache {
+  id: string;
+  author_id: string;
+  content: string;
+  timestamp: number;
+  is_bot: boolean;
+  is_webhook: boolean;
+}
+
+export interface FloodDetection {
+  detected: boolean;
+  message_count: number;
+  unique_users: number;
+}
+
+export interface BadWordDetectionResult {
+  detected: boolean;
+  words: string[];
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface CaptchaSession {
+  member_id: string;
+  guild_id: string;
+  code: string;
+  attempts: number;
+  expires_at: Date;
 }
 
 export interface RaidDetection {

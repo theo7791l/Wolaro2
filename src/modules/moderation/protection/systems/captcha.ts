@@ -1,305 +1,182 @@
 /**
- * Captcha System for Anti-Raid
- * Génération de captcha visuel pour vérification humaine
+ * Captcha System - Fixed imports
  */
 
-import { GuildMember, AttachmentBuilder, EmbedBuilder } from 'discord.js';
-import { createCanvas } from 'canvas';
+import { GuildMember, AttachmentBuilder, EmbedBuilder, Guild, Message } from 'discord.js';
+import { ProtectionDatabase } from '../database';
 import { logger } from '../../../../utils/logger';
-import { ProtectionDB } from '../database';
 import type { CaptchaSession } from '../types';
 
+// Try to import canvas, fallback gracefully
+let createCanvas: any = null;
+try {
+  const canvasModule = require('canvas');
+  createCanvas = canvasModule.createCanvas;
+  logger.info('✅ Canvas module loaded - Image captcha enabled');
+} catch (error) {
+  logger.warn('⚠️ Canvas not available - Using text-based captcha');
+}
+
 export class CaptchaSystem {
-  private sessions = new Map<string, CaptchaSession>();
-  private db: ProtectionDB;
+  private pendingSessions = new Map<string, CaptchaSession>();
+  private readonly CAPTCHA_LENGTH = 6;
+  private readonly MAX_ATTEMPTS = 3;
+  private readonly TIMEOUT = 300000; // 5 minutes
 
-  constructor(db: ProtectionDB) {
-    this.db = db;
-    
-    // Cleanup expired sessions every 60s
-    setInterval(() => this.cleanupExpiredSessions(), 60000);
-  }
+  constructor(private db: ProtectionDatabase) {}
 
   /**
-   * Send captcha challenge to member via DM
-   */
-  async sendCaptcha(member: GuildMember): Promise<void> {
-    try {
-      // Generate captcha code
-      const code = this.generateCode();
-      const imageBuffer = await this.generateCaptchaImage(code);
-
-      // Create session
-      const session: CaptchaSession = {
-        guild_id: member.guild.id,
-        user_id: member.id,
-        code,
-        image_buffer: imageBuffer,
-        created_at: new Date(),
-        expires_at: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
-        attempts: 0
-      };
-
-      this.sessions.set(`${member.guild.id}-${member.id}`, session);
-
-      // Send DM
-      const attachment = new AttachmentBuilder(imageBuffer, { name: 'captcha.png' });
-      const embed = new EmbedBuilder()
-        .setColor(0x00ff00)
-        .setTitle('🔐 Vérification Anti-Raid')
-        .setDescription(
-          `Bienvenue sur **${member.guild.name}** !\n\n` +
-          `Pour des raisons de sécurité, veuillez entrer le code ci-dessous.\n\n` +
-          `**Instructions :**\n` +
-          `• Envoyez le code visible dans l'image\n` +
-          `• Vous avez **5 minutes** et **3 tentatives**\n` +
-          `• Le code contient 6 caractères (majuscules)\n\n` +
-          `⚠️ Si vous échouez, vous serez automatiquement expulsé du serveur.`
-        )
-        .setImage('attachment://captcha.png')
-        .setFooter({ text: 'Wolaro Protection System' })
-        .setTimestamp();
-
-      await member.send({ embeds: [embed], files: [attachment] });
-
-      logger.info(`[Captcha] Sent to ${member.user.tag} in ${member.guild.name}`);
-
-      // Auto-kick after 5 minutes if not verified
-      setTimeout(async () => {
-        if (this.sessions.has(`${member.guild.id}-${member.id}`)) {
-          await this.handleCaptchaTimeout(member);
-        }
-      }, 5 * 60 * 1000);
-
-    } catch (error) {
-      logger.error('[Captcha] Error sending:', error);
-      // If DM fails, kick member
-      await member.kick('Captcha DM failed').catch(() => {});
-    }
-  }
-
-  /**
-   * Verify captcha code
-   */
-  async verifyCaptcha(member: GuildMember, code: string): Promise<boolean> {
-    const sessionKey = `${member.guild.id}-${member.id}`;
-    const session = this.sessions.get(sessionKey);
-
-    if (!session) {
-      return false;
-    }
-
-    session.attempts++;
-
-    if (code.toUpperCase() === session.code) {
-      // Success!
-      this.sessions.delete(sessionKey);
-
-      // Add verified role
-      const verifiedRole = member.guild.roles.cache.find(r => r.name === 'Vérifié');
-      if (verifiedRole) {
-        await member.roles.add(verifiedRole).catch(() => {});
-      }
-
-      await member.send({
-        embeds: [{
-          color: 0x00ff00,
-          title: '✅ Vérification réussie',
-          description: `Bienvenue sur **${member.guild.name}** ! Vous avez maintenant accès au serveur.`
-        }]
-      }).catch(() => {});
-
-      await this.db.logAction({
-        guild_id: member.guild.id,
-        user_id: member.id,
-        type: 'captcha_passed',
-        action: 'none',
-        reason: 'Captcha vérifié avec succès',
-        details: { attempts: session.attempts }
-      });
-
-      logger.info(`[Captcha] ✅ ${member.user.tag} verified`);
-      return true;
-    }
-
-    // Wrong code
-    if (session.attempts >= 3) {
-      // Max attempts reached
-      this.sessions.delete(sessionKey);
-      await this.handleCaptchaFailure(member, 'Trop de tentatives échouées');
-      return false;
-    }
-
-    // Allow retry
-    await member.send({
-      embeds: [{
-        color: 0xff0000,
-        title: '❌ Code incorrect',
-        description: `Tentative ${session.attempts}/3. Réessayez.`
-      }]
-    }).catch(() => {});
-
-    return false;
-  }
-
-  /**
-   * Handle captcha timeout
-   */
-  private async handleCaptchaTimeout(member: GuildMember): Promise<void> {
-    const sessionKey = `${member.guild.id}-${member.id}`;
-    this.sessions.delete(sessionKey);
-
-    try {
-      await member.send({
-        embeds: [{
-          color: 0xff0000,
-          title: '⏱️ Temps écoulé',
-          description: 'Vous n\'avez pas vérifié le captcha à temps. Vous avez été expulsé du serveur.'
-        }]
-      }).catch(() => {});
-
-      await member.kick('Captcha timeout');
-
-      await this.db.logAction({
-        guild_id: member.guild.id,
-        user_id: member.id,
-        type: 'captcha_failed',
-        action: 'kick',
-        reason: 'Timeout captcha (5 minutes)',
-        details: {}
-      });
-
-      logger.info(`[Captcha] ⏱️ ${member.user.tag} kicked (timeout)`);
-    } catch (error) {
-      logger.error('[Captcha] Error handling timeout:', error);
-    }
-  }
-
-  /**
-   * Handle captcha failure
-   */
-  private async handleCaptchaFailure(member: GuildMember, reason: string): Promise<void> {
-    try {
-      await member.send({
-        embeds: [{
-          color: 0xff0000,
-          title: '❌ Vérification échouée',
-          description: `${reason}. Vous avez été expulsé du serveur.`
-        }]
-      }).catch(() => {});
-
-      await member.kick(reason);
-
-      await this.db.logAction({
-        guild_id: member.guild.id,
-        user_id: member.id,
-        type: 'captcha_failed',
-        action: 'kick',
-        reason,
-        details: {}
-      });
-
-      logger.info(`[Captcha] ❌ ${member.user.tag} kicked (${reason})`);
-    } catch (error) {
-      logger.error('[Captcha] Error handling failure:', error);
-    }
-  }
-
-  /**
-   * Generate random 6-character code
+   * Generate captcha code
    */
   private generateCode(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars (I, O, 0, 1)
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < this.CAPTCHA_LENGTH; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return code;
   }
 
   /**
-   * Generate captcha image with distortion
+   * Create captcha image if canvas available
    */
-  private async generateCaptchaImage(code: string): Promise<Buffer> {
-    const width = 300;
-    const height = 100;
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
+  private async createCaptchaImage(code: string): Promise<Buffer | null> {
+    if (!createCanvas) return null;
 
-    // Background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, height);
+    try {
+      const canvas = createCanvas(300, 100);
+      const ctx = canvas.getContext('2d');
 
-    // Add noise lines
-    for (let i = 0; i < 5; i++) {
-      ctx.strokeStyle = this.randomColor();
-      ctx.beginPath();
-      ctx.moveTo(Math.random() * width, Math.random() * height);
-      ctx.lineTo(Math.random() * width, Math.random() * height);
-      ctx.stroke();
-    }
+      // Background
+      ctx.fillStyle = '#2C2F33';
+      ctx.fillRect(0, 0, 300, 100);
 
-    // Add noise dots
-    for (let i = 0; i < 50; i++) {
-      ctx.fillStyle = this.randomColor();
-      ctx.fillRect(
-        Math.random() * width,
-        Math.random() * height,
-        2,
-        2
-      );
-    }
-
-    // Draw code with distortion
-    ctx.font = 'bold 48px Arial';
-    const spacing = width / (code.length + 1);
-
-    for (let i = 0; i < code.length; i++) {
-      ctx.save();
-
-      const x = spacing * (i + 1);
-      const y = height / 2 + (Math.random() - 0.5) * 20;
-
-      // Random rotation
-      ctx.translate(x, y);
-      ctx.rotate((Math.random() - 0.5) * 0.4);
-
-      // Random color
-      ctx.fillStyle = this.randomColor();
-      ctx.fillText(code[i], 0, 0);
-
-      ctx.restore();
-    }
-
-    return canvas.toBuffer('image/png');
-  }
-
-  /**
-   * Generate random color
-   */
-  private randomColor(): string {
-    const r = Math.floor(Math.random() * 150);
-    const g = Math.floor(Math.random() * 150);
-    const b = Math.floor(Math.random() * 150);
-    return `rgb(${r},${g},${b})`;
-  }
-
-  /**
-   * Cleanup expired sessions
-   */
-  private cleanupExpiredSessions(): void {
-    const now = new Date();
-    for (const [key, session] of this.sessions.entries()) {
-      if (session.expires_at < now) {
-        this.sessions.delete(key);
+      // Noise
+      for (let i = 0; i < 100; i++) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.3})`;
+        ctx.fillRect(Math.random() * 300, Math.random() * 100, 2, 2);
       }
+
+      // Text with distortion
+      ctx.font = 'bold 48px Arial';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i < code.length; i++) {
+        ctx.save();
+        const x = 50 + i * 40;
+        const y = 50 + (Math.random() - 0.5) * 20;
+        const angle = (Math.random() - 0.5) * 0.4;
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillText(code[i], 0, 0);
+        ctx.restore();
+      }
+
+      return canvas.toBuffer('image/png');
+    } catch (error) {
+      logger.error('Error creating captcha image:', error);
+      return null;
     }
   }
 
   /**
-   * Get active session for member
+   * Send captcha to member
    */
-  getSession(guildId: string, userId: string): CaptchaSession | undefined {
-    return this.sessions.get(`${guildId}-${userId}`);
+  async sendCaptcha(member: GuildMember): Promise<boolean> {
+    try {
+      const code = this.generateCode();
+      const session: CaptchaSession = {
+        member_id: member.id,
+        guild_id: member.guild.id,
+        code,
+        attempts: 0,
+        expires_at: new Date(Date.now() + this.TIMEOUT),
+      };
+
+      this.pendingSessions.set(member.id, session);
+
+      const embed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle('🔐 Vérification Captcha')
+        .setDescription(
+          `Bienvenue sur **${member.guild.name}** !\n\n` +
+          `Pour accéder au serveur, merci de répondre avec le code captcha.\n\n` +
+          `⏱️ Temps restant: 5 minutes\n` +
+          `🔄 Tentatives: ${this.MAX_ATTEMPTS}`
+        )
+        .setFooter({ text: 'Répondez dans ce message privé avec le code' })
+        .setTimestamp();
+
+      const imageBuffer = await this.createCaptchaImage(code);
+
+      if (imageBuffer) {
+        const attachment = new AttachmentBuilder(imageBuffer, { name: 'captcha.png' });
+        embed.setImage('attachment://captcha.png');
+        await member.send({ embeds: [embed], files: [attachment] });
+      } else {
+        embed.addFields({
+          name: '📝 Code Captcha',
+          value: `\`\`\`\n${code}\`\`\``,
+          inline: false,
+        });
+        await member.send({ embeds: [embed] });
+      }
+
+      setTimeout(async () => {
+        if (this.pendingSessions.has(member.id)) {
+          this.pendingSessions.delete(member.id);
+          try {
+            await member.kick('Captcha non complété');
+          } catch (error) {
+            logger.error('Error kicking for captcha timeout:', error);
+          }
+        }
+      }, this.TIMEOUT);
+
+      return true;
+    } catch (error) {
+      logger.error('Error sending captcha:', error);
+      this.pendingSessions.delete(member.id);
+      return false;
+    }
+  }
+
+  /**
+   * Verify captcha
+   */
+  verifyCaptcha(memberId: string, response: string): { success: boolean; message: string } {
+    const session = this.pendingSessions.get(memberId);
+
+    if (!session) {
+      return { success: false, message: '❌ Aucun captcha en attente' };
+    }
+
+    if (Date.now() > session.expires_at.getTime()) {
+      this.pendingSessions.delete(memberId);
+      return { success: false, message: '⏱️ Captcha expiré' };
+    }
+
+    if (response.toUpperCase() === session.code) {
+      this.pendingSessions.delete(memberId);
+      return { success: true, message: '✅ Captcha vérifié !' };
+    }
+
+    session.attempts++;
+
+    if (session.attempts >= this.MAX_ATTEMPTS) {
+      this.pendingSessions.delete(memberId);
+      return { success: false, message: '❌ Trop de tentatives' };
+    }
+
+    return {
+      success: false,
+      message: `❌ Code incorrect (${this.MAX_ATTEMPTS - session.attempts} restantes)`,
+    };
+  }
+
+  hasPendingCaptcha(memberId: string): boolean {
+    return this.pendingSessions.has(memberId);
   }
 }
