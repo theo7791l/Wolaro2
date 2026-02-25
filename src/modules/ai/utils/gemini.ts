@@ -17,7 +17,7 @@ interface GeminiErrorResponse {
 export class GeminiClient {
   private apiKey: string;
   private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-  private model = 'gemini-2.0-flash'; // Version stable GA (Generally Available) - Février 2026
+  private model = 'gemini-1.5-flash'; // Modèle free tier avec quota généreux
 
   constructor(apiKey: string) {
     if (!apiKey || apiKey === 'your_gemini_api_key_here') {
@@ -56,7 +56,7 @@ export class GeminiClient {
           ],
           generationConfig: {
             maxOutputTokens: options.maxTokens || 2000,
-            temperature: options.temperature !== undefined ? options.temperature : 1.0, // Température par défaut recommandée pour Gemini 2.0
+            temperature: options.temperature !== undefined ? options.temperature : 1.0,
           },
         }),
       });
@@ -79,17 +79,17 @@ export class GeminiClient {
         
         if (response.status === 400) {
           const details = errorData?.error?.message || JSON.stringify(errorData);
-          errorMessage = `❌ Requête invalide (400): ${details}\n\u2139️ Vérifiez votre GEMINI_API_KEY dans .env`;
+          errorMessage = `❌ Requête invalide (400): ${details}\nℹ️ Vérifiez votre GEMINI_API_KEY dans .env`;
         } else if (response.status === 403) {
           const details = errorData?.error?.message || 'Accès refusé';
-          errorMessage = `❌ Accès refusé (403): ${details}\n\u2139️ Vérifiez que votre clé API Gemini a les bonnes permissions`;
+          errorMessage = `❌ Accès refusé (403): ${details}\nℹ️ Vérifiez que votre clé API Gemini a les bonnes permissions`;
         } else if (response.status === 404) {
-          errorMessage = `❌ Modèle "${this.model}" non trouvé (404)\n\u2139️ Votre clé API Gemini est invalide ou expirée`;
+          errorMessage = `❌ Modèle "${this.model}" non trouvé (404)\nℹ️ Votre clé API Gemini est invalide ou expirée`;
         } else if (response.status === 429) {
           const details = errorData?.error?.message || 'Trop de requêtes';
-          errorMessage = `⏳ Limite de requêtes atteinte (429): ${details}\n\u2139️ Attendez quelques minutes ou vérifiez votre quota Gemini API`;
+          errorMessage = `⏳ Limite de requêtes atteinte (429)\n${details}\nℹ️ Attendez 60 secondes ou vérifiez votre quota sur https://aistudio.google.com/apikey`;
         } else if (response.status === 500 || response.status === 503) {
-          errorMessage = `⚠️ Erreur serveur Gemini (${response.status})\n\u2139️ Réessayez dans quelques instants`;
+          errorMessage = `⚠️ Erreur serveur Gemini (${response.status})\nℹ️ Réessayez dans quelques instants`;
         } else {
           const details = errorData?.error?.message || response.statusText;
           errorMessage = `❌ Erreur API Gemini (${response.status}): ${details}`;
@@ -108,7 +108,7 @@ export class GeminiClient {
       // Vérifier que la réponse contient bien le texte
       if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
         logger.error('Gemini response structure invalid:', JSON.stringify(data));
-        throw new Error('❌ Réponse API Gemini invalide (pas de contenu)\n\u2139️ La réponse ne contient pas de texte généré');
+        throw new Error('❌ Réponse API Gemini invalide (pas de contenu)\nℹ️ La réponse ne contient pas de texte généré');
       }
       
       return data.candidates[0].content.parts[0].text;
@@ -137,7 +137,7 @@ export class GeminiClient {
       const imageBuffer = await imageResponse.arrayBuffer();
       const base64Image = Buffer.from(imageBuffer).toString('base64');
 
-      // Utiliser le même modèle pour la vision (gemini-2.0-flash supporte les images)
+      // Utiliser le même modèle pour la vision (gemini-1.5-flash supporte les images)
       const url = `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`;
 
       const response = await fetch(url, {
