@@ -97,8 +97,7 @@ export class SetXPCommand implements ICommand {
       );
     } catch (error) {
       await interaction.reply({
-        content: '❌ Impossible de modifier l\'XP.',
-        ephemeral: true,
+        content: '❌ Impossible de modifier l\'XP.'
       });
     }
   }

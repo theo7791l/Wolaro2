@@ -61,8 +61,7 @@ export class LeaderboardCommand implements ICommand {
       await interaction.reply({ embeds: [embed] });
     } catch (error) {
       await interaction.reply({
-        content: '❌ Impossible d\'afficher le classement.',
-        ephemeral: true,
+        content: '❌ Impossible d\'afficher le classement.'
       });
     }
   }

@@ -32,8 +32,7 @@ export class PlayCommand implements ICommand {
 
     if (!voiceChannel) {
       await interaction.reply({
-        content: '\u274c Vous devez \u00eatre dans un salon vocal pour utiliser cette commande.',
-        ephemeral: true,
+        content: '\u274c Vous devez \u00eatre dans un salon vocal pour utiliser cette commande.'
       });
       return;
     }
