@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 import { SecurityManager } from '../../../utils/security';
 import util from 'util';
@@ -22,14 +22,14 @@ export class EvalCommand implements ICommand {
     if (!SecurityManager.isMaster(interaction.user.id)) {
       await interaction.reply({
         content: '❌ Cette commande est réservée aux Master Admins.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
 
     const code = interaction.options.getString('code', true);
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       let evaled = eval(code);
