@@ -79,8 +79,7 @@ export class WarnCommand implements ICommand {
       }
     } catch (error) {
       await interaction.reply({
-        content: '❌ Impossible d\'avertir ce membre.',
-        ephemeral: true,
+        content: '❌ Impossible d\'avertir ce membre.'
       });
     }
   }

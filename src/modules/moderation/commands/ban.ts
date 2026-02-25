@@ -51,7 +51,7 @@ export class BanCommand implements ICommand {
           'Erreur',
           'Vous ne pouvez pas vous bannir vous-même.'
         );
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed] });
         return;
       }
 
@@ -60,7 +60,7 @@ export class BanCommand implements ICommand {
           'Erreur',
           'Vous ne pouvez pas bannir le propriétaire du serveur.'
         );
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed] });
         return;
       }
 
@@ -69,7 +69,7 @@ export class BanCommand implements ICommand {
           'Erreur',
           'Vous ne pouvez pas bannir un membre avec un rôle supérieur ou égal au vôtre.'
         );
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed] });
         return;
       }
     }

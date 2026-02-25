@@ -61,9 +61,9 @@ export class BalanceCommand implements ICommand {
         'Une erreur est survenue lors de la récupération du solde.'
       );
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ embeds: [embed], ephemeral: true });
+        await interaction.followUp({ embeds: [embed] });
       } else {
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed] });
       }
     }
   }
