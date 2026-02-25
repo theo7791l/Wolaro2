@@ -8,6 +8,7 @@ import { StatsCommand } from './commands/stats';
 import { ReloadCommand } from './commands/reload';
 import { EvalCommand } from './commands/eval';
 import { UpdateCommand } from './commands/update';
+import ConfigCommand from './commands/config.js';
 
 export default class AdminModule implements IModule {
   name = 'admin';
@@ -24,6 +25,7 @@ export default class AdminModule implements IModule {
     new ReloadCommand(),
     new EvalCommand(),
     new UpdateCommand(),
+    ConfigCommand, // Ajout de la commande /config
   ];
 
   events = [];
