@@ -7,6 +7,8 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
+  TextChannel,
+  Message,
 } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 import { logger } from '../../../utils/logger';
@@ -77,14 +79,24 @@ export class PlayCommand implements ICommand {
         embeds: [embed],
       });
 
+      // Vérifier que c'est un TextChannel
+      const channel = interaction.channel;
+      if (!channel || !('awaitMessages' in channel)) {
+        await interaction.followUp({
+          content: '❌ Cette commande ne peut être utilisée que dans un salon textuel.',
+          ephemeral: true,
+        });
+        return;
+      }
+
       // Attendre une réponse numérique (1-10)
-      const filter = (msg: any) => {
+      const filter = (msg: Message) => {
         const num = parseInt(msg.content);
         return msg.author.id === interaction.user.id && num >= 1 && num <= results.length;
       };
 
       try {
-        const collected = await interaction.channel!.awaitMessages({
+        const collected = await channel.awaitMessages({
           filter,
           max: 1,
           time: 60000, // 60 secondes
