@@ -11,37 +11,45 @@ export class GeminiClient {
   private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
 
   constructor(apiKey: string) {
+    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+      throw new Error('GEMINI_API_KEY is not configured. Please set a valid API key in your .env file.');
+    }
     this.apiKey = apiKey;
+    logger.info(`Gemini client initialized with API key: ${apiKey.substring(0, 8)}...`);
   }
 
   async generateText(prompt: string, options: GenerateOptions = {}): Promise<string> {
     try {
-      const response = await fetch(
-        `${this.baseUrl}/models/gemini-pro:generateContent?key=${this.apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: options.systemPrompt
-                      ? `${options.systemPrompt}\n\n${prompt}`
-                      : prompt,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              maxOutputTokens: options.maxTokens || 2000,
-              temperature: options.temperature || 0.7,
+      const url = `${this.baseUrl}/models/gemini-pro:generateContent?key=${this.apiKey}`;
+      
+      logger.debug('Gemini API request:', {
+        url: url.replace(this.apiKey, 'REDACTED'),
+        promptLength: prompt.length,
+      });
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: options.systemPrompt
+                    ? `${options.systemPrompt}\n\n${prompt}`
+                    : prompt,
+                },
+              ],
             },
-          }),
-        }
-      );
+          ],
+          generationConfig: {
+            maxOutputTokens: options.maxTokens || 2000,
+            temperature: options.temperature || 0.7,
+          },
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -49,31 +57,39 @@ export class GeminiClient {
           status: response.status,
           statusText: response.statusText,
           error: errorData,
+          url: url.replace(this.apiKey, 'REDACTED'),
         });
         
         // Messages d'erreur plus clairs
         if (response.status === 400) {
-          throw new Error('Clé API Gemini invalide ou requête mal formée. Vérifiez votre GEMINI_API_KEY dans .env');
+          throw new Error('❌ Clé API Gemini invalide ou requête mal formée. Vérifiez votre GEMINI_API_KEY dans .env');
         } else if (response.status === 403) {
-          throw new Error('Accès refusé à l\'API Gemini. Vérifiez que votre clé API a les bonnes permissions.');
+          throw new Error('❌ Accès refusé à l\'API Gemini. Vérifiez que votre clé API a les bonnes permissions.');
+        } else if (response.status === 404) {
+          throw new Error('❌ API endpoint non trouvé. Votre clé API Gemini est peut-être invalide ou le modèle n\'est pas disponible.');
         } else if (response.status === 429) {
-          throw new Error('Limite de requêtes atteinte. Attendez quelques minutes.');
+          throw new Error('⏳ Limite de requêtes atteinte. Attendez quelques minutes.');
         } else {
-          throw new Error(`Erreur API Gemini: ${response.statusText}`);
+          throw new Error(`❌ Erreur API Gemini: ${response.status} ${response.statusText}`);
         }
       }
 
       const data = await response.json() as any;
       
+      logger.debug('Gemini API response:', {
+        hasCandidates: !!data.candidates,
+        candidatesCount: data.candidates?.length || 0,
+      });
+      
       // Vérifier que la réponse contient bien le texte
       if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-        logger.error('Gemini response structure invalid:', data);
-        throw new Error('Réponse API Gemini invalide (pas de contenu)');
+        logger.error('Gemini response structure invalid:', JSON.stringify(data));
+        throw new Error('❌ Réponse API Gemini invalide (pas de contenu)');
       }
       
       return data.candidates[0].content.parts[0].text;
     } catch (error: any) {
-      logger.error('Gemini API error:', error);
+      logger.error('Gemini API error:', error.message || error);
       // Propager l'erreur avec le message détaillé
       throw error;
     }
