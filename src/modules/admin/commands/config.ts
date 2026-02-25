@@ -4,6 +4,8 @@ import {
   PermissionFlagsBits,
   EmbedBuilder,
   ChannelType,
+  TextChannel,
+  CategoryChannel,
 } from 'discord.js';
 import { pool } from '../../../database/pool.js';
 import { logger } from '../../../utils/logger.js';
@@ -139,7 +141,7 @@ export default {
         .addNumberOption((opt) =>
           opt
             .setName('toxicity_threshold')
-            .setDescription('Toxicity threshold (0.0-1.0)')
+            .setDescription('Toxicity threshold (0.0-1.0, float value for AI analysis)')
             .setMinValue(0.0)
             .setMaxValue(1.0)
         )
@@ -249,10 +251,21 @@ export default {
     const subcommand = interaction.options.getSubcommand();
     const guildId = interaction.guildId!;
 
+    const client = await pool.connect();
     try {
-      // Get current config
-      const currentConfig = await pool.query(
-        'SELECT guild_settings FROM guild_modules WHERE guild_id = $1 AND module_name = $2',
+      await client.query('BEGIN');
+
+      // FIX BUG #2: Ensure guild exists to avoid FK violation
+      await client.query(
+        `INSERT INTO guilds (guild_id, guild_name, joined_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (guild_id) DO NOTHING`,
+        [guildId, interaction.guild!.name]
+      );
+
+      // FIX BUG #3: Lock row to prevent race conditions
+      const currentConfig = await client.query(
+        'SELECT guild_settings FROM guild_modules WHERE guild_id = $1 AND module_name = $2 FOR UPDATE',
         [guildId, subcommand]
       );
 
@@ -266,10 +279,24 @@ export default {
             settings.enabled = interaction.options.getBoolean('enabled');
             updates.push(`Enabled: **${settings.enabled}**`);
           }
+          
+          // FIX BUG #5: Verify channel permissions
           if (interaction.options.getChannel('log_channel')) {
-            settings.log_channel = interaction.options.getChannel('log_channel')!.id;
+            const logChannel = interaction.options.getChannel('log_channel') as TextChannel;
+            const permissions = logChannel.permissionsFor(interaction.guild!.members.me!);
+            
+            if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
+              await client.query('ROLLBACK');
+              return interaction.reply({
+                content: `❌ I don't have permission to send messages in <#${logChannel.id}>.`,
+                ephemeral: true,
+              });
+            }
+            
+            settings.log_channel = logChannel.id;
             updates.push(`Log Channel: <#${settings.log_channel}>`);
           }
+          
           if (interaction.options.getRole('mute_role')) {
             settings.mute_role = interaction.options.getRole('mute_role')!.id;
             updates.push(`Mute Role: <@&${settings.mute_role}>`);
@@ -305,12 +332,41 @@ export default {
             settings.daily_amount = interaction.options.getInteger('daily_amount');
             updates.push(`Daily Amount: **${settings.daily_amount}**`);
           }
-          if (interaction.options.getInteger('work_min')) {
-            settings.work_min = interaction.options.getInteger('work_min');
+          
+          // FIX BUG #1: Validate work_min <= work_max
+          const workMin = interaction.options.getInteger('work_min');
+          const workMax = interaction.options.getInteger('work_max');
+          
+          if (workMin && workMax && workMin > workMax) {
+            await client.query('ROLLBACK');
+            return interaction.reply({
+              content: `❌ Work minimum (${workMin}) cannot be greater than work maximum (${workMax}).`,
+              ephemeral: true,
+            });
+          }
+          
+          if (workMin && settings.work_max && workMin > settings.work_max) {
+            await client.query('ROLLBACK');
+            return interaction.reply({
+              content: `❌ Work minimum (${workMin}) cannot be greater than current work maximum (${settings.work_max}).`,
+              ephemeral: true,
+            });
+          }
+          
+          if (workMax && settings.work_min && workMax < settings.work_min) {
+            await client.query('ROLLBACK');
+            return interaction.reply({
+              content: `❌ Work maximum (${workMax}) cannot be less than current work minimum (${settings.work_min}).`,
+              ephemeral: true,
+            });
+          }
+          
+          if (workMin) {
+            settings.work_min = workMin;
             updates.push(`Work Min: **${settings.work_min}**`);
           }
-          if (interaction.options.getInteger('work_max')) {
-            settings.work_max = interaction.options.getInteger('work_max');
+          if (workMax) {
+            settings.work_max = workMax;
             updates.push(`Work Max: **${settings.work_max}**`);
           }
           break;
@@ -328,10 +384,23 @@ export default {
             settings.xp_cooldown = interaction.options.getInteger('xp_cooldown');
             updates.push(`XP Cooldown: **${settings.xp_cooldown}s**`);
           }
+          
           if (interaction.options.getChannel('level_up_channel')) {
-            settings.level_up_channel = interaction.options.getChannel('level_up_channel')!.id;
+            const levelUpChannel = interaction.options.getChannel('level_up_channel') as TextChannel;
+            const permissions = levelUpChannel.permissionsFor(interaction.guild!.members.me!);
+            
+            if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
+              await client.query('ROLLBACK');
+              return interaction.reply({
+                content: `❌ I don't have permission to send messages in <#${levelUpChannel.id}>.`,
+                ephemeral: true,
+              });
+            }
+            
+            settings.level_up_channel = levelUpChannel.id;
             updates.push(`Level-Up Channel: <#${settings.level_up_channel}>`);
           }
+          
           if (interaction.options.getBoolean('stack_roles') !== null) {
             settings.stack_roles = interaction.options.getBoolean('stack_roles');
             updates.push(`Stack Roles: **${settings.stack_roles}**`);
@@ -366,14 +435,28 @@ export default {
             settings.enabled = interaction.options.getBoolean('enabled');
             updates.push(`Enabled: **${settings.enabled}**`);
           }
+          
           if (interaction.options.getChannel('chat_channel')) {
-            settings.chat_channel = interaction.options.getChannel('chat_channel')!.id;
+            const chatChannel = interaction.options.getChannel('chat_channel') as TextChannel;
+            const permissions = chatChannel.permissionsFor(interaction.guild!.members.me!);
+            
+            if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
+              await client.query('ROLLBACK');
+              return interaction.reply({
+                content: `❌ I don't have permission to send messages in <#${chatChannel.id}>.`,
+                ephemeral: true,
+              });
+            }
+            
+            settings.chat_channel = chatChannel.id;
             updates.push(`Chat Channel: <#${settings.chat_channel}>`);
           }
+          
           if (interaction.options.getBoolean('auto_moderate') !== null) {
             settings.auto_moderate = interaction.options.getBoolean('auto_moderate');
             updates.push(`Auto-Moderate: **${settings.auto_moderate}**`);
           }
+          // FIX BUG #6: Documented as float for AI toxicity analysis
           if (interaction.options.getNumber('toxicity_threshold') !== null) {
             settings.toxicity_threshold = interaction.options.getNumber('toxicity_threshold');
             updates.push(`Toxicity Threshold: **${settings.toxicity_threshold}**`);
@@ -401,8 +484,20 @@ export default {
             settings.daily_reward = interaction.options.getInteger('daily_reward');
             updates.push(`Daily Reward: **${settings.daily_reward}**`);
           }
+          
           if (interaction.options.getChannel('quest_channel')) {
-            settings.quest_channel = interaction.options.getChannel('quest_channel')!.id;
+            const questChannel = interaction.options.getChannel('quest_channel') as TextChannel;
+            const permissions = questChannel.permissionsFor(interaction.guild!.members.me!);
+            
+            if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
+              await client.query('ROLLBACK');
+              return interaction.reply({
+                content: `❌ I don't have permission to send messages in <#${questChannel.id}>.`,
+                ephemeral: true,
+              });
+            }
+            
+            settings.quest_channel = questChannel.id;
             updates.push(`Quest Channel: <#${settings.quest_channel}>`);
           }
           break;
@@ -412,18 +507,44 @@ export default {
             settings.enabled = interaction.options.getBoolean('enabled');
             updates.push(`Enabled: **${settings.enabled}**`);
           }
+          
           if (interaction.options.getChannel('category')) {
-            settings.category = interaction.options.getChannel('category')!.id;
+            const category = interaction.options.getChannel('category') as CategoryChannel;
+            const permissions = category.permissionsFor(interaction.guild!.members.me!);
+            
+            if (!permissions?.has(['ManageChannels', 'ViewChannel'])) {
+              await client.query('ROLLBACK');
+              return interaction.reply({
+                content: `❌ I don't have permission to manage channels in category <#${category.id}>.`,
+                ephemeral: true,
+              });
+            }
+            
+            settings.category = category.id;
             updates.push(`Category: <#${settings.category}>`);
           }
+          
           if (interaction.options.getRole('support_role')) {
             settings.support_role = interaction.options.getRole('support_role')!.id;
             updates.push(`Support Role: <@&${settings.support_role}>`);
           }
+          
           if (interaction.options.getChannel('transcript_channel')) {
-            settings.transcript_channel = interaction.options.getChannel('transcript_channel')!.id;
+            const transcriptChannel = interaction.options.getChannel('transcript_channel') as TextChannel;
+            const permissions = transcriptChannel.permissionsFor(interaction.guild!.members.me!);
+            
+            if (!permissions?.has(['SendMessages', 'ViewChannel', 'AttachFiles'])) {
+              await client.query('ROLLBACK');
+              return interaction.reply({
+                content: `❌ I don't have permission to send files in <#${transcriptChannel.id}>.`,
+                ephemeral: true,
+              });
+            }
+            
+            settings.transcript_channel = transcriptChannel.id;
             updates.push(`Transcript Channel: <#${settings.transcript_channel}>`);
           }
+          
           if (interaction.options.getInteger('auto_close_hours')) {
             settings.auto_close_hours = interaction.options.getInteger('auto_close_hours');
             updates.push(`Auto-Close: **${settings.auto_close_hours}h**`);
@@ -455,14 +576,15 @@ export default {
       }
 
       if (updates.length === 0) {
+        await client.query('ROLLBACK');
         return interaction.reply({
           content: '❌ No options provided. Please specify at least one option to update.',
           ephemeral: true,
         });
       }
 
-      // Update database
-      await pool.query(
+      // Update database within transaction
+      await client.query(
         `INSERT INTO guild_modules (guild_id, module_name, guild_settings, updated_at)
          VALUES ($1, $2, $3, NOW())
          ON CONFLICT (guild_id, module_name)
@@ -470,11 +592,7 @@ export default {
         [guildId, subcommand, JSON.stringify(settings)]
       );
 
-      // Create audit log
-      await pool.query(
-        'INSERT INTO audit_logs (guild_id, user_id, action, details) VALUES ($1, $2, $3, $4)',
-        [guildId, interaction.user.id, 'config_update', JSON.stringify({ module: subcommand, updates })]
-      );
+      await client.query('COMMIT');
 
       const embed = new EmbedBuilder()
         .setColor(0x00ff00)
@@ -486,12 +604,25 @@ export default {
       await interaction.reply({ embeds: [embed] });
 
       logger.info(`Config updated for ${subcommand} in guild ${guildId} by ${interaction.user.tag}`);
+
+      // FIX BUG #4: Non-blocking audit log (runs after response)
+      try {
+        await pool.query(
+          'INSERT INTO audit_logs (guild_id, user_id, action, details) VALUES ($1, $2, $3, $4)',
+          [guildId, interaction.user.id, 'config_update', JSON.stringify({ module: subcommand, updates })]
+        );
+      } catch (auditError) {
+        logger.warn('Failed to create audit log (non-critical):', auditError);
+      }
     } catch (error) {
+      await client.query('ROLLBACK');
       logger.error('Error updating config:', error);
       await interaction.reply({
         content: '❌ An error occurred while updating configuration.',
         ephemeral: true,
       });
+    } finally {
+      client.release();
     }
   },
 };
