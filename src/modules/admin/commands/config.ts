@@ -7,7 +7,7 @@ import {
   TextChannel,
   CategoryChannel,
 } from 'discord.js';
-import { pool } from '../../../database/pool.js';
+import { pool } from '../../../database/manager.js';
 import { logger } from '../../../utils/logger.js';
 
 export default {
@@ -247,7 +247,7 @@ export default {
         )
     ),
 
-  async execute(interaction: ChatInputCommandInteraction) {
+  async execute(interaction: ChatInputCommandInteraction): Promise<void> {
     const subcommand = interaction.options.getSubcommand();
     const guildId = interaction.guildId!;
 
@@ -287,10 +287,11 @@ export default {
             
             if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
               await client.query('ROLLBACK');
-              return interaction.reply({
+              await interaction.reply({
                 content: `❌ I don't have permission to send messages in <#${logChannel.id}>.`,
                 ephemeral: true,
               });
+              return;
             }
             
             settings.log_channel = logChannel.id;
@@ -339,26 +340,29 @@ export default {
           
           if (workMin && workMax && workMin > workMax) {
             await client.query('ROLLBACK');
-            return interaction.reply({
+            await interaction.reply({
               content: `❌ Work minimum (${workMin}) cannot be greater than work maximum (${workMax}).`,
               ephemeral: true,
             });
+            return;
           }
           
           if (workMin && settings.work_max && workMin > settings.work_max) {
             await client.query('ROLLBACK');
-            return interaction.reply({
+            await interaction.reply({
               content: `❌ Work minimum (${workMin}) cannot be greater than current work maximum (${settings.work_max}).`,
               ephemeral: true,
             });
+            return;
           }
           
           if (workMax && settings.work_min && workMax < settings.work_min) {
             await client.query('ROLLBACK');
-            return interaction.reply({
+            await interaction.reply({
               content: `❌ Work maximum (${workMax}) cannot be less than current work minimum (${settings.work_min}).`,
               ephemeral: true,
             });
+            return;
           }
           
           if (workMin) {
@@ -391,10 +395,11 @@ export default {
             
             if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
               await client.query('ROLLBACK');
-              return interaction.reply({
+              await interaction.reply({
                 content: `❌ I don't have permission to send messages in <#${levelUpChannel.id}>.`,
                 ephemeral: true,
               });
+              return;
             }
             
             settings.level_up_channel = levelUpChannel.id;
@@ -442,10 +447,11 @@ export default {
             
             if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
               await client.query('ROLLBACK');
-              return interaction.reply({
+              await interaction.reply({
                 content: `❌ I don't have permission to send messages in <#${chatChannel.id}>.`,
                 ephemeral: true,
               });
+              return;
             }
             
             settings.chat_channel = chatChannel.id;
@@ -491,10 +497,11 @@ export default {
             
             if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
               await client.query('ROLLBACK');
-              return interaction.reply({
+              await interaction.reply({
                 content: `❌ I don't have permission to send messages in <#${questChannel.id}>.`,
                 ephemeral: true,
               });
+              return;
             }
             
             settings.quest_channel = questChannel.id;
@@ -514,10 +521,11 @@ export default {
             
             if (!permissions?.has(['ManageChannels', 'ViewChannel'])) {
               await client.query('ROLLBACK');
-              return interaction.reply({
+              await interaction.reply({
                 content: `❌ I don't have permission to manage channels in category <#${category.id}>.`,
                 ephemeral: true,
               });
+              return;
             }
             
             settings.category = category.id;
@@ -535,10 +543,11 @@ export default {
             
             if (!permissions?.has(['SendMessages', 'ViewChannel', 'AttachFiles'])) {
               await client.query('ROLLBACK');
-              return interaction.reply({
+              await interaction.reply({
                 content: `❌ I don't have permission to send files in <#${transcriptChannel.id}>.`,
                 ephemeral: true,
               });
+              return;
             }
             
             settings.transcript_channel = transcriptChannel.id;
@@ -577,10 +586,11 @@ export default {
 
       if (updates.length === 0) {
         await client.query('ROLLBACK');
-        return interaction.reply({
+        await interaction.reply({
           content: '❌ No options provided. Please specify at least one option to update.',
           ephemeral: true,
         });
+        return;
       }
 
       // Update database within transaction
