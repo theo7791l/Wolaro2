@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 import { logger } from '../../../utils/logger.js';
+import { ValidationUtils } from '../../../utils/validation';
 
 export class BuyCommand implements ICommand {
   data = new SlashCommandBuilder()
@@ -45,26 +46,44 @@ export class BuyCommand implements ICommand {
       return;
     }
 
+    // Valider le prix de l'item
     try {
-      // Get user RPG profile
-      const result = await context.database.query(
-        'SELECT gold, inventory FROM rpg_profiles WHERE guild_id = $1 AND user_id = $2',
+      ValidationUtils.requireValidAmount(item.price, 'prix de l\'item');
+    } catch (error) {
+      logger.error('Invalid item price:', { itemId, price: item.price });
+      await interaction.reply({
+        content: '❌ Erreur: prix de l\'item invalide. Contactez un administrateur.'
+      });
+      return;
+    }
+
+    const client = await context.database.pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+
+      // Get user RPG profile avec lock FOR UPDATE pour éviter race conditions
+      const result = await client.query(
+        'SELECT gold, inventory FROM rpg_profiles WHERE guild_id = $1 AND user_id = $2 FOR UPDATE',
         [interaction.guildId!, interaction.user.id]
       );
 
-      if (!result.length) {
+      if (!result.rows.length) {
+        await client.query('ROLLBACK');
         await interaction.reply({
           content: '❌ Vous n\'avez pas encore de profil RPG ! Utilisez `/rpgstart` pour commencer.'
         });
         return;
       }
 
-      const gold = result[0].gold;
-      const inventory = result[0].inventory || [];
+      const gold = Number(result.rows[0].gold);
+      const inventory = result.rows[0].inventory || [];
 
-      if (gold < item.price) {
+      // Vérifier le solde
+      if (!ValidationUtils.hasSufficientBalance(item.price, gold)) {
+        await client.query('ROLLBACK');
         await interaction.reply({
-          content: `❌ Vous n'avez pas assez d'or ! Il vous manque **${item.price - gold}** or.\\nVotre or: **${gold}** or`
+          content: `❌ Vous n'avez pas assez d'or ! Il vous manque **${item.price - gold}** or.\nVotre or: **${gold}** or`
         });
         return;
       }
@@ -80,16 +99,39 @@ export class BuyCommand implements ICommand {
         purchasedAt: new Date().toISOString(),
       });
 
-      // Deduct gold and update inventory using INSERT ON CONFLICT
-      await context.database.query(
-        `INSERT INTO rpg_profiles (guild_id, user_id, gold, inventory)
-         VALUES ($1, $2, 0, '[]'::jsonb)
-         ON CONFLICT (guild_id, user_id)
-         DO UPDATE SET 
-           gold = rpg_profiles.gold - $3,
-           inventory = $4::jsonb`,
+      // Deduct gold and update inventory atomiquement
+      const updateResult = await client.query(
+        `UPDATE rpg_profiles 
+         SET gold = gold - $3, inventory = $4::jsonb
+         WHERE guild_id = $1 AND user_id = $2 AND gold >= $3
+         RETURNING gold`,
         [interaction.guildId!, interaction.user.id, item.price, JSON.stringify(inventory)]
       );
+
+      if (updateResult.rowCount === 0) {
+        // Race condition: solde insuffisant entre le check et l'update
+        await client.query('ROLLBACK');
+        await interaction.reply({
+          content: '❌ Solde insuffisant. Quelqu\'un d\'autre a modifié votre profil pendant l\'achat.'
+        });
+        return;
+      }
+
+      const newGold = Number(updateResult.rows[0].gold);
+
+      // Log action
+      await client.query(
+        `INSERT INTO action_logs (user_id, action_type, metadata, guild_id, created_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [
+          interaction.user.id,
+          'RPG_ITEM_PURCHASE',
+          JSON.stringify({ itemId, itemName: item.name, price: item.price }),
+          interaction.guildId!
+        ]
+      );
+
+      await client.query('COMMIT');
 
       let statsText = '';
       if (item.attack) statsText += `+${item.attack} ATK `;
@@ -97,23 +139,18 @@ export class BuyCommand implements ICommand {
       if (item.heal) statsText += `+${item.heal} HP `;
 
       await interaction.reply(
-        `✅ Vous avez acheté **${item.name}** pour **${item.price}** or !\\n${statsText}\\nOr restant: **${gold - item.price}** or`
+        `✅ Vous avez acheté **${item.name}** pour **${item.price}** or !\n${statsText}\nOr restant: **${newGold}** or`
       );
 
-      logger.info(`RPG item purchased: ${item.name} by ${interaction.user.tag} in guild ${interaction.guildId}`);
-
-      // Log action
-      await context.database.logAction(
-        interaction.user.id,
-        'RPG_ITEM_PURCHASE',
-        { itemId, itemName: item.name, price: item.price },
-        interaction.guildId!
-      );
+      logger.info(`RPG item purchased: ${item.name} by ${interaction.user.username} in guild ${interaction.guildId}`);
     } catch (error) {
+      await client.query('ROLLBACK');
       logger.error('Error in rpgbuy command:', error);
       await interaction.reply({
         content: '❌ Erreur lors de l\'achat. Veuillez réessayer.'
       });
+    } finally {
+      client.release();
     }
   }
 }
