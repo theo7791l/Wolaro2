@@ -33,12 +33,29 @@ export class CommandHandler {
     try {
       const commands = this.moduleLoader.getAllCommands();
       const commandData = commands.map((cmd) => cmd.data.toJSON());
-      const rest = new REST({ version: '10' }).setToken(config.token);
+      
+      const rest = new REST({ version: '10', timeout: 30000 }).setToken(config.token);
+      
       logger.info(`Started refreshing ${commandData.length} application (/) commands.`);
-      await rest.put(Routes.applicationCommands(config.clientId), { body: commandData });
-      logger.info(`Successfully registered ${commandData.length} application (/) commands.`);
-    } catch (error) {
+      
+      // Wrapper avec timeout pour éviter le blocage infini
+      const registrationPromise = rest.put(
+        Routes.applicationCommands(config.clientId), 
+        { body: commandData }
+      );
+      
+      // Timeout de 30 secondes
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Command registration timeout after 30s')), 30000)
+      );
+      
+      await Promise.race([registrationPromise, timeoutPromise]);
+      
+      logger.info(`✅ Successfully registered ${commandData.length} application (/) commands.`);
+    } catch (error: any) {
       logger.error('Failed to register slash commands:', error);
+      logger.warn('⚠️ Bot will continue without updating commands. Existing commands will still work.');
+      // Ne pas crash le bot, continuer sans mettre à jour les commandes
     }
   }
 
