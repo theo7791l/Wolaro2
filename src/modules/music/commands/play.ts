@@ -1,24 +1,26 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, GuildMember } from 'discord.js';
+import {
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+  GuildMember,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+} from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
-import { MusicQueue } from '../utils/queue';
-import * as play from 'play-dl';
 import { logger } from '../../../utils/logger';
-
-interface SearchResult {
-  title: string;
-  url: string;
-  duration: number;
-  thumbnail: string;
-}
+import { newpipe, NewPipeSearchResult } from '../utils/newpipe';
+import { getPlayer } from '../utils/player';
 
 export class PlayCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Jouer une musique depuis YouTube, Spotify ou SoundCloud')
+    .setDescription('Jouer une musique depuis YouTube avec NewPipe')
     .addStringOption((option) =>
       option
-        .setName('recherche')
-        .setDescription('URL ou terme de recherche')
+        .setName('titre')
+        .setDescription('Titre de la musique à rechercher')
         .setRequired(true),
     ) as SlashCommandBuilder;
 
@@ -32,118 +34,146 @@ export class PlayCommand implements ICommand {
 
     if (!voiceChannel) {
       await interaction.reply({
-        content: '\u274c Vous devez \u00eatre dans un salon vocal pour utiliser cette commande.'
+        content: '❌ Vous devez être dans un salon vocal pour utiliser cette commande.',
+        ephemeral: true,
       });
       return;
     }
 
-    const query = interaction.options.getString('recherche', true);
+    const query = interaction.options.getString('titre', true);
 
     await interaction.deferReply();
 
     try {
-      // Get or create queue for this guild
-      let queue = MusicQueue.get(interaction.guildId!);
-
-      // Check if bot is in voice channel
-      if (!queue) {
-        // Create new queue and join voice
-        queue = await MusicQueue.create(
-          interaction.guildId!,
-          voiceChannel.id,
-          interaction.channel!.id,
-          context.client,
+      // Vérifier si yt-dlp est installé
+      const isInstalled = await newpipe.checkInstallation();
+      if (!isInstalled) {
+        await interaction.editReply(
+          '❌ **yt-dlp n\'est pas installé !**\n\n' +
+          'Installez-le avec:\n' +
+          '```bash\n' +
+          'pip install -U yt-dlp\n' +
+          '# ou\n' +
+          'sudo apt install yt-dlp\n' +
+          '```'
         );
-      }
-
-      // Search for track
-      const track = await this.searchTrack(query);
-
-      if (!track) {
-        await interaction.editReply('\u274c Aucun r\u00e9sultat trouv\u00e9.');
         return;
       }
 
-      // Add to queue
-      queue.addTrack({
-        title: track.title,
-        url: track.url,
-        duration: track.duration,
-        thumbnail: track.thumbnail,
-        requester: interaction.user.id,
+      // Rechercher sur YouTube
+      await interaction.editReply(`🔍 Recherche de "**${query}**" sur YouTube...`);
+      const results = await newpipe.search(query, 10);
+
+      if (results.length === 0) {
+        await interaction.editReply('❌ Aucun résultat trouvé.');
+        return;
+      }
+
+      // Créer l'embed avec les résultats
+      const embed = this.createResultsEmbed(results, query);
+
+      await interaction.editReply({
+        content: '🎵 **Résultats de recherche** - Répondez avec un numéro entre **1** et **10** :',
+        embeds: [embed],
       });
 
-      if (queue.isPlaying()) {
-        await interaction.editReply(
-          `\u2705 **${track.title}** ajout\u00e9 \u00e0 la queue (Position: ${queue.tracks.length})`,
-        );
-      } else {
-        await interaction.editReply(`\ud83c\udfb5 Lecture en cours: **${track.title}**`);
-        await queue.play();
+      // Attendre une réponse numérique (1-10)
+      const filter = (msg: any) => {
+        const num = parseInt(msg.content);
+        return msg.author.id === interaction.user.id && num >= 1 && num <= results.length;
+      };
+
+      try {
+        const collected = await interaction.channel!.awaitMessages({
+          filter,
+          max: 1,
+          time: 60000, // 60 secondes
+          errors: ['time'],
+        });
+
+        const choice = parseInt(collected.first()!.content);
+        const selected = results[choice - 1];
+
+        // Supprimer le message de choix de l'utilisateur
+        await collected.first()!.delete().catch(() => {});
+
+        // Jouer la musique sélectionnée
+        await this.playTrack(interaction, voiceChannel, selected, context);
+      } catch (error) {
+        await interaction.followUp({
+          content: '⏰ **Temps écoulé** - Vous n\'avez pas répondu à temps.',
+          ephemeral: true,
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error in play command:', error);
-      await interaction.editReply('\u274c Erreur lors de la lecture de la musique.');
+      await interaction.editReply(`❌ Erreur: ${error.message}`);
     }
   }
 
-  private async searchTrack(query: string): Promise<SearchResult | null> {
+  private createResultsEmbed(results: NewPipeSearchResult[], query: string): EmbedBuilder {
+    const embed = new EmbedBuilder()
+      .setColor(0x1DB954)
+      .setTitle(`🔎 Résultats pour "${query}"`)
+      .setDescription(results.map((r, i) => 
+        `**${i + 1}.** [${r.title}](${r.url})\n` +
+        `⏱️ ${r.duration} | 👤 ${r.uploader}`
+      ).join('\n\n'))
+      .setFooter({ text: 'Répondez avec un numéro entre 1 et 10 pour choisir' })
+      .setTimestamp();
+
+    return embed;
+  }
+
+  private async playTrack(
+    interaction: ChatInputCommandInteraction,
+    voiceChannel: any,
+    track: NewPipeSearchResult,
+    context: ICommandContext
+  ): Promise<void> {
     try {
-      // Check if it's a URL
-      if (play.yt_validate(query) === 'video') {
-        const info = await play.video_info(query);
-        return {
-          title: info.video_details.title || 'Unknown',
-          url: info.video_details.url,
-          duration: info.video_details.durationInSec,
-          thumbnail: info.video_details.thumbnails[0]?.url || '',
-        };
-      } else if (play.yt_validate(query) === 'playlist') {
-        const playlist = await play.playlist_info(query, { incomplete: true });
-        const videos = await playlist.all_videos();
-        if (videos.length > 0) {
-          const firstVideo = videos[0];
-          return {
-            title: firstVideo.title || 'Unknown',
-            url: firstVideo.url,
-            duration: firstVideo.durationInSec,
-            thumbnail: firstVideo.thumbnails[0]?.url || '',
-          };
-        }
-      } else if (play.sp_validate(query)) {
-        // Spotify URL
-        const spotifyData = await play.spotify(query);
-        if (spotifyData.type === 'track') {
-          // Search for the track on YouTube
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const searchQuery = `${spotifyData.name} ${(spotifyData as any).artists?.map((a: any) => a.name).join(' ')}`;
-          const searched = await play.search(searchQuery, { limit: 1 });
-          if (searched.length > 0) {
-            return {
-              title: searched[0].title || 'Unknown',
-              url: searched[0].url,
-              duration: searched[0].durationInSec,
-              thumbnail: searched[0].thumbnails[0]?.url || '',
-            };
-          }
-        }
-      } else {
-        // Search YouTube
-        const searched = await play.search(query, { limit: 1 });
-        if (searched.length > 0) {
-          return {
-            title: searched[0].title || 'Unknown',
-            url: searched[0].url,
-            duration: searched[0].durationInSec,
-            thumbnail: searched[0].thumbnails[0]?.url || '',
-          };
-        }
+      await interaction.followUp(`🔄 Chargement de **${track.title}**...`);
+
+      // Récupérer le player de la guild
+      const player = getPlayer(interaction.guildId!);
+
+      // Rejoindre le salon vocal si pas déjà connecté
+      if (!player.isConnected()) {
+        await player.join(voiceChannel);
+        await interaction.followUp(`✅ Connecté au salon **${voiceChannel.name}**`);
       }
 
-      return null;
-    } catch (error) {
-      logger.error('Error searching track:', error);
-      return null;
+      // Ajouter à la queue et jouer
+      const queueItem = await player.addToQueue(track.url, interaction.user.id);
+
+      const currentTrack = player.getCurrentTrack();
+      
+      if (currentTrack && currentTrack.info.url !== queueItem.info.url) {
+        // Ajouté à la queue
+        const position = player.getQueue().length + 1;
+        await interaction.followUp(
+          `✅ **${track.title}** ajouté à la queue !\n` +
+          `📍 Position: **#${position}**\n` +
+          `⏱️ Durée: **${queueItem.info.duration}**`
+        );
+      } else {
+        // Lecture immédiate
+        const embed = new EmbedBuilder()
+          .setColor(0x1DB954)
+          .setTitle('🎵 Lecture en cours')
+          .setDescription(`**${queueItem.info.title}**`)
+          .addFields(
+            { name: '⏱️ Durée', value: queueItem.info.duration, inline: true },
+            { name: '👤 Chaîne', value: queueItem.info.uploader, inline: true },
+            { name: '🎶 Demandé par', value: `<@${interaction.user.id}>`, inline: true }
+          )
+          .setTimestamp();
+
+        await interaction.followUp({ embeds: [embed] });
+      }
+    } catch (error: any) {
+      logger.error('Failed to play track:', error);
+      await interaction.followUp(`❌ Impossible de jouer cette musique: ${error.message}`);
     }
   }
 }
