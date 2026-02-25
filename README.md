@@ -1,250 +1,207 @@
-# 🤖 Wolaro - Discord Bot Multi-Fonctions
+# Wolaro2 🤖
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
-[![Discord.js](https://img.shields.io/badge/Discord.js-14.14-5865F2.svg)](https://discord.js.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+> Bot Discord multifonction nouvelle génération avec système de protection avancée
 
-Bot Discord modulaire avancé avec système d'économie, RPG, modération IA, musique et bien plus.
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-green)](https://nodejs.org/)
+[![Discord.js](https://img.shields.io/badge/Discord.js-14.14-blurple)](https://discord.js.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
 
 ## ✨ Fonctionnalités
 
-- 🛡️ **Modération** - Anti-spam, auto-mod, logs, avertissements
-- 🤖 **Intelligence Artificielle** - Chatbot Gemini, auto-modération IA, analyse d'images
-- 💰 **Économie** - Monnaie virtuelle, daily, work, shop, inventaire
-- 📈 **Système de niveaux** - XP par message, rôles-récompenses
-- 🎵 **Musique** - YouTube, Spotify, SoundCloud, queue, filtres audio
-- ⚔️ **RPG** - Combat PvP/PvE, quêtes, inventaire, progression
-- 🎫 **Tickets** - Support, transcripts automatiques
-- 🎉 **Giveaways** - Concours automatiques, multi-gagnants
-- 🌐 **Panel Web** - Dashboard avec WebSocket temps réel
-- 🔐 **Sécurité** - JWT, chiffrement AES-256, rate limiting
+### 🛡️ Protection Avancée (TheoProtect Integration)
 
-## 🚀 Installation rapide
+Wolaro2 intègre tous les systèmes de protection de **TheoProtect** migrés en TypeScript :
+
+- **Anti-Spam** : Détection intelligente avec nettoyage automatique
+- **Bad Words Filter** : Filtrage FR/EN avec bypass detection
+- **Anti-Raid** : 6 facteurs de risque + système de captcha
+- **Anti-Phishing** : Détection par patterns + vérifications externes (Google Safe Browsing, PhishTank)
+- **Anti-Nuke** : Protection contre destruction massive (channels, roles, bans)
+- **NSFW Detection** : IA Sightengine pour détection contenu explicite (optionnel)
+- **Smart Lockdown** : Verrouillage serveur 4 niveaux avec escalade auto
+
+### 📊 Dashboard Web
+
+- Interface d'administration temps réel
+- Statistiques détaillées par système
+- Configuration graphique
+- Logs live stream
+- Charts et graphiques
+
+### 🎮 Autres Modules
+
+- **Modération** : Sanctions, logs, cas
+- **Tickets** : Système de support
+- **Niveaux** : XP et classements
+- **Économie** : Monnaie virtuelle
+- **Musique** : Lecture audio
+
+## 🚀 Installation
 
 ### Prérequis
 
-- Node.js ≥ 20.0.0
-- PostgreSQL ≥ 14
-- Redis ≥ 6
-- FFmpeg (pour la musique)
+- Node.js 20+
+- PostgreSQL 14+
+- Redis 7+ (optionnel)
+- Yarn ou npm
 
-### 1. Clone et install
+### Configuration
 
 ```bash
+# Cloner le repo
 git clone https://github.com/theo7791l/Wolaro2.git
 cd Wolaro2
-npm install
-```
 
-### 2. Configuration
+# Installer les dépendances
+yarn install
 
-```bash
+# Copier .env.example
 cp .env.example .env
+
+# Configurer les variables
 nano .env
 ```
 
-**⚠️ IMPORTANT : Configuration de la clé API Gemini**
-
-Pour que les fonctionnalités IA fonctionnent, vous DEVEZ configurer `GEMINI_API_KEY` :
-
-1. Rendez-vous sur [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-2. Connectez-vous avec votre compte Google
-3. Cliquez sur **"Create API Key"** → **"Create API key in new project"**
-4. Copiez la clé (format `AIzaSy...`)
-5. Dans `.env`, remplacez :
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-   par votre vraie clé :
-   ```env
-   GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-   ```
-
-**Vérification :** Au démarrage du bot, vous devriez voir :
-```
-: Gemini client initialized with model: gemini-2.5-flash, API key: AIzaSyXX...
-```
-
-Si vous voyez `API key:` (vide), la clé n'est pas chargée.
-
-### 3. Base de données
+### Variables d'environnement
 
 ```bash
-psql -U postgres
-CREATE DATABASE wolaro;
-CREATE USER wolaro WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE wolaro TO wolaro;
-\q
-
-npm run migrate
-```
-
-### 4. Build et démarrage
-
-```bash
-npm run build
-npm start
-
-# OU en mode développement avec hot-reload
-npm run dev
-```
-
-### 5. Déploiement des commandes
-
-```bash
-# Déploiement global (1h de propagation Discord)
-npm run deploy-commands
-
-# OU déploiement instantané sur un serveur de test
-GUILD_ID=1234567890 npm run deploy-commands
-```
-
-## 📦 Scripts disponibles
-
-```bash
-npm run dev                # Développement avec hot-reload
-npm run build              # Compile TypeScript → JavaScript
-npm start                  # Démarre le bot en production
-npm run deploy-commands    # Enregistre les slash commands
-npm run lint               # Vérifie le code
-npm run lint:fix           # Corrige automatiquement les erreurs
-npm run format             # Formate le code avec Prettier
-npm test                   # Lance les tests
-npm run migrate            # Applique les migrations de base de données
-```
-
-## 🔧 Configuration des modules
-
-Une fois le bot démarré, configurez chaque module avec `/config` :
-
-```
-/config → Sélectionnez un module → Remplissez le formulaire
-```
-
-**Exemple de configuration AI :**
-- Activé : `true`
-- Salon chat IA : `1234567890` (ID du salon)
-- Auto-modération IA : `true`
-- Seuil toxicité : `0.6` (0.0-1.0)
-- Chance de réponse : `50` (% de chance de réponse automatique)
-
-## 🐳 Déploiement Docker (optionnel)
-
-```bash
-# Build l'image
-docker build -t wolaro .
-
-# Lance avec docker-compose
-docker-compose up -d
-```
-
-## 🛠️ Architecture
-
-```
-src/
-├── modules/          # Modules (admin, ai, economy, etc.)
-│   ├── admin/
-│   │   ├── commands/ # Slash commands
-│   │   └── events/   # Event handlers
-│   └── ai/
-│       ├── commands/
-│       ├── events/
-│       └── utils/    # GeminiClient, etc.
-├── core/             # Core système (CommandHandler, EventHandler)
-├── utils/            # Utilitaires (logger, database, redis)
-├── types/            # Types TypeScript
-└── index.ts          # Point d'entrée
-```
-
-## 📝 Variables d'environnement essentielles
-
-```env
 # Discord
-DISCORD_TOKEN=your_token
+DISCORD_TOKEN=your_bot_token
 DISCORD_CLIENT_ID=your_client_id
 
 # Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=wolaro
-DB_USER=wolaro
-DB_PASSWORD=your_password
+DATABASE_URL=postgresql://user:password@localhost:5432/wolaro2
+REDIS_URL=redis://localhost:6379
 
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
+# APIs (Optionnelles)
+GOOGLE_SAFE_BROWSING_KEY=xxx          # Anti-Phishing amélioré
+SIGHTENGINE_API_USER=xxx              # NSFW Detection
+SIGHTENGINE_API_SECRET=xxx
 
-# API
-API_PORT=3000
-API_JWT_SECRET=your_jwt_secret_32_chars_min
-
-# AI (REQUIS pour fonctionnalités IA)
-GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# Dashboard
+WEB_PORT=3000
+WEB_SECRET=random_secret_key
 ```
 
-## 🔍 Troubleshooting
+### Lancement
 
-### Le bot démarre mais l'IA ne fonctionne pas
-
-**Symptôme :** Logs montrent `API key:` (vide)
-
-**Solution :**
-1. Vérifiez que `GEMINI_API_KEY` est dans `.env`
-2. Pas de guillemets autour de la clé
-3. Redémarrez le bot après modification du `.env`
-4. Testez avec `/ask question: Dis bonjour`
-
-### Erreur "tsx: not found"
-
-**Solution :** Exécutez `npm install` (tsx est maintenant en dépendance de production)
-
-### Les commandes n'apparaissent pas sur Discord
-
-**Solutions :**
-1. Attendez jusqu'à 1h (déploiement global)
-2. OU utilisez `GUILD_ID=xxx npm run deploy-commands` (instantané)
-3. Rechargez Discord (Ctrl+R)
-4. Vérifiez que le bot a le scope `applications.commands`
-
-### La musique ne fonctionne pas
-
-**Solution :** Installez FFmpeg :
 ```bash
-# Ubuntu/Debian
-sudo apt-get install ffmpeg
+# Développement
+yarn dev
 
-# macOS
-brew install ffmpeg
+# Production
+yarn build
+yarn start
+
+# Dashboard (terminal séparé)
+cd dashboard
+yarn dev
 ```
 
-## 📚 Documentation
+## 📖 Utilisation
 
-- [Guide de configuration](docs/CONFIGURATION.md)
-- [Guide des modules](docs/MODULES.md)
-- [API Documentation](docs/API.md)
-- [Architecture système](docs/ARCHITECTURE.md)
+### Commandes Protection
+
+```bash
+# Configuration
+/protection-config view                          # Voir config
+/protection-config spam [enabled] [level]        # Config anti-spam
+/protection-config raid [enabled] [captcha]      # Config anti-raid
+/protection-config phishing [enabled]            # Config anti-phishing
+/protection-config nuke [enabled]                # Config anti-nuke
+/protection-config nsfw [enabled] [threshold]    # Config NSFW
+
+# Lockdown
+/protection-lockdown activate [level] [reason]   # Activer
+/protection-lockdown deactivate                  # Désactiver
+/protection-lockdown status                      # Voir status
+
+# Monitoring
+/protection-stats [period] [type]                # Statistiques
+/protection-logs [limit] [type]                  # Logs récents
+
+# Whitelist
+/protection-whitelist add [user|role]            # Ajouter
+/protection-whitelist remove [user|role]         # Retirer
+/protection-whitelist list                       # Lister
+```
+
+### Dashboard
+
+Accédez à `http://localhost:3000` après avoir lancé le dashboard.
+
+- **Overview** : Statistiques globales
+- **Protection** : Config + stats par système
+- **Logs** : Stream temps réel
+- **Lockdown** : Contrôle lockdown
+- **Settings** : Configuration générale
+
+## 🏗️ Architecture
+
+```
+src/
+├── modules/
+│   ├── moderation/
+│   │   └── protection/          # Module Protection
+│   │       ├── systems/         # 8 systèmes de protection
+│   │       ├── commands/        # Commandes slash
+│   │       ├── events/          # Event handlers
+│   │       ├── database.ts      # Gestion BDD
+│   │       ├── types.ts         # Interfaces TypeScript
+│   │       └── index.ts         # Point d'entrée
+│   ├── tickets/
+│   ├── levels/
+│   └── ...
+├── utils/
+├── types/
+└── index.ts
+
+dashboard/
+├── src/
+│   ├── pages/
+│   ├── components/
+│   └── api/
+└── ...
+```
+
+## 📊 Systèmes de Protection
+
+| Système | Lignes | Fonctionnalités |
+|---------|--------|----------------|
+| Anti-Spam | 600 | Duplicate detection, rate limiting, cleanup auto |
+| Bad Words | 400 | Filtres FR/EN, bypass detection, whitelist |
+| Anti-Raid | 600 | 6 risk factors, captcha, auto-actions |
+| Anti-Phishing | 450 | Patterns, APIs externes, cache intelligent |
+| Anti-Nuke | 300 | 7 actions trackées, ban auto attaquant |
+| NSFW Detection | 350 | AI Sightengine, 3 modèles, cache 1h |
+| Smart Lockdown | 300 | 4 niveaux, auto-escalade, restore perms |
+| **Total** | **~3000** | **Module complet TypeScript** |
+
+## 🎯 Roadmap
+
+- [x] Migration TheoProtect → Wolaro2
+- [x] Dashboard web intégré
+- [x] APIs REST + WebSocket
+- [ ] Mobile app React Native
+- [ ] Machine Learning détection avancée
+- [ ] Multi-langue (i18n)
+- [ ] Plugin system
 
 ## 🤝 Contribution
 
-Les pull requests sont les bienvenues ! Pour des changements majeurs, ouvrez d'abord une issue.
+Les contributions sont les bienvenues ! Voir [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-```bash
-git checkout -b feature/ma-fonctionnalité
-git commit -m "feat: ajout de ma fonctionnalité"
-git push origin feature/ma-fonctionnalité
-```
+## 📄 License
 
-## 📄 Licence
-
-[MIT](LICENSE) © theo7791l
+MIT © [theo7791l](https://github.com/theo7791l)
 
 ## 🔗 Liens
 
-- [Site web](https://wolaro.fr)
-- [Discord](https://discord.gg/wolaro)
-- [Documentation](https://docs.wolaro.fr)
+- [Documentation](https://docs.wolaro.dev)
+- [Discord Support](https://discord.gg/wolaro)
+- [Changelog](./CHANGELOG.md)
 
 ---
 
-**Développé avec ❤️ par theo7791l**
+**Made with ❤️ by theo7791l**

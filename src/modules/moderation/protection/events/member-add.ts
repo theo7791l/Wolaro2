@@ -1,61 +1,49 @@
 /**
- * Protection Event: Member Add
- * Analyse chaque nouveau membre pour détection de raids
+ * Guild Member Add Event Handler
+ * Vérifie nouveaux membres pour raids + applique captcha si besoin
  */
 
 import { GuildMember } from 'discord.js';
+import protectionModule from '../index';
 import { logger } from '../../../../utils/logger';
-import type { WolaroEvent } from '../../../../types';
 
 export default {
   name: 'guildMemberAdd',
-  once: false,
-  
   async execute(member: GuildMember) {
     try {
-      // Import systems dynamically to avoid circular dependencies
-      const { antiRaid } = await import('../index');
-      if (!antiRaid) return;
+      const config = await (protectionModule as any).db.getConfig(member.guild.id);
 
-      // Analyze member
-      const analysis = await antiRaid.analyzeMemberJoin(member);
+      // Check if lockdown is active (RAID mode)
+      const lockdownStatus = protectionModule.smartLockdown.getStatus(member.guild.id);
+      if (lockdownStatus && config.antiraid_auto_lockdown) {
+        await member.kick('Lockdown actif - Nouveaux membres refusés');
+        logger.info(`[Protection] Kicked ${member.user.tag} during lockdown`);
+        return;
+      }
 
-      // Execute action if suspicious
-      if (analysis.isSuspicious && analysis.action.type !== 'NONE') {
-        const result = await antiRaid.executeAction(member, analysis.action, analysis.riskScore);
-        
-        // Log to channel
-        const config = await antiRaid['db'].getConfig(member.guild.id);
-        if (config.log_channel_id) {
-          const logChannel = member.guild.channels.cache.get(config.log_channel_id);
-          if (logChannel?.isTextBased()) {
-            await logChannel.send({
-              embeds: [{
-                color: analysis.riskScore >= 10 ? 0xff0000 : analysis.riskScore >= 7 ? 0xff6600 : 0xffaa00,
-                title: '🚨 Membre suspect détecté',
-                description:
-                  `**Membre:** ${member.user.tag} (${member.id})\n` +
-                  `**Score de risque:** ${analysis.riskScore}/15\n` +
-                  `**Mode raid:** ${analysis.raidMode ? '🔴 ACTIF' : '🟢 Inactif'}\n` +
-                  `**Action:** ${result.message}`,
-                fields: analysis.riskFactors.map(rf => ({
-                  name: `${rf.type} (+${rf.severity})`,
-                  value: rf.details,
-                  inline: true
-                })),
-                timestamp: new Date().toISOString(),
-                footer: { text: 'Wolaro Anti-Raid System' }
-              }]
-            });
+      // Anti-Raid Analysis
+      if (config.antiraid_enabled) {
+        const raidResult = await protectionModule.antiRaid.analyzeMember(member);
+
+        if (raidResult.action) {
+          await protectionModule.antiRaid.executeAction(member, raidResult.action, raidResult);
+
+          // Check for auto-lockdown
+          if (config.antiraid_auto_lockdown && raidResult.riskScore >= 7) {
+            await protectionModule.smartLockdown.autoEscalateLockdown(
+              member.guild,
+              raidResult.riskScore
+            );
           }
         }
 
-        logger.info(
-          `[AntiRaid] ${member.user.tag}: Risk ${analysis.riskScore} → ${analysis.action.type}`
-        );
+        // Send captcha if enabled and member not kicked
+        if (config.antiraid_captcha_enabled && raidResult.riskScore >= 3 && member.joinedAt) {
+          await protectionModule.antiRaid.sendCaptcha(member);
+        }
       }
     } catch (error) {
-      logger.error('[Protection Member Add] Error:', error);
+      logger.error('[Protection] Error in guildMemberAdd handler:', error);
     }
   }
-} as WolaroEvent;
+};
