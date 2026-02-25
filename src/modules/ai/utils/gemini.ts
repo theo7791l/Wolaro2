@@ -6,6 +6,14 @@ interface GenerateOptions {
   systemPrompt?: string;
 }
 
+interface GeminiErrorResponse {
+  error?: {
+    message?: string;
+    code?: number;
+    status?: string;
+  };
+}
+
 export class GeminiClient {
   private apiKey: string;
   private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
@@ -54,7 +62,7 @@ export class GeminiClient {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData: GeminiErrorResponse = await response.json().catch(() => ({}));
         
         // Log détaillé pour déboguer
         logger.error('Gemini API error details:', {
@@ -155,7 +163,7 @@ export class GeminiClient {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData: GeminiErrorResponse = await response.json().catch(() => ({}));
         logger.error('Gemini Vision API error:', {
           status: response.status,
           error: errorData,
