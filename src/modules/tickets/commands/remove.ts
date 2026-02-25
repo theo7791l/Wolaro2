@@ -43,7 +43,9 @@ export class RemoveUserCommand implements ICommand {
     }
 
     try {
-      await interaction.channel?.permissionOverwrites.delete(user.id);
+      if (interaction.channel && 'permissionOverwrites' in interaction.channel) {
+        await (interaction.channel as any).permissionOverwrites.delete(user.id);
+      }
       await interaction.reply(`✅ ${user} a été retiré du ticket.`);
     } catch (error) {
       await interaction.reply({
