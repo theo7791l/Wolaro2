@@ -7,11 +7,12 @@ import {
   TextChannel,
   CategoryChannel,
 } from 'discord.js';
+import { ICommand, ICommandContext } from '../../../types';
 import { pool } from '../../../database/manager.js';
 import { logger } from '../../../utils/logger.js';
 
-export default {
-  data: new SlashCommandBuilder()
+export class ConfigCommand implements ICommand {
+  data = new SlashCommandBuilder()
     .setName('config')
     .setDescription('⚙️ Configure bot modules for this server')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
@@ -245,9 +246,12 @@ export default {
             .setMinValue(0)
             .setMaxValue(90)
         )
-    ),
+    ) as SlashCommandBuilder;
 
-  async execute(interaction: ChatInputCommandInteraction): Promise<void> {
+  module = 'admin';
+  guildOnly = true;
+
+  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
     const subcommand = interaction.options.getSubcommand();
     const guildId = interaction.guildId!;
 
@@ -634,5 +638,5 @@ export default {
     } finally {
       client.release();
     }
-  },
-};
+  }
+}
