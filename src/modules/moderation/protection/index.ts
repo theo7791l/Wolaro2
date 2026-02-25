@@ -14,7 +14,13 @@ import { NSFWDetectionSystem } from './systems/nsfw-detection';
 import { SmartLockdownSystem } from './systems/smart-lockdown';
 import { CaptchaSystem } from './systems/captcha';
 import { ProtectionDatabase } from './database';
-import type { WolaroModule } from '../../../types';
+
+// Fix: Définition locale de l'interface au lieu d'import
+interface WolaroModule {
+  name: string;
+  initialize: (client: Client) => Promise<void>;
+  shutdown?: () => Promise<void>;
+}
 
 class ProtectionModule implements WolaroModule {
   name = 'protection';
