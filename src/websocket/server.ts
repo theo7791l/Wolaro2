@@ -93,7 +93,13 @@ export class WebSocketServer {
    */
   private async setupRedisSubscriber(): Promise<void> {
     try {
-      this.redisSubscriber = this.redis.getClient().duplicate();
+      const client = this.redis.getClient();
+      if (!client) {
+        logger.warn('Redis client not available, WebSocket will work without real-time updates');
+        return;
+      }
+      
+      this.redisSubscriber = client.duplicate();
       await this.redisSubscriber.connect();
 
       await this.redisSubscriber.subscribe('config:update', this.handleConfigUpdate.bind(this));
