@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 
 export class PayCommand implements ICommand {
@@ -30,7 +30,7 @@ export class PayCommand implements ICommand {
     if (target.bot) {
       await interaction.reply({
         content: '❌ Vous ne pouvez pas envoyer d\'argent à un bot.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -38,7 +38,7 @@ export class PayCommand implements ICommand {
     if (target.id === interaction.user.id) {
       await interaction.reply({
         content: '❌ Vous ne pouvez pas vous envoyer de l\'argent à vous-même.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -49,8 +49,8 @@ export class PayCommand implements ICommand {
       
       if (senderBalance < amount) {
         await interaction.reply({
-          content: `❌ Vous n'avez pas assez d'argent. Solde actuel : **${senderBalance} coins**.`,
-          ephemeral: true,
+          content: `❌ Vous n'avez pas assez d'argent. Solde actuel : **${senderBalance} coins**.,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -102,7 +102,7 @@ export class PayCommand implements ICommand {
     } catch (error) {
       await interaction.reply({
         content: '❌ Impossible de transférer l\'argent.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }

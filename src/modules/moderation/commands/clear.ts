@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, TextChannel } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, TextChannel, MessageFlags } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 
 export class ClearCommand implements ICommand {
@@ -29,7 +29,7 @@ export class ClearCommand implements ICommand {
     const amount = interaction.options.getInteger('nombre', true);
     const targetUser = interaction.options.getUser('utilisateur');
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const messages = await interaction.channel!.messages.fetch({ limit: 100 });
