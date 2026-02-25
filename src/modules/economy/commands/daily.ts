@@ -12,7 +12,7 @@ export class DailyCommand implements ICommand {
   cooldown = 5;
 
   async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
-    const client = await context.database.pool.connect();
+    const client = await context.database.getClient();
     
     try {
       await client.query('BEGIN');
