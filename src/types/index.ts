@@ -22,3 +22,7 @@ export interface BotConfig {
   databaseUrl: string;
   redisUrl?: string;
 }
+
+// Re-export pour compatibilité
+export type { WolaroModule as IModule };
+export type { Command as ICommand };
