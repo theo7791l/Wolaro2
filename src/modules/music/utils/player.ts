@@ -11,7 +11,6 @@ import {
 } from '@discordjs/voice';
 import { VoiceBasedChannel } from 'discord.js';
 import play from 'play-dl';
-import sodium from 'libsodium-wrappers';
 import { logger } from '../../../utils/logger';
 import { NewPipeAudioInfo, newpipe } from './newpipe';
 
@@ -26,7 +25,6 @@ export class MusicPlayer {
   private queue: QueueItem[] = [];
   private currentTrack: QueueItem | null = null;
   private isPlaying: boolean = false;
-  private static sodiumInitialized = false;
 
   constructor() {
     this.player = createAudioPlayer();
@@ -53,37 +51,32 @@ export class MusicPlayer {
   }
 
   /**
-   * Initialiser libsodium pour le chiffrement vocal
-   */
-  private async initializeSodium(): Promise<void> {
-    if (!MusicPlayer.sodiumInitialized) {
-      try {
-        await sodium.ready;
-        MusicPlayer.sodiumInitialized = true;
-        logger.info('libsodium initialized successfully');
-      } catch (error) {
-        logger.error('Failed to initialize libsodium:', error);
-        throw new Error('Impossible d\'initialiser le chiffrement vocal');
-      }
-    }
-  }
-
-  /**
    * Rejoindre un salon vocal
    */
   async join(channel: VoiceBasedChannel): Promise<VoiceConnection> {
     try {
-      // Initialiser libsodium avant de rejoindre
-      await this.initializeSodium();
-
       this.connection = joinVoiceChannel({
         channelId: channel.id,
         guildId: channel.guild.id,
         adapterCreator: channel.guild.voiceAdapterCreator as any,
       });
 
+      // Gérer les événements de connexion
+      this.connection.on('stateChange', (oldState, newState) => {
+        logger.debug(`Voice connection state changed: ${oldState.status} -> ${newState.status}`);
+      });
+
+      this.connection.on('error', (error) => {
+        logger.error('Voice connection error:', error);
+      });
+
       // Attendre que la connexion soit prête
-      await entersState(this.connection, VoiceConnectionStatus.Ready, 30000);
+      try {
+        await entersState(this.connection, VoiceConnectionStatus.Ready, 30000);
+      } catch (error) {
+        logger.error('Failed to enter Ready state:', error);
+        throw new Error('Timeout lors de la connexion au salon vocal');
+      }
 
       // S'abonner au player
       this.connection.subscribe(this.player);
@@ -93,9 +86,15 @@ export class MusicPlayer {
     } catch (error: any) {
       logger.error('Failed to join voice channel:', error);
       
+      // Nettoyer la connexion en cas d'erreur
+      if (this.connection) {
+        this.connection.destroy();
+        this.connection = null;
+      }
+      
       // Message d'erreur plus détaillé
       if (error.message?.includes('encryption')) {
-        throw new Error('Erreur de chiffrement vocal. Vérifiez que libsodium-wrappers est installé.');
+        throw new Error('Erreur de chiffrement vocal. Installez sodium ou libsodium-wrappers.');
       }
       
       throw new Error(`Impossible de rejoindre le salon vocal: ${error.message}`);
@@ -144,6 +143,8 @@ export class MusicPlayer {
     this.currentTrack = item;
 
     try {
+      logger.info(`Playing next track: ${item.info.title}`);
+      
       // Obtenir le stream audio depuis YouTube via play-dl
       const stream = await play.stream(item.info.url, {
         quality: 2, // Haute qualité audio
@@ -159,9 +160,16 @@ export class MusicPlayer {
       resource.volume?.setVolume(0.5);
 
       this.player.play(resource);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to play track:', error);
-      this.playNext(); // Essayer la suivante
+      
+      // Essayer la suivante si disponible
+      if (this.queue.length > 0) {
+        logger.info('Trying next track in queue...');
+        this.playNext();
+      } else {
+        this.currentTrack = null;
+      }
     }
   }
 
