@@ -47,10 +47,11 @@ export class NewPipeExtractor {
 
   /**
    * Extrait l'URL audio streamable d'une vidéo YouTube
+   * Pour play-dl, on retourne directement l'URL de la vidéo car le stream sera géré par le player
    */
   async getAudioUrl(videoUrl: string): Promise<NewPipeAudioInfo> {
     try {
-      logger.debug(`Extracting audio URL for: ${videoUrl}`);
+      logger.debug(`Extracting audio info for: ${videoUrl}`);
 
       // Vérifier le type d'URL
       const urlType = play.yt_validate(videoUrl);
@@ -61,21 +62,18 @@ export class NewPipeExtractor {
 
       // Obtenir les infos de la vidéo
       const info = await play.video_info(videoUrl);
-      
-      // Obtenir le stream audio
-      const stream = await play.stream(videoUrl, {
-        quality: 2, // Audio haute qualité
-      });
 
+      // Pour play-dl, on retourne l'URL de la vidéo
+      // Le player utilisera play-dl pour obtenir le stream audio
       return {
-        url: stream.stream.url,
+        url: videoUrl, // L'URL YouTube originale
         title: info.video_details.title || 'Sans titre',
         duration: this.formatDuration(info.video_details.durationInSec || 0),
         uploader: info.video_details.channel?.name || 'Inconnu',
       };
     } catch (error: any) {
-      logger.error('Failed to extract audio URL:', error);
-      throw new Error(`Impossible d'extraire l'audio: ${error.message}`);
+      logger.error('Failed to extract audio info:', error);
+      throw new Error(`Impossible d'extraire les infos audio: ${error.message}`);
     }
   }
 
