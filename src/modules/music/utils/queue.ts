@@ -59,7 +59,7 @@ export class MusicQueue {
     const connection = joinVoiceChannel({
       channelId: voiceChannelId,
       guildId: guildId,
-      adapterCreator: channel.guild.voiceAdapterCreator,
+      adapterCreator: channel.guild.voiceAdapterCreator as any,
     });
 
     // Create audio player
