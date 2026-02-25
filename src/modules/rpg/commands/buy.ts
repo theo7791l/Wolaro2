@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
+import { logger } from '../../../utils/logger.js';
 
 export class BuyCommand implements ICommand {
   data = new SlashCommandBuilder()
@@ -40,7 +41,7 @@ export class BuyCommand implements ICommand {
     if (!item) {
       await interaction.reply({
         content: '❌ Équipement introuvable. Utilisez `/rpgshop` pour voir les équipements disponibles.',
-        ephemeral: true,
+        flags: ['Ephemeral'],
       });
       return;
     }
@@ -55,7 +56,7 @@ export class BuyCommand implements ICommand {
       if (!result.length) {
         await interaction.reply({
           content: '❌ Vous n\'avez pas encore de profil RPG ! Utilisez `/rpgstart` pour commencer.',
-          ephemeral: true,
+          flags: ['Ephemeral'],
         });
         return;
       }
@@ -65,8 +66,8 @@ export class BuyCommand implements ICommand {
 
       if (gold < item.price) {
         await interaction.reply({
-          content: `❌ Vous n'avez pas assez d'or ! Il vous manque **${item.price - gold}** or.\nVotre or: **${gold}** or`,
-          ephemeral: true,
+          content: `❌ Vous n'avez pas assez d'or ! Il vous manque **${item.price - gold}** or.\\nVotre or: **${gold}** or`,
+          flags: ['Ephemeral'],
         });
         return;
       }
@@ -82,11 +83,14 @@ export class BuyCommand implements ICommand {
         purchasedAt: new Date().toISOString(),
       });
 
-      // Deduct gold and update inventory
+      // Deduct gold and update inventory using INSERT ON CONFLICT
       await context.database.query(
-        `UPDATE rpg_profiles 
-         SET gold = gold - $3, inventory = $4::jsonb
-         WHERE guild_id = $1 AND user_id = $2`,
+        `INSERT INTO rpg_profiles (guild_id, user_id, gold, inventory)
+         VALUES ($1, $2, 0, '[]'::jsonb)
+         ON CONFLICT (guild_id, user_id)
+         DO UPDATE SET 
+           gold = rpg_profiles.gold - $3,
+           inventory = $4::jsonb`,
         [interaction.guildId!, interaction.user.id, item.price, JSON.stringify(inventory)]
       );
 
@@ -96,8 +100,10 @@ export class BuyCommand implements ICommand {
       if (item.heal) statsText += `+${item.heal} HP `;
 
       await interaction.reply(
-        `✅ Vous avez acheté **${item.name}** pour **${item.price}** or !\n${statsText}\nOr restant: **${gold - item.price}** or`
+        `✅ Vous avez acheté **${item.name}** pour **${item.price}** or !\\n${statsText}\\nOr restant: **${gold - item.price}** or`
       );
+
+      logger.info(`RPG item purchased: ${item.name} by ${interaction.user.tag} in guild ${interaction.guildId}`);
 
       // Log action
       await context.database.logAction(
@@ -107,9 +113,10 @@ export class BuyCommand implements ICommand {
         interaction.guildId!
       );
     } catch (error) {
+      logger.error('Error in rpgbuy command:', error);
       await interaction.reply({
         content: '❌ Erreur lors de l\'achat. Veuillez réessayer.',
-        ephemeral: true,
+        flags: ['Ephemeral'],
       });
     }
   }
