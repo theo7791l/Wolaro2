@@ -1,13 +1,24 @@
 /**
- * Module Loader - Fixed type mismatch
+ * Module Loader - Fixed type imports
  */
 
 import { Client } from 'discord.js';
 import { Pool } from 'pg';
 import { RedisManager } from '../cache/redis';
 import { logger } from '../utils/logger';
-import type { WolaroModule } from '../types';
-import type { Command } from '../types';
+
+// Fix: Import direct des interfaces au lieu du module types
+interface WolaroModule {
+  name: string;
+  initialize: (client: Client) => Promise<void>;
+  shutdown?: () => Promise<void>;
+}
+
+interface Command {
+  data: any;
+  execute: (interaction: any) => Promise<void>;
+  cooldown?: number;
+}
 
 interface EventHandler {
   name: string;
