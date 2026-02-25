@@ -14,7 +14,7 @@ const router = Router();
  */
 
 // Get user guilds with bot presence and permissions
-router.get('/guilds', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.id;
     const database: DatabaseManager = req.app.locals.database;
@@ -46,7 +46,7 @@ router.get('/guilds', standardRateLimiter, authMiddleware, async (req: Request, 
 });
 
 // Get specific guild configuration
-router.get('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -91,7 +91,7 @@ router.get('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: 
 });
 
 // Update guild settings
-router.patch('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+router.patch('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -141,7 +141,7 @@ router.patch('/guilds/:guildId', standardRateLimiter, authMiddleware, async (req
 });
 
 // Get guild modules
-router.get('/guilds/:guildId/modules', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/modules', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -182,7 +182,7 @@ router.get('/guilds/:guildId/modules', standardRateLimiter, authMiddleware, asyn
 });
 
 // Toggle module
-router.patch('/guilds/:guildId/modules/:moduleName', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+router.patch('/guilds/:guildId/modules/:moduleName', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { guildId, moduleName } = req.params;
     const userId = (req as any).user.id;
@@ -235,7 +235,7 @@ router.patch('/guilds/:guildId/modules/:moduleName', standardRateLimiter, authMi
 });
 
 // Get guild analytics
-router.get('/guilds/:guildId/analytics', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/analytics', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -283,7 +283,7 @@ router.get('/guilds/:guildId/analytics', standardRateLimiter, authMiddleware, as
 });
 
 // Get audit logs
-router.get('/guilds/:guildId/audit', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+router.get('/guilds/:guildId/audit', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
@@ -335,7 +335,7 @@ router.get('/guilds/:guildId/audit', standardRateLimiter, authMiddleware, async 
 });
 
 // Sync guild data from Discord
-router.post('/guilds/:guildId/sync', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+router.post('/guilds/:guildId/sync', standardRateLimiter, authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { guildId } = req.params;
     const userId = (req as any).user.id;
