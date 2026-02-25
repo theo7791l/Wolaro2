@@ -2,7 +2,7 @@
 
 ## Fonctionnalités
 
-- 🔎 **Recherche YouTube** via NewPipe (yt-dlp)
+- 🔎 **Recherche YouTube** via play-dl (pas de sudo requis !)
 - 🎯 **Sélection interactive** : Choisissez parmi 10 résultats
 - 🎶 **Lecture audio** en haute qualité
 - 📋 **Système de queue** fonctionnel
@@ -10,58 +10,20 @@
 
 ## Installation
 
-### 1. Installer yt-dlp (NewPipe backend)
+### 1. Installer les dépendances Node.js
 
-**Ubuntu/Debian** :
 ```bash
-sudo apt update
-sudo apt install -y yt-dlp
-
-# Ou via pip pour la dernière version
-pip install -U yt-dlp
+cd ~/mmmm/Wolaro2
+npm install
 ```
 
-**macOS** :
-```bash
-brew install yt-dlp
-```
+**C'est tout !** ✅ Pas besoin de sudo ou de packages système
 
-**Windows** :
-```bash
-pip install -U yt-dlp
-```
-
-### 2. Installer ffmpeg (requis pour l'audio)
-
-**Ubuntu/Debian** :
-```bash
-sudo apt install -y ffmpeg
-```
-
-**macOS** :
-```bash
-brew install ffmpeg
-```
-
-**Windows** :
-Télécharger depuis [ffmpeg.org](https://ffmpeg.org/download.html)
-
-### 3. Installer les dépendances Node.js
+### 2. Vérifier l'installation
 
 ```bash
-npm install @discordjs/voice libsodium-wrappers
-```
-
-**Pour Ubuntu, installer aussi** :
-```bash
-sudo apt install -y libsodium-dev
-```
-
-### 4. Vérifier l'installation
-
-```bash
-yt-dlp --version
-ffmpeg -version
+npm run build
+npm start
 ```
 
 ## Utilisation
@@ -96,6 +58,21 @@ Affiche la musique en cours de lecture.
 #### `/volume <1-100>`
 Change le volume de lecture.
 
+## Compatibilité hébergement
+
+✅ **Compatible avec** :
+- Hébergement gratuit (Skybots, Replit, etc.)
+- VPS sans accès root
+- Docker
+- Serveurs dédiés
+
+❌ **Pas besoin de** :
+- `sudo` ou accès root
+- `yt-dlp` ou autres outils externes
+- `ffmpeg` installé sur le système
+
+Tout fonctionne avec les packages Node.js **déjà installés** !
+
 ## Architecture technique
 
 ### Fichiers
@@ -111,7 +88,7 @@ src/modules/music/
 │   └── volume.ts       # Contrôle du volume
 │
 ├── utils/
-│   ├── newpipe.ts      # Extracteur YouTube (yt-dlp)
+│   ├── newpipe.ts      # Extracteur YouTube (play-dl)
 │   └── player.ts       # Player audio + queue manager
 │
 ├── index.ts            # Export du module
@@ -120,13 +97,13 @@ src/modules/music/
 
 ### Fonctionnement
 
-#### NewPipe Extractor (`utils/newpipe.ts`)
+#### YouTube Extractor (`utils/newpipe.ts`)
 
-- **`search(query, limit)`** : Recherche sur YouTube via yt-dlp
+- **`search(query, limit)`** : Recherche sur YouTube via play-dl
   - Retourne : ID, titre, chaîne, durée, URL, thumbnail
   
 - **`getAudioUrl(videoUrl)`** : Extrait l'URL audio directe
-  - Utilise `yt-dlp -f bestaudio` pour la meilleure qualité
+  - Utilise `play.stream()` pour obtenir l'audio haute qualité
   - Retourne une URL streamable
 
 #### Music Player (`utils/player.ts`)
@@ -136,14 +113,26 @@ src/modules/music/
 - **AudioPlayer** : Utilise `@discordjs/voice` pour streamer
 - **Auto-play** : Joue automatiquement la prochaine piste
 
+## Dépendances utilisées
+
+```json
+{
+  "discord.js": "^14.14.1",
+  "@discordjs/voice": "^0.16.1",
+  "@discordjs/opus": "^0.9.0",
+  "libsodium-wrappers": "^0.7.13",
+  "play-dl": "^1.9.7",
+  "ffmpeg-static": "^5.2.0"
+}
+```
+
 ## Dépannage
 
-### Erreur : "yt-dlp n'est pas installé"
+### Erreur : "play-dl not available"
 
 ```bash
-pip install -U yt-dlp
-# Vérifier
-yt-dlp --version
+npm install play-dl
+npm run build
 ```
 
 ### Erreur : "Impossible de rejoindre le salon vocal"
@@ -155,14 +144,14 @@ Vérifiez que le bot a les permissions :
 
 ### Erreur : "Failed to play track"
 
-1. Vérifiez que **ffmpeg** est installé :
-```bash
-ffmpeg -version
-```
-
-2. Vérifiez que **libsodium** est installé :
+1. Vérifiez que **libsodium-wrappers** est installé :
 ```bash
 npm list libsodium-wrappers
+```
+
+2. Vérifiez que **@discordjs/voice** est installé :
+```bash
+npm list @discordjs/voice
 ```
 
 3. Regardez les logs du bot pour plus de détails
@@ -185,7 +174,6 @@ YouTube limite le nombre de requêtes. Attendez quelques minutes.
 
 ## Crédits
 
-- **NewPipe** : Backend d'extraction YouTube
-- **yt-dlp** : Outil de téléchargement vidéo
+- **play-dl** : Library d'extraction YouTube/Spotify
 - **Discord.js** : Library Discord
 - **@discordjs/voice** : Module audio Discord
