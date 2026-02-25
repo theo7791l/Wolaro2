@@ -1,23 +1,27 @@
 /**
- * Module Loader - Fixed type imports
+ * Module Loader - Complete Command interface
  */
 
-import { Client } from 'discord.js';
+import { Client, PermissionsBitField } from 'discord.js';
 import { Pool } from 'pg';
 import { RedisManager } from '../cache/redis';
 import { logger } from '../utils/logger';
 
-// Fix: Import direct des interfaces au lieu du module types
+// Interface pour les modules Wolaro2
 interface WolaroModule {
   name: string;
   initialize: (client: Client) => Promise<void>;
   shutdown?: () => Promise<void>;
 }
 
+// Interface complète pour les commandes
 interface Command {
   data: any;
-  execute: (interaction: any) => Promise<void>;
+  execute: (interaction: any, context?: any) => Promise<void>;
   cooldown?: number;
+  guildOnly?: boolean;
+  ownerOnly?: boolean;
+  permissions?: bigint[];
 }
 
 interface EventHandler {
