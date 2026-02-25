@@ -7,8 +7,10 @@ import {
   VoiceConnection,
   VoiceConnectionStatus,
   entersState,
+  StreamType,
 } from '@discordjs/voice';
 import { VoiceBasedChannel } from 'discord.js';
+import play from 'play-dl';
 import { logger } from '../../../utils/logger';
 import { NewPipeAudioInfo, newpipe } from './newpipe';
 
@@ -115,8 +117,14 @@ export class MusicPlayer {
     this.currentTrack = item;
 
     try {
-      // Créer une ressource audio depuis l'URL
-      const resource = createAudioResource(item.info.url, {
+      // Obtenir le stream audio depuis YouTube via play-dl
+      const stream = await play.stream(item.info.url, {
+        quality: 2, // Haute qualité audio
+      });
+
+      // Créer une ressource audio depuis le stream
+      const resource = createAudioResource(stream.stream, {
+        inputType: stream.type,
         inlineVolume: true,
       });
 
