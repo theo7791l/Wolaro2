@@ -1,39 +1,39 @@
-/**
- * Channel Delete Event Handler
- * Track suppressions de channels pour anti-nuke
- */
-
-import { DMChannel, GuildChannel, AuditLogEvent } from 'discord.js';
-import protectionModule from '../index';
+import { GuildChannel, NonThreadGuildBasedChannel } from 'discord.js';
 import { logger } from '../../../../utils/logger';
 
-export default {
-  name: 'channelDelete',
-  async execute(channel: DMChannel | GuildChannel) {
-    if (!channel.guild) return;
+export async function handleChannelDelete(
+  channel: GuildChannel | NonThreadGuildBasedChannel,
+  protectionModule: any
+): Promise<void> {
+  try {
+    // Type guard for guild channels
+    if (!('guild' in channel)) return;
 
-    try {
-      const executor = await protectionModule.antiNuke.getExecutor(
+    const config = await protectionModule.database.getConfig(channel.guild.id);
+    
+    if (!config.antinuke_enabled) return;
+
+    await protectionModule.antiNuke.handleChannelDelete(
+      channel.guild,
+      channel
+    );
+
+    await protectionModule.database.logAction(
+      channel.guild.id,
+      'system',
+      'nuke_attempt',
+      'channel_deleted',
+      'Channel supprimé',
+      { channel_id: channel.id, channel_name: channel.name }
+    );
+
+    if (config.antinuke_protect_admins) {
+      await protectionModule.antiNuke.protectServer(
         channel.guild,
-        AuditLogEvent.ChannelDelete
+        'channel_delete'
       );
-      if (!executor) return;
-
-      const exceeded = await protectionModule.antiNuke.trackAction(
-        executor.id,
-        channel.guild.id,
-        'channelDelete'
-      );
-
-      if (exceeded) {
-        await protectionModule.antiNuke.handleNukeAttempt(
-          channel.guild,
-          executor,
-          'channelDelete'
-        );
-      }
-    } catch (error) {
-      logger.error('[Protection] Error in channelDelete handler:', error);
     }
+  } catch (error) {
+    logger.error('Error handling channel delete:', error);
   }
-};
+}
