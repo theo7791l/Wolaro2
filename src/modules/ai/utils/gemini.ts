@@ -17,7 +17,7 @@ interface GeminiErrorResponse {
 export class GeminiClient {
   private apiKey: string;
   private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-  private model = 'gemini-1.5-flash'; // Modèle free tier avec quota généreux
+  private model = 'gemini-1.5-flash-latest'; // Utiliser l'alias latest pour toujours avoir la dernière version stable
 
   constructor(apiKey: string) {
     if (!apiKey || apiKey === 'your_gemini_api_key_here') {
@@ -35,6 +35,7 @@ export class GeminiClient {
         model: this.model,
         url: url.replace(this.apiKey, 'REDACTED'),
         promptLength: prompt.length,
+        baseUrl: this.baseUrl,
       });
 
       const response = await fetch(url, {
@@ -71,6 +72,7 @@ export class GeminiClient {
           error: errorData,
           model: this.model,
           apiKeyPrefix: this.apiKey.substring(0, 12),
+          apiKeyLength: this.apiKey.length,
           url: url.replace(this.apiKey, 'REDACTED'),
         });
         
@@ -82,9 +84,10 @@ export class GeminiClient {
           errorMessage = `❌ Requête invalide (400): ${details}\nℹ️ Vérifiez votre GEMINI_API_KEY dans .env`;
         } else if (response.status === 403) {
           const details = errorData?.error?.message || 'Accès refusé';
-          errorMessage = `❌ Accès refusé (403): ${details}\nℹ️ Vérifiez que votre clé API Gemini a les bonnes permissions`;
+          errorMessage = `❌ Accès refusé (403): ${details}\nℹ️ Vérifiez que votre clé API Gemini a les bonnes permissions sur https://aistudio.google.com/apikey`;
         } else if (response.status === 404) {
-          errorMessage = `❌ Modèle "${this.model}" non trouvé (404)\nℹ️ Votre clé API Gemini est invalide ou expirée`;
+          const details = errorData?.error?.message || 'Modèle non trouvé';
+          errorMessage = `❌ Modèle "${this.model}" non trouvé (404): ${details}\nℹ️ SOLUTIONS:\n1. Vérifiez que votre clé API est valide sur https://aistudio.google.com/apikey\n2. Supprimez votre ancienne clé et créez-en une nouvelle\n3. Vérifiez que la clé commence par 'AIzaSy' (39 caractères)\n4. Testez votre clé avec: curl 'https://generativelanguage.googleapis.com/v1beta/models?key=VOTRE_CLE'`;
         } else if (response.status === 429) {
           const details = errorData?.error?.message || 'Trop de requêtes';
           errorMessage = `⏳ Limite de requêtes atteinte (429)\n${details}\nℹ️ Attendez 60 secondes ou vérifiez votre quota sur https://aistudio.google.com/apikey`;
@@ -137,7 +140,7 @@ export class GeminiClient {
       const imageBuffer = await imageResponse.arrayBuffer();
       const base64Image = Buffer.from(imageBuffer).toString('base64');
 
-      // Utiliser le même modèle pour la vision (gemini-1.5-flash supporte les images)
+      // Utiliser le même modèle pour la vision
       const url = `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`;
 
       const response = await fetch(url, {
