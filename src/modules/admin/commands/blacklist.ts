@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 import { SecurityManager } from '../../../utils/security';
+import { logger } from '../../../utils/logger.js';
 
 export class BlacklistCommand implements ICommand {
   data = new SlashCommandBuilder()
@@ -33,7 +34,7 @@ export class BlacklistCommand implements ICommand {
     if (!SecurityManager.isMaster(interaction.user.id)) {
       await interaction.reply({
         content: '❌ Cette commande est réservée aux Master Admins.',
-        ephemeral: true,
+        flags: ['Ephemeral'],
       });
       return;
     }
@@ -43,11 +44,19 @@ export class BlacklistCommand implements ICommand {
     const reason = interaction.options.getString('raison') || 'Aucune raison fournie';
 
     try {
+      // Get guild owner info if available
+      const targetGuild = await context.client.guilds.fetch(guildId).catch(() => null);
+      const ownerId = targetGuild?.ownerId || '000000000000000000';
+
+      // Ensure guild exists in database before updating
       await context.database.query(
-        `UPDATE guilds
-         SET is_blacklisted = $2, blacklist_reason = $3
-         WHERE guild_id = $1`,
-        [guildId, shouldBlacklist, shouldBlacklist ? reason : null]
+        `INSERT INTO guilds (guild_id, owner_id, is_blacklisted, blacklist_reason)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (guild_id)
+         DO UPDATE SET 
+           is_blacklisted = $3,
+           blacklist_reason = $4`,
+        [guildId, ownerId, shouldBlacklist, shouldBlacklist ? reason : null]
       );
 
       // Invalidate cache
@@ -61,22 +70,27 @@ export class BlacklistCommand implements ICommand {
         guildId
       );
 
+      logger.info(`Guild ${guildId} ${shouldBlacklist ? 'blacklisted' : 'unblacklisted'} by ${interaction.user.tag}. Reason: ${reason}`);
+
       await interaction.reply({
-        content: `✅ Serveur ${guildId} ${shouldBlacklist ? 'blacklisté' : 'déblacklisté'}.\n**Raison:** ${reason}`,
-        ephemeral: true,
+        content: `✅ Serveur ${guildId} ${shouldBlacklist ? 'blacklisté' : 'déblacklisté'}.\\n**Raison:** ${reason}`,
+        flags: ['Ephemeral'],
       });
 
       // Try to leave the guild if blacklisted
-      if (shouldBlacklist) {
-        const guild = await context.client.guilds.fetch(guildId).catch(() => null);
-        if (guild) {
-          await guild.leave();
+      if (shouldBlacklist && targetGuild) {
+        try {
+          await targetGuild.leave();
+          logger.info(`Left blacklisted guild ${guildId}`);
+        } catch (error) {
+          logger.error(`Failed to leave blacklisted guild ${guildId}:`, error);
         }
       }
     } catch (error) {
+      logger.error('Error modifying blacklist:', error);
       await interaction.reply({
         content: '❌ Erreur lors de la modification du blacklist.',
-        ephemeral: true,
+        flags: ['Ephemeral'],
       });
     }
   }
