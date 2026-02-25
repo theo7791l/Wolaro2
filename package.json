@@ -1,7 +1,7 @@
 {
   "name": "wolaro2",
-  "version": "1.0.0",
-  "description": "Discord bot multi-fonctions avec système modulaire avancé",
+  "version": "2.0.0",
+  "description": "Discord bot multi-fonctions avec système modulaire avancé + TheoProtect",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -14,10 +14,11 @@
     "lint:ci": "eslint . --ext .ts --max-warnings=299",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest",
-    "migrate": "node scripts/migrate.js",
+    "migrate": "tsx scripts/run-migrations.ts",
+    "migrate:protection": "tsx scripts/migrate-protection.ts",
     "db:reset": "node scripts/reset-db.js"
   },
-  "keywords": ["discord", "bot", "typescript", "modular"],
+  "keywords": ["discord", "bot", "typescript", "modular", "protection"],
   "author": "theo7791l",
   "license": "MIT",
   "dependencies": {
@@ -34,6 +35,7 @@
     "redis": "^4.6.12",
     "dotenv": "^16.3.1",
     "axios": "^1.6.5",
+    "canvas": "^2.11.2",
     "zod": "^3.22.4",
     "ws": "^8.16.0",
     "bcrypt": "^5.1.1",
