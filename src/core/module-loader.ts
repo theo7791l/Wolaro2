@@ -7,9 +7,18 @@ import { Pool } from 'pg';
 import { RedisManager } from '../cache/redis';
 import { logger } from '../utils/logger';
 import type { WolaroModule } from '../types';
+import type { Command } from '../types';
+
+interface EventHandler {
+  name: string;
+  module: string;
+  execute: (...args: any[]) => Promise<void>;
+}
 
 export class ModuleLoader {
   private modules = new Map<string, WolaroModule>();
+  private commands = new Map<string, Command>();
+  private events = new Map<string, EventHandler[]>();
   private client: Client;
   private database: Pool;
   private redis: RedisManager;
@@ -36,6 +45,30 @@ export class ModuleLoader {
     // Module loading logic here
   }
 
+  registerCommand(command: Command): void {
+    const commandName = command.data.name;
+    this.commands.set(commandName, command);
+  }
+
+  registerEvent(eventName: string, handler: EventHandler): void {
+    if (!this.events.has(eventName)) {
+      this.events.set(eventName, []);
+    }
+    this.events.get(eventName)!.push(handler);
+  }
+
+  getAllCommands(): Command[] {
+    return Array.from(this.commands.values());
+  }
+
+  getCommand(commandName: string): Command | undefined {
+    return this.commands.get(commandName);
+  }
+
+  getEvents(eventName: string): EventHandler[] {
+    return this.events.get(eventName) || [];
+  }
+
   async isModuleEnabled(guildId: string, moduleName: string): Promise<boolean> {
     const cacheKey = `module:${guildId}:${moduleName}:enabled`;
     const cached = await this.redis.get(cacheKey);
@@ -51,6 +84,10 @@ export class ModuleLoader {
     await this.redis.set(cacheKey, String(enabled), 300);
 
     return enabled;
+  }
+
+  async isModuleEnabledForGuild(guildId: string, moduleName: string): Promise<boolean> {
+    return this.isModuleEnabled(guildId, moduleName);
   }
 
   getModule(name: string): WolaroModule | undefined {
