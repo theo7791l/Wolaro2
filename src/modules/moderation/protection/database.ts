@@ -1,149 +1,89 @@
 /**
- * Protection Database Manager
- * Wrapper PostgreSQL + Redis pour le module protection
+ * Protection Database - Fixed exports
  */
 
 import { Pool } from 'pg';
 import { logger } from '../../../utils/logger';
-import { redis } from '../../../cache/redis';
-import type { ProtectionConfig, ProtectionLog, ProtectionStats, DEFAULT_PROTECTION_CONFIG } from './types';
+import type { ProtectionConfig, ProtectionLog, ProtectionStats } from './types';
 
-export class ProtectionDB {
-  private pool: Pool;
+type StatType = keyof Omit<ProtectionStats, 'guild_id' | 'last_reset'>;
 
-  constructor(pool: Pool) {
-    this.pool = pool;
-  }
+export class ProtectionDatabase {
+  constructor(private pool: Pool) {}
 
-  /**
-   * Get protection config for guild (with caching)
-   */
   async getConfig(guildId: string): Promise<ProtectionConfig> {
-    const cacheKey = `protection:config:${guildId}`;
-    
-    // Try cache first
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-    
-    // Query database
     const result = await this.pool.query(
       'SELECT * FROM protection_config WHERE guild_id = $1',
       [guildId]
     );
-    
-    let config: ProtectionConfig;
-    
-    if (result.rows.length === 0) {
-      // Create default config
-      config = await this.createDefaultConfig(guildId);
-    } else {
-      config = result.rows[0];
-    }
-    
-    // Cache for 5 minutes
-    await redis.set(cacheKey, JSON.stringify(config), 'EX', 300);
-    
-    return config;
-  }
 
-  /**
-   * Create default config for guild
-   */
-  private async createDefaultConfig(guildId: string): Promise<ProtectionConfig> {
-    const result = await this.pool.query(
-      `INSERT INTO protection_config (guild_id) VALUES ($1)
-       ON CONFLICT (guild_id) DO UPDATE SET updated_at = NOW()
-       RETURNING *`,
-      [guildId]
-    );
-    
+    if (result.rows.length === 0) {
+      return this.createDefaultConfig(guildId);
+    }
+
     return result.rows[0];
   }
 
-  /**
-   * Update protection config
-   */
-  async updateConfig(guildId: string, updates: Partial<ProtectionConfig>): Promise<void> {
-    const fields = Object.keys(updates)
-      .filter(k => k !== 'guild_id' && k !== 'created_at' && k !== 'updated_at')
-      .map((k, i) => `${k} = $${i + 2}`)
-      .join(', ');
-    
-    const values = Object.values(updates).filter((_, i) => {
-      const key = Object.keys(updates)[i];
-      return key !== 'guild_id' && key !== 'created_at' && key !== 'updated_at';
-    });
-    
+  async updateConfig(guildId: string, config: Partial<ProtectionConfig>): Promise<void> {
+    const fields = Object.keys(config).filter(k => k !== 'guild_id');
+    const values = fields.map(f => (config as any)[f]);
+    const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+
     await this.pool.query(
-      `UPDATE protection_config SET ${fields}, updated_at = NOW() WHERE guild_id = $1`,
+      `UPDATE protection_config SET ${setClause} WHERE guild_id = $1`,
       [guildId, ...values]
     );
-    
-    // Invalidate cache
-    await redis.del(`protection:config:${guildId}`);
   }
 
-  /**
-   * Log protection action
-   */
-  async logAction(log: Omit<ProtectionLog, 'id' | 'timestamp'>): Promise<void> {
+  async logAction(
+    guildId: string,
+    userId: string,
+    type: string,
+    action: string,
+    reason: string,
+    details: any
+  ): Promise<void> {
     await this.pool.query(
-      `INSERT INTO protection_logs (guild_id, user_id, type, action, reason, details, moderator_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        log.guild_id,
-        log.user_id,
-        log.type,
-        log.action,
-        log.reason,
-        JSON.stringify(log.details || {}),
-        log.moderator_id || null
-      ]
+      `INSERT INTO protection_logs (guild_id, user_id, type, action, reason, details) 
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [guildId, userId, type, action, reason, JSON.stringify(details)]
     );
   }
 
-  /**
-   * Increment stat counter for today
-   */
-  async incrementStat(guildId: string, statName: keyof Omit<ProtectionStats, 'guild_id' | 'date' | 'updated_at'>): Promise<void> {
-    try {
-      await this.pool.query(
-        'SELECT increment_protection_stat($1, $2, 1)',
-        [guildId, statName]
-      );
-    } catch (error) {
-      logger.error('[Protection] Error incrementing stat:', error);
-    }
+  async incrementStat(guildId: string, stat: StatType): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO protection_stats (guild_id, ${stat}) VALUES ($1, 1)
+       ON CONFLICT (guild_id) DO UPDATE SET ${stat} = protection_stats.${stat} + 1`,
+      [guildId]
+    );
   }
 
-  /**
-   * Get stats for date range
-   */
-  async getStats(guildId: string, days = 7): Promise<ProtectionStats[]> {
+  async getStats(guildId: string): Promise<ProtectionStats | null> {
     const result = await this.pool.query(
-      `SELECT * FROM protection_stats
-       WHERE guild_id = $1 AND date >= CURRENT_DATE - $2
-       ORDER BY date DESC`,
-      [guildId, days]
+      'SELECT * FROM protection_stats WHERE guild_id = $1',
+      [guildId]
     );
-    
-    return result.rows;
+    return result.rows[0] || null;
   }
 
-  /**
-   * Get recent logs
-   */
-  async getRecentLogs(guildId: string, limit = 100): Promise<ProtectionLog[]> {
-    const result = await this.pool.query(
-      `SELECT * FROM protection_logs
-       WHERE guild_id = $1
-       ORDER BY timestamp DESC
-       LIMIT $2`,
-      [guildId, limit]
+  async logRaidDetection(
+    memberId: string,
+    guildId: string,
+    riskScore: number,
+    riskFactors: any[]
+  ): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO raid_detections (member_id, guild_id, risk_score, risk_factors)
+       VALUES ($1, $2, $3, $4)`,
+      [memberId, guildId, riskScore, JSON.stringify(riskFactors)]
     );
-    
-    return result.rows;
+  }
+
+  private async createDefaultConfig(guildId: string): Promise<ProtectionConfig> {
+    const result = await this.pool.query(
+      `INSERT INTO protection_config (guild_id) VALUES ($1) RETURNING *`,
+      [guildId]
+    );
+    return result.rows[0];
   }
 }
