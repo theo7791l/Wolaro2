@@ -16,14 +16,12 @@ export class BalanceCommand implements ICommand {
   module = 'economy';
   guildOnly = true;
   cooldown = 3;
-  // Pas de permissions = accessible à TOUT LE MONDE
 
   async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
     const targetUser = interaction.options.getUser('utilisateur') || interaction.user;
 
     try {
-      // FIX: Utiliser getOrCreateEconomyProfile pour s'assurer que la guilde est initialisée
-      // avant d'accéder à guild_economy (évite FK constraint error si guilde pas encore sync)
+      // S'assurer que la guilde est initialisée et le profil existe
       await context.database.getOrCreateEconomyProfile(interaction.guildId!, targetUser.id);
 
       const profile = await context.database.query(
@@ -54,6 +52,7 @@ export class BalanceCommand implements ICommand {
         });
       }
 
+      // FIX: Retrait de ephemeral - les soldes sont publics et partageables
       await interaction.reply({ embeds: [embed] });
     } catch (error) {
       const embed = EmbedStyles.error(
