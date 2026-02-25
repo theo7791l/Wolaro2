@@ -8,11 +8,20 @@
 
 **Wolaro** est un bot Discord professionnel avec architecture multi-tenant, 9 modules complets, IA Gemini, système RPG, tickets de support et giveaways automatiques.
 
-## ⚠️ MISE À JOUR CRITIQUE - 23 Février 2026 18h30
+## ⚠️ MISE À JOUR CRITIQUE - 25 Février 2026 06h18
 
-🎉 **TOUS LES BUGS CRITIQUES ONT ÉTÉ CORRIGÉS !**
+🎉 **COMMANDE /CONFIG AJO TOUTÉE ET BUGS CORRIGÉS !**
 
-### Dernières corrections (18h30)
+### Dernières corrections (25 février 06h18)
+- ✅ Commande `/config` ajoutée au module admin
+- ✅ Bug #1: Validation work_min > work_max
+- ✅ Bug #2: Vérification existence guild (FK violation)
+- ✅ Bug #3: Transaction avec lock (race condition)
+- ✅ Bug #4: Audit log non-bloquant
+- ✅ Bug #5: Vérification permissions channels
+- ✅ Bug #6: Documentation type Number vs Integer
+
+### Corrections précédentes (23 février 18h30)
 - ✅ Table `raid_events` ajoutée au schéma SQL
 - ✅ Bug regex dans `security.ts` corrigé
 - ✅ Variable shadowing dans WebSocket corrigée
@@ -22,14 +31,7 @@
 
 **👉 Voir tous les détails : [BUG_FIXES_CRITICAL.md](BUG_FIXES_CRITICAL.md)**
 
-### Corrections précédentes (16h00)
-- ✅ Script de build TypeScript corrigé
-- ✅ Dépendances natives optionnelles
-- ✅ Mode strict TypeScript activé
-- ✅ 5 bugs base de données corrigés
-- ✅ Tous les modules activés par défaut
-
-**📖 Documentation complète :**
+**📍 Documentation complète :**
 - [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md) - Guide d'installation pas à pas
 - [FIXES_APPLIED.md](FIXES_APPLIED.md) - Détail des premières corrections
 - [BUG_FIXES_CRITICAL.md](BUG_FIXES_CRITICAL.md) - Bugs critiques récents corrigés
@@ -54,7 +56,7 @@
 - **Encryption AES-256** : Données sensibles
 - **Audit Logs** : Traçabilité complète
 
-### 📦 9 Modules Complets (48 Commandes)
+### 📦 9 Modules Complets (49 Commandes)
 
 #### 1️⃣ Moderation (8 commandes)
 ```
@@ -92,15 +94,24 @@
 - Filtres audio (bass boost, nightcore)
 - Auto-leave configurable
 
-#### 5️⃣ Admin - Master Only (5 commandes)
+#### 5️⃣ Admin - Master Only (6 commandes) 🆕
 ```
-/impersonate, /blacklist, /stats, /reload, /eval
+/config, /impersonate, /blacklist, /stats, /reload, /eval
 ```
-- Impersonate n'importe quel serveur
-- Blacklist guilds avec raison
-- Métriques système temps réel
-- Hot-reload modules
-- Code eval (danger zone)
+- **⚙️ `/config`** : **Configurer tous les modules du bot** 🆕
+  - `/config moderation` - Salon de logs, rôle mute, seuil spam
+  - `/config economy` - Nom devise, récompenses daily/work
+  - `/config leveling` - XP par message, salon level-up
+  - `/config music` - Volume par défaut, taille queue, rôle DJ
+  - `/config ai` - Salon chat IA, auto-modération, toxicité
+  - `/config rpg` - Or/santé de départ, récompense daily
+  - `/config tickets` - Catégorie, rôle support, auto-close
+  - `/config giveaways` - Rôle ping, âge minimum compte/serveur
+- `/impersonate` - Usurper n'importe quel serveur
+- `/blacklist` - Blacklister des guilds avec raison
+- `/stats` - Métriques système temps réel
+- `/reload` - Hot-reload modules
+- `/eval` - Code eval (danger zone)
 
 #### 6️⃣ AI - Gemini (4 commandes) 🆕
 ```
@@ -149,7 +160,7 @@
 
 ## 🚀 Installation Rapide
 
-### 📖 Guide Complet
+### 📍 Guide Complet
 
 **Pour un guide d'installation détaillé avec toutes les étapes et la résolution des problèmes :**
 
@@ -261,7 +272,7 @@ node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
 
 ---
 
-## 📊 Base de Données
+## 📊Base de Données
 
 ### 22 Tables PostgreSQL
 
