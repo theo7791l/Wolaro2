@@ -57,7 +57,7 @@ export class BuyCommand implements ICommand {
       return;
     }
 
-    const client = await context.database.pool.connect();
+    const client = await context.database.getClient();
     
     try {
       await client.query('BEGIN');
