@@ -4,6 +4,7 @@ import {
   ChatInputCommandInteraction,
   REST,
   Routes,
+  MessageFlags,
 } from 'discord.js';
 import { DatabaseManager } from '../database/manager';
 import { RedisManager } from '../cache/redis';
@@ -50,7 +51,7 @@ export class CommandHandler {
       // 1. Commande existe ?
       const command = this.moduleLoader.getCommand(commandName);
       if (!command) {
-        await interaction.reply({ content: '❌ Cette commande n\'existe pas.', ephemeral: true });
+        await interaction.reply({ content: '❌ Cette commande n\'existe pas.', flags: MessageFlags.Ephemeral });
         return;
       }
 
@@ -58,7 +59,7 @@ export class CommandHandler {
       if (command.guildOnly && !guildId) {
         await interaction.reply({
           content: '❌ Cette commande ne peut être utilisée que dans un serveur.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -68,11 +69,11 @@ export class CommandHandler {
       // sur les commandes admin, ET tout le monde semblait bloqué car les commandes normales
       // échouaient sur FK constraint (guild non initialisée). Fix double :
       //   a) Utiliser command.ownerOnly (le bon nom de champ)
-      //   b) La sync des guildes dans ready() résout le FK constraint
+      //   b) La sync des guilds dans ready() résout le FK constraint
       if (command.ownerOnly && !SecurityManager.isMaster(user.id)) {
         await interaction.reply({
           content: '❌ Cette commande est réservée aux administrateurs du bot.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -85,7 +86,7 @@ export class CommandHandler {
           if (member && !member.permissions.has(command.permissions)) {
             await interaction.reply({
               content: '❌ Vous n\'avez pas les permissions Discord nécessaires pour cette commande.',
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
             return;
           }
@@ -100,7 +101,7 @@ export class CommandHandler {
           const remaining = await this.redis.getCooldownTTL(cooldownKey);
           await interaction.reply({
             content: `⏱️ Veuillez attendre **${remaining}s** avant de réutiliser cette commande.`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
@@ -114,7 +115,7 @@ export class CommandHandler {
         if (!allowed && !SecurityManager.isMaster(user.id)) {
           await interaction.reply({
             content: '⚠️ Vous envoyez trop de commandes. Ralentissez !',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
@@ -143,9 +144,9 @@ export class CommandHandler {
       const errorMessage = '❌ Une erreur est survenue lors de l\'exécution de la commande.';
       try {
         if (interaction.replied || interaction.deferred) {
-          await interaction.followUp({ content: errorMessage, ephemeral: true });
+          await interaction.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
         } else {
-          await interaction.reply({ content: errorMessage, ephemeral: true });
+          await interaction.reply({ content: errorMessage, flags: MessageFlags.Ephemeral });
         }
       } catch (replyError) {
         logger.error('Failed to send error reply:', replyError);
