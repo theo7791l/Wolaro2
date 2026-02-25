@@ -8,7 +8,7 @@ export class AddUserCommand implements ICommand {
     .addUserOption((option) =>
       option
         .setName('utilisateur')
-        .setDescription('L\'utilisateur à ajouter')
+        .setDescription('L\'utilisateur \u00e0 ajouter')
         .setRequired(true)
     ) as SlashCommandBuilder;
 
@@ -28,8 +28,7 @@ export class AddUserCommand implements ICommand {
 
     if (ticket.length === 0) {
       await interaction.reply({
-        content: '❌ Cette commande ne peut être utilisée que dans un ticket.',
-        ephemeral: true,
+        content: '\u274c Cette commande ne peut \u00eatre utilis\u00e9e que dans un ticket.'
       });
       return;
     }
@@ -41,11 +40,10 @@ export class AddUserCommand implements ICommand {
         ReadMessageHistory: true,
       });
 
-      await interaction.reply(`✅ ${user} a été ajouté au ticket.`);
+      await interaction.reply(`\u2705 ${user} a \u00e9t\u00e9 ajout\u00e9 au ticket.`);
     } catch (error) {
       await interaction.reply({
-        content: '❌ Impossible d\'ajouter l\'utilisateur.',
-        ephemeral: true,
+        content: '\u274c Impossible d\'ajouter l\'utilisateur.'
       });
     }
   }

@@ -4,7 +4,7 @@ import { ICommand, ICommandContext } from '../../../types';
 export class QuestCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('quest')
-    .setDescription('Voir vos quêtes actives') as SlashCommandBuilder;
+    .setDescription('Voir vos qu\u00eates actives') as SlashCommandBuilder;
 
   module = 'rpg';
   guildOnly = true;
@@ -22,7 +22,7 @@ export class QuestCommand implements ICommand {
     {
       id: 'collect_gold',
       name: '💰 Amasseur d\'or',
-      description: 'Posséder 1000 or',
+      description: 'Poss\u00e9der 1000 or',
       progress: 0,
       goal: 1000,
       rewards: { gold: 500, xp: 500 },
@@ -41,15 +41,15 @@ export class QuestCommand implements ICommand {
     try {
       const embed = new EmbedBuilder()
         .setColor('#4A90E2')
-        .setTitle('📜 Quêtes Actives')
-        .setDescription('Complétez des quêtes pour obtenir des récompenses !')
+        .setTitle('📜 Qu\u00eates Actives')
+        .setDescription('Compl\u00e9tez des qu\u00eates pour obtenir des r\u00e9compenses !')
         .setTimestamp();
 
       for (const quest of this.quests) {
         const progressBar = this.createProgressBar(quest.progress, quest.goal);
         embed.addFields({
           name: quest.name,
-          value: `${quest.description}\n${progressBar} ${quest.progress}/${quest.goal}\nRécompenses: ${quest.rewards.gold} or, ${quest.rewards.xp} XP`,
+          value: `${quest.description}\n${progressBar} ${quest.progress}/${quest.goal}\nR\u00e9compenses: ${quest.rewards.gold} or, ${quest.rewards.xp} XP`,
           inline: false,
         });
       }
@@ -57,8 +57,7 @@ export class QuestCommand implements ICommand {
       await interaction.reply({ embeds: [embed] });
     } catch (error) {
       await interaction.reply({
-        content: '❌ Impossible de charger les quêtes.',
-        ephemeral: true,
+        content: '\u274c Impossible de charger les qu\u00eates.'
       });
     }
   }
@@ -67,6 +66,6 @@ export class QuestCommand implements ICommand {
     const percentage = Math.min((current / max) * 100, 100);
     const filled = Math.floor(percentage / 10);
     const empty = 10 - filled;
-    return `[${'█'.repeat(filled)}${'░'.repeat(empty)}]`;
+    return `[${'\u2588'.repeat(filled)}${'\u2591'.repeat(empty)}]`;
   }
 }

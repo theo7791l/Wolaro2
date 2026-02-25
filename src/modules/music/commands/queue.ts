@@ -16,8 +16,7 @@ export class QueueCommand implements ICommand {
 
     if (!queue || queue.tracks.length === 0) {
       await interaction.reply({
-        content: '\u274c La queue est vide.',
-        ephemeral: true,
+        content: '\u274c La queue est vide.'
       });
       return;
     }
