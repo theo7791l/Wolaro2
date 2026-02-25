@@ -62,7 +62,7 @@ export class GeminiClient {
       });
 
       if (!response.ok) {
-        const errorData: GeminiErrorResponse = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch(() => ({})) as GeminiErrorResponse;
         
         // Log détaillé pour déboguer
         logger.error('Gemini API error details:', {
@@ -163,7 +163,7 @@ export class GeminiClient {
       });
 
       if (!response.ok) {
-        const errorData: GeminiErrorResponse = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch(() => ({})) as GeminiErrorResponse;
         logger.error('Gemini Vision API error:', {
           status: response.status,
           error: errorData,
