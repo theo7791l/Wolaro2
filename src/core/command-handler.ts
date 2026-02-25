@@ -64,12 +64,7 @@ export class CommandHandler {
         return;
       }
 
-      // 3. FIX CRITIQUE - Vérification ownerOnly (admin bot seulement)
-      // Le check utilisait "masterOnly" mais ICommand déclare "ownerOnly" → personne n'était bloqué
-      // sur les commandes admin, ET tout le monde semblait bloqué car les commandes normales
-      // échouaient sur FK constraint (guild non initialisée). Fix double :
-      //   a) Utiliser command.ownerOnly (le bon nom de champ)
-      //   b) La sync des guilds dans ready() résout le FK constraint
+      // 3. Vérification ownerOnly (admin bot seulement)
       if (command.ownerOnly && !SecurityManager.isMaster(user.id)) {
         await interaction.reply({
           content: '❌ Cette commande est réservée aux administrateurs du bot.',
@@ -79,7 +74,6 @@ export class CommandHandler {
       }
 
       // 4. Vérification des permissions Discord (modération, etc.)
-      // Seulement si la commande demande des permissions spécifiques
       if (command.permissions && command.permissions.length > 0 && guildId) {
         if (!SecurityManager.isMaster(user.id)) {
           const member = await interaction.guild?.members.fetch(user.id);
@@ -121,15 +115,38 @@ export class CommandHandler {
         }
       }
 
-      // 7. Exécution de la commande
-      await command.execute(interaction as ChatInputCommandInteraction, {
-        database: this.database,
-        redis: this.redis,
-        client: this.client,
-      });
+      // 7. FIX: Gestion automatique du defer pour éviter timeout Discord (3s)
+      let deferTimeout: NodeJS.Timeout | null = null;
+      const shouldAutoDefer = !interaction.deferred && !interaction.replied;
+      
+      if (shouldAutoDefer) {
+        deferTimeout = setTimeout(async () => {
+          if (!interaction.deferred && !interaction.replied) {
+            try {
+              await interaction.deferReply();
+              logger.debug(`Auto-deferred reply for /${commandName}`);
+            } catch (err) {
+              logger.warn(`Failed to auto-defer /${commandName}:`, err);
+            }
+          }
+        }, 2000); // Déferer après 2 secondes si pas encore répondu
+      }
 
-      // 8. Log de l'exécution
-      // FIX: 'COMMAND_EXECUTE' → 'COMMAND_EXECUTED' (ActionType dans types.ts)
+      // 8. Exécution de la commande
+      try {
+        await command.execute(interaction as ChatInputCommandInteraction, {
+          database: this.database,
+          redis: this.redis,
+          client: this.client,
+        });
+      } finally {
+        // Nettoyer le timeout si la commande a répondu rapidement
+        if (deferTimeout) {
+          clearTimeout(deferTimeout);
+        }
+      }
+
+      // 9. Log de l'exécution
       if (guildId) {
         await this.database.logAction(user.id, 'COMMAND_EXECUTED', {
           command: commandName,
@@ -137,10 +154,15 @@ export class CommandHandler {
         });
       }
 
-      // FIX: user.tag déprécié en discord.js v14 → user.username
       logger.info(`Command /${commandName} executed by ${user.username} in guild ${guildId}`);
     } catch (error) {
-      logger.error(`Error executing command /${commandName}:`, error);
+      logger.error(`Error executing command /${commandName}:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        userId: user.id,
+        guildId,
+      });
+      
       const errorMessage = '❌ Une erreur est survenue lors de l\'exécution de la commande.';
       try {
         if (interaction.replied || interaction.deferred) {
