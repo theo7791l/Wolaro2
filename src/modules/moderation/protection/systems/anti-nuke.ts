@@ -1,8 +1,8 @@
 /**
- * Anti-Nuke System - Fixed User type
+ * Anti-Nuke System - Complete implementation
  */
 
-import { Guild, GuildAuditLogsEntry, PermissionsBitField, User } from 'discord.js';
+import { Guild, GuildAuditLogsEntry, PermissionsBitField, User, Role } from 'discord.js';
 import { ProtectionDatabase } from '../database';
 import { logger } from '../../../../utils/logger';
 
@@ -13,22 +13,65 @@ export class AntiNukeSystem {
 
   async handleChannelDelete(guild: Guild, channel: any): Promise<void> {
     try {
+      const executor = await this.getExecutor(guild, 'CHANNEL_DELETE');
+      if (!executor) return;
+
+      const exceeded = await this.trackAction(guild.id, executor.id, 'channel_delete');
+      if (exceeded) {
+        await this.handleNukeAttempt(guild, executor, 'channelDelete');
+      }
+
+      await this.db.incrementStat(guild.id, 'nuke_attempts');
+    } catch (error) {
+      logger.error('Error handling channel delete:', error);
+    }
+  }
+
+  async handleRoleDelete(guild: Guild, role: Role): Promise<void> {
+    try {
+      const executor = await this.getExecutor(guild, 'ROLE_DELETE');
+      if (!executor) return;
+
+      const exceeded = await this.trackAction(guild.id, executor.id, 'role_delete');
+      if (exceeded) {
+        await this.handleNukeAttempt(guild, executor, 'roleDelete');
+      }
+
+      await this.db.incrementStat(guild.id, 'nuke_attempts');
+    } catch (error) {
+      logger.error('Error handling role delete:', error);
+    }
+  }
+
+  async getExecutor(guild: Guild, action: string): Promise<User | null> {
+    try {
       const auditLogs = await guild.fetchAuditLogs({
-        type: 12, // CHANNEL_DELETE
         limit: 1,
       });
 
       const entry = auditLogs.entries.first();
-      if (!entry || !entry.executor) return;
+      if (!entry || !entry.executor) return null;
 
-      // Handle User | PartialUser
-      const executor: User | null = entry.executor.partial ? null : entry.executor as User;
-      if (!executor) return;
-
-      await this.trackAction(guild.id, executor.id, 'channel_delete');
-      await this.db.incrementStat(guild.id, 'nuke_attempts');
+      return entry.executor.partial ? null : entry.executor as User;
     } catch (error) {
-      logger.error('Error handling channel delete:', error);
+      logger.error('Error getting executor:', error);
+      return null;
+    }
+  }
+
+  async handleNukeAttempt(guild: Guild, executor: User, actionType: string): Promise<void> {
+    try {
+      logger.warn(`Nuke attempt detected: ${executor.tag} - ${actionType}`);
+
+      const member = await guild.members.fetch(executor.id).catch(() => null);
+      if (member) {
+        await member.ban({ reason: `Anti-Nuke: ${actionType}` });
+        logger.info(`Banned ${executor.tag} for nuke attempt`);
+      }
+
+      await this.protectServer(guild, actionType);
+    } catch (error) {
+      logger.error('Error handling nuke attempt:', error);
     }
   }
 
@@ -59,15 +102,18 @@ export class AntiNukeSystem {
     }
   }
 
-  private async trackAction(guildId: string, userId: string, action: string): Promise<void> {
+  private async trackAction(guildId: string, userId: string, action: string): Promise<boolean> {
     if (!this.actionTracking.has(guildId)) {
       this.actionTracking.set(guildId, new Map());
     }
 
     const tracking = this.actionTracking.get(guildId)!;
     const key = `${userId}-${action}`;
-    tracking.set(key, (tracking.get(key) || 0) + 1);
+    const count = (tracking.get(key) || 0) + 1;
+    tracking.set(key, count);
 
     setTimeout(() => tracking.delete(key), 60000);
+
+    return count >= 3;
   }
 }

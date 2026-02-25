@@ -1,5 +1,5 @@
 /**
- * Protection Database - Fixed exports
+ * Protection Database - Complete exports
  */
 
 import { Pool } from 'pg';
@@ -87,3 +87,6 @@ export class ProtectionDatabase {
     return result.rows[0];
   }
 }
+
+// Alias for compatibility
+export { ProtectionDatabase as ProtectionDB };

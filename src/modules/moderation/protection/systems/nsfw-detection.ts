@@ -1,5 +1,5 @@
 /**
- * NSFW Detection System - Fixed channel types
+ * NSFW Detection System - Add isEnabled method
  */
 
 import { Message } from 'discord.js';
@@ -14,11 +14,15 @@ export class NSFWDetectionSystem {
 
   constructor(private db: ProtectionDatabase) {}
 
+  isEnabled(): boolean {
+    return !!(this.sightengineUser && this.sightengineSecret);
+  }
+
   async check(message: Message): Promise<boolean> {
     if (!message.guild || message.attachments.size === 0) return false;
 
     const config = await this.db.getConfig(message.guild.id);
-    if (!config.nsfw_detection_enabled || !this.sightengineUser) return false;
+    if (!config.nsfw_detection_enabled || !this.isEnabled()) return false;
 
     for (const attachment of message.attachments.values()) {
       if (attachment.contentType?.startsWith('image/')) {

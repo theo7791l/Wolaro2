@@ -1,33 +1,30 @@
 /**
- * Role Delete Event Handler
- * Track suppressions de rôles pour anti-nuke
+ * Role Delete Event Handler - Fixed
  */
 
-import { Role, AuditLogEvent } from 'discord.js';
-import protectionModule from '../index';
+import { Role } from 'discord.js';
 import { logger } from '../../../../utils/logger';
 
-export default {
-  name: 'roleDelete',
-  async execute(role: Role) {
-    try {
-      const executor = await protectionModule.antiNuke.getExecutor(
-        role.guild,
-        AuditLogEvent.RoleDelete
-      );
-      if (!executor) return;
+export async function handleRoleDelete(
+  role: Role,
+  protectionModule: any
+): Promise<void> {
+  try {
+    const config = await protectionModule.database.getConfig(role.guild.id);
 
-      const exceeded = await protectionModule.antiNuke.trackAction(
-        executor.id,
-        role.guild.id,
-        'roleDelete'
-      );
+    if (!config.antinuke_enabled) return;
 
-      if (exceeded) {
-        await protectionModule.antiNuke.handleNukeAttempt(role.guild, executor, 'roleDelete');
-      }
-    } catch (error) {
-      logger.error('[Protection] Error in roleDelete handler:', error);
-    }
+    await protectionModule.antiNuke.handleRoleDelete(role.guild, role);
+
+    await protectionModule.database.logAction(
+      role.guild.id,
+      'system',
+      'nuke_attempt',
+      'role_deleted',
+      'Role supprimé',
+      { role_id: role.id, role_name: role.name }
+    );
+  } catch (error) {
+    logger.error('Error handling role delete:', error);
   }
-};
+}

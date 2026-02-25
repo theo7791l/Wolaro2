@@ -1,5 +1,5 @@
 /**
- * Anti-Spam System - Fixed types
+ * Anti-Spam System - Fixed constructor
  */
 
 import { Message, GuildMember } from 'discord.js';
@@ -38,7 +38,6 @@ export class AntiSpamSystem {
 
     messages.push(cached);
 
-    // Clean old messages
     const recent = messages.filter(m => now - m.timestamp < config.antispam_time_window);
     this.messageCache.set(key, recent);
 
@@ -64,12 +63,9 @@ export class AntiSpamSystem {
       const warnings = (this.userWarnings.get(message.author.id) || 0) + 1;
       this.userWarnings.set(message.author.id, warnings);
 
-      if (warnings >= 3) {
-        const member = message.member;
-        if (member) {
-          await member.timeout(300000, 'Spam répété');
-          this.userWarnings.delete(message.author.id);
-        }
+      if (warnings >= 3 && message.member) {
+        await message.member.timeout(300000, 'Spam répété');
+        this.userWarnings.delete(message.author.id);
       }
     } catch (error) {
       logger.error('Error handling spam:', error);

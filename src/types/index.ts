@@ -9,3 +9,5 @@ export interface WolaroModule {
   initialize: (client: Client) => Promise<void>;
   shutdown?: () => Promise<void>;
 }
+
+export * from './commands';

@@ -1,5 +1,5 @@
 /**
- * Anti-Raid System - Fixed property names
+ * Anti-Raid System - Fixed constructor params
  */
 
 import { GuildMember, Guild } from 'discord.js';
@@ -30,7 +30,6 @@ export class AntiRaidSystem {
     let riskScore = 0;
     const riskFactors: RiskAnalysis['riskFactors'] = [];
 
-    // Account age check
     const accountAge = Date.now() - member.user.createdTimestamp;
     const oneDayMs = 86400000;
 
@@ -43,7 +42,6 @@ export class AntiRaidSystem {
       });
     }
 
-    // Default avatar
     if (!member.user.avatar) {
       riskScore += 1;
       riskFactors.push({
@@ -53,7 +51,6 @@ export class AntiRaidSystem {
       });
     }
 
-    // Join rate
     const guildId = member.guild.id;
     if (!this.joinTracker.has(guildId)) {
       this.joinTracker.set(guildId, []);

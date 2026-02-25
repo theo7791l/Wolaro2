@@ -1,5 +1,5 @@
 /**
- * Bad Words System - Fixed types
+ * Bad Words System - Fixed exports
  */
 
 import { Message } from 'discord.js';
@@ -11,7 +11,6 @@ export class BadWordsSystem {
   private badWords = [
     'badword1',
     'badword2',
-    // Add more as needed
   ];
 
   constructor(private db: ProtectionDatabase) {}
@@ -56,3 +55,6 @@ export class BadWordsSystem {
     }
   }
 }
+
+// Alias for compatibility
+export { BadWordsSystem as BadWordsFilter };
