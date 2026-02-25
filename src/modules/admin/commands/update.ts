@@ -2,6 +2,7 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   EmbedBuilder,
+  MessageFlags,
 } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 import { exec } from 'child_process';
@@ -34,7 +35,7 @@ export class UpdateCommand implements ICommand {
         .setDescription('This command is restricted to master administrators only.')
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
       return;
     }
 
