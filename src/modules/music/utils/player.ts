@@ -11,6 +11,7 @@ import {
 } from '@discordjs/voice';
 import { VoiceBasedChannel } from 'discord.js';
 import play from 'play-dl';
+import sodium from 'libsodium-wrappers';
 import { logger } from '../../../utils/logger';
 import { NewPipeAudioInfo, newpipe } from './newpipe';
 
@@ -25,6 +26,7 @@ export class MusicPlayer {
   private queue: QueueItem[] = [];
   private currentTrack: QueueItem | null = null;
   private isPlaying: boolean = false;
+  private static sodiumInitialized = false;
 
   constructor() {
     this.player = createAudioPlayer();
@@ -51,10 +53,29 @@ export class MusicPlayer {
   }
 
   /**
+   * Initialiser libsodium pour le chiffrement vocal
+   */
+  private async initializeSodium(): Promise<void> {
+    if (!MusicPlayer.sodiumInitialized) {
+      try {
+        await sodium.ready;
+        MusicPlayer.sodiumInitialized = true;
+        logger.info('libsodium initialized successfully');
+      } catch (error) {
+        logger.error('Failed to initialize libsodium:', error);
+        throw new Error('Impossible d\'initialiser le chiffrement vocal');
+      }
+    }
+  }
+
+  /**
    * Rejoindre un salon vocal
    */
   async join(channel: VoiceBasedChannel): Promise<VoiceConnection> {
     try {
+      // Initialiser libsodium avant de rejoindre
+      await this.initializeSodium();
+
       this.connection = joinVoiceChannel({
         channelId: channel.id,
         guildId: channel.guild.id,
@@ -69,9 +90,15 @@ export class MusicPlayer {
 
       logger.info(`Joined voice channel: ${channel.name}`);
       return this.connection;
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to join voice channel:', error);
-      throw new Error('Impossible de rejoindre le salon vocal');
+      
+      // Message d'erreur plus détaillé
+      if (error.message?.includes('encryption')) {
+        throw new Error('Erreur de chiffrement vocal. Vérifiez que libsodium-wrappers est installé.');
+      }
+      
+      throw new Error(`Impossible de rejoindre le salon vocal: ${error.message}`);
     }
   }
 
