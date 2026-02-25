@@ -65,7 +65,7 @@ export class WebSocketServer {
    * Authenticate WebSocket connections with JWT
    */
   private setupAuthentication(): void {
-    this.io.use(async (socket: Socket, next) => {
+    this.io.use(async (socket: Socket, next: any) => {
       try {
         const token =
           socket.handshake.auth.token ||
