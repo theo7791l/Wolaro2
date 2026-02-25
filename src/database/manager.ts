@@ -172,11 +172,13 @@ export class DatabaseManager {
 
   async updateModuleConfig(guildId: string, moduleName: string, moduleConfig: any): Promise<void> {
     await this.query(
-      `UPDATE guild_modules
-       SET config = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE guild_id = $1 AND module_name = $2`,
+      `INSERT INTO guild_modules (guild_id, module_name, config, updated_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (guild_id, module_name)
+       DO UPDATE SET config = $3, updated_at = CURRENT_TIMESTAMP`,
       [guildId, moduleName, JSON.stringify(moduleConfig)]
     );
+    logger.debug(`Module config updated for ${moduleName} in guild ${guildId}`);
   }
 
   // ========================================
@@ -197,10 +199,12 @@ export class DatabaseManager {
 
   async updateGlobalXP(userId: string, xpGain: number): Promise<void> {
     await this.query(
-      `UPDATE global_profiles
-       SET global_xp = GREATEST(0, global_xp + $2),
-           global_level = GREATEST(1, FLOOR(POWER(GREATEST(0, global_xp + $2) / 100.0, 0.5))::INTEGER + 1)
-       WHERE user_id = $1`,
+      `INSERT INTO global_profiles (user_id, username, global_xp, global_level)
+       VALUES ($1, 'Unknown', GREATEST(0, $2), GREATEST(1, FLOOR(POWER(GREATEST(0, $2) / 100.0, 0.5))::INTEGER + 1))
+       ON CONFLICT (user_id)
+       DO UPDATE SET 
+         global_xp = GREATEST(0, global_profiles.global_xp + $2),
+         global_level = GREATEST(1, FLOOR(POWER(GREATEST(0, global_profiles.global_xp + $2) / 100.0, 0.5))::INTEGER + 1)`,
       [userId, xpGain]
     );
   }
