@@ -9,7 +9,7 @@ export class BuyCommand implements ICommand {
     .addStringOption((option) =>
       option
         .setName('item')
-        .setDescription('L\'équipement à acheter')
+        .setDescription('L\'\u00e9quipement à acheter')
         .setRequired(true)
         .addChoices(
           { name: '⚔️ Épée en fer - 100 or (+10 ATK)', value: 'sword' },
@@ -40,8 +40,7 @@ export class BuyCommand implements ICommand {
 
     if (!item) {
       await interaction.reply({
-        content: '❌ Équipement introuvable. Utilisez `/rpgshop` pour voir les équipements disponibles.',
-        flags: ['Ephemeral'],
+        content: '❌ Équipement introuvable. Utilisez `/rpgshop` pour voir les équipements disponibles.'
       });
       return;
     }
@@ -55,8 +54,7 @@ export class BuyCommand implements ICommand {
 
       if (!result.length) {
         await interaction.reply({
-          content: '❌ Vous n\'avez pas encore de profil RPG ! Utilisez `/rpgstart` pour commencer.',
-          flags: ['Ephemeral'],
+          content: '❌ Vous n\'avez pas encore de profil RPG ! Utilisez `/rpgstart` pour commencer.'
         });
         return;
       }
@@ -66,8 +64,7 @@ export class BuyCommand implements ICommand {
 
       if (gold < item.price) {
         await interaction.reply({
-          content: `❌ Vous n'avez pas assez d'or ! Il vous manque **${item.price - gold}** or.\\nVotre or: **${gold}** or`,
-          flags: ['Ephemeral'],
+          content: `❌ Vous n'avez pas assez d'or ! Il vous manque **${item.price - gold}** or.\\nVotre or: **${gold}** or`
         });
         return;
       }
@@ -115,8 +112,7 @@ export class BuyCommand implements ICommand {
     } catch (error) {
       logger.error('Error in rpgbuy command:', error);
       await interaction.reply({
-        content: '❌ Erreur lors de l\'achat. Veuillez réessayer.',
-        flags: ['Ephemeral'],
+        content: '❌ Erreur lors de l\'achat. Veuillez réessayer.'
       });
     }
   }

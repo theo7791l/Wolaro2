@@ -37,8 +37,7 @@ export class BuyCommand implements ICommand {
 
     if (!item) {
       await interaction.reply({
-        content: '❌ Article introuvable. Utilisez `/shop` pour voir les articles disponibles.',
-        ephemeral: true,
+        content: '❌ Article introuvable. Utilisez `/shop` pour voir les articles disponibles.'
       });
       return;
     }
@@ -54,8 +53,7 @@ export class BuyCommand implements ICommand {
 
       if (balance < item.price) {
         await interaction.reply({
-          content: `❌ Vous n'avez pas assez d'argent ! Il vous manque **${item.price - balance}** coins.\nVotre solde: **${balance}** coins`,
-          ephemeral: true,
+          content: `❌ Vous n'avez pas assez d'argent ! Il vous manque **${item.price - balance}** coins.\nVotre solde: **${balance}** coins`
         });
         return;
       }
@@ -89,8 +87,7 @@ export class BuyCommand implements ICommand {
       );
     } catch (error) {
       await interaction.reply({
-        content: '❌ Erreur lors de l\'achat. Veuillez réessayer.',
-        ephemeral: true,
+        content: '❌ Erreur lors de l\'achat. Veuillez réessayer.'
       });
     }
   }

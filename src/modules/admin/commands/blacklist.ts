@@ -33,8 +33,7 @@ export class BlacklistCommand implements ICommand {
   async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
     if (!SecurityManager.isMaster(interaction.user.id)) {
       await interaction.reply({
-        content: '❌ Cette commande est réservée aux Master Admins.',
-        flags: ['Ephemeral'],
+        content: '❌ Cette commande est réservée aux Master Admins.'
       });
       return;
     }
@@ -73,8 +72,7 @@ export class BlacklistCommand implements ICommand {
       logger.info(`Guild ${guildId} ${shouldBlacklist ? 'blacklisted' : 'unblacklisted'} by ${interaction.user.tag}. Reason: ${reason}`);
 
       await interaction.reply({
-        content: `✅ Serveur ${guildId} ${shouldBlacklist ? 'blacklisté' : 'déblacklisté'}.\\n**Raison:** ${reason}`,
-        flags: ['Ephemeral'],
+        content: `✅ Serveur ${guildId} ${shouldBlacklist ? 'blacklisté' : 'déblacklisté'}.\\n**Raison:** ${reason}`
       });
 
       // Try to leave the guild if blacklisted
@@ -89,8 +87,7 @@ export class BlacklistCommand implements ICommand {
     } catch (error) {
       logger.error('Error modifying blacklist:', error);
       await interaction.reply({
-        content: '❌ Erreur lors de la modification du blacklist.',
-        flags: ['Ephemeral'],
+        content: '❌ Erreur lors de la modification du blacklist.'
       });
     }
   }
