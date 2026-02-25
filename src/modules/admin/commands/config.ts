@@ -3,6 +3,13 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits,
   EmbedBuilder,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuInteraction,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ModalSubmitInteraction,
   ChannelType,
   TextChannel,
   CategoryChannel,
@@ -10,255 +17,231 @@ import {
 import { ICommand, ICommandContext } from '../../../types';
 import { logger } from '../../../utils/logger.js';
 
+interface ModuleConfig {
+  name: string;
+  emoji: string;
+  description: string;
+  fields: ConfigField[];
+}
+
+interface ConfigField {
+  id: string;
+  label: string;
+  placeholder: string;
+  required: boolean;
+  style?: TextInputStyle;
+  maxLength?: number;
+}
+
+const MODULES: Record<string, ModuleConfig> = {
+  moderation: {
+    name: 'Moderation',
+    emoji: '🛡️',
+    description: 'Auto-modération, logs, anti-raid et anti-spam',
+    fields: [
+      { id: 'enabled', label: 'Activé (true/false)', placeholder: 'true', required: true },
+      { id: 'log_channel', label: 'Salon de logs (ID)', placeholder: '1234567890', required: false },
+      { id: 'mute_role', label: 'Rôle Mute (ID)', placeholder: '1234567890', required: false },
+      { id: 'max_warns', label: 'Avertissements max (1-10)', placeholder: '3', required: false },
+      { id: 'spam_threshold', label: 'Seuil spam msgs/5s (3-20)', placeholder: '5', required: false },
+    ],
+  },
+  economy: {
+    name: 'Economy',
+    emoji: '💰',
+    description: 'Système bancaire, daily, work, shop',
+    fields: [
+      { id: 'enabled', label: 'Activé (true/false)', placeholder: 'true', required: true },
+      { id: 'currency_name', label: 'Nom de la devise', placeholder: 'coins', required: false },
+      { id: 'currency_symbol', label: 'Symbole devise', placeholder: '🪙', required: false },
+      { id: 'daily_amount', label: 'Récompense daily (100-10000)', placeholder: '500', required: false },
+      { id: 'work_range', label: 'Récompense work (min-max)', placeholder: '50-500', required: false },
+    ],
+  },
+  leveling: {
+    name: 'Leveling',
+    emoji: '📈',
+    description: 'XP par message, level-up, rôles-récompenses',
+    fields: [
+      { id: 'enabled', label: 'Activé (true/false)', placeholder: 'true', required: true },
+      { id: 'xp_per_message', label: 'XP par message (10-100)', placeholder: '25', required: false },
+      { id: 'xp_cooldown', label: 'Cooldown XP secondes (30-300)', placeholder: '60', required: false },
+      { id: 'level_up_channel', label: 'Salon level-up (ID)', placeholder: '1234567890', required: false },
+      { id: 'stack_roles', label: 'Stack rôles (true/false)', placeholder: 'true', required: false },
+    ],
+  },
+  music: {
+    name: 'Music',
+    emoji: '🎵',
+    description: 'YouTube, Spotify, SoundCloud, queue, filtres',
+    fields: [
+      { id: 'enabled', label: 'Activé (true/false)', placeholder: 'true', required: true },
+      { id: 'default_volume', label: 'Volume par défaut (1-100)', placeholder: '50', required: false },
+      { id: 'max_queue_size', label: 'Taille queue max (10-500)', placeholder: '100', required: false },
+      { id: 'allow_filters', label: 'Filtres audio (true/false)', placeholder: 'true', required: false },
+      { id: 'dj_role', label: 'Rôle DJ (ID)', placeholder: '1234567890', required: false },
+    ],
+  },
+  ai: {
+    name: 'AI (Gemini)',
+    emoji: '🤖',
+    description: 'Chatbot, support, auto-modération IA',
+    fields: [
+      { id: 'enabled', label: 'Activé (true/false)', placeholder: 'true', required: true },
+      { id: 'chat_channel', label: 'Salon chat IA (ID)', placeholder: '1234567890', required: false },
+      { id: 'auto_moderate', label: 'Auto-modération IA (true/false)', placeholder: 'false', required: false },
+      { id: 'toxicity_threshold', label: 'Seuil toxicité (0.0-1.0)', placeholder: '0.8', required: false },
+      { id: 'response_chance', label: 'Chance réponse % (0-100)', placeholder: '10', required: false },
+    ],
+  },
+  rpg: {
+    name: 'RPG',
+    emoji: '⚔️',
+    description: 'Combat PvP/PvE, inventaire, quêtes',
+    fields: [
+      { id: 'enabled', label: 'Activé (true/false)', placeholder: 'true', required: true },
+      { id: 'start_gold', label: 'Or de départ (0-10000)', placeholder: '100', required: false },
+      { id: 'start_health', label: 'Santé départ (50-500)', placeholder: '100', required: false },
+      { id: 'daily_reward', label: 'Récompense daily (100-5000)', placeholder: '200', required: false },
+      { id: 'quest_channel', label: 'Salon quêtes (ID)', placeholder: '1234567890', required: false },
+    ],
+  },
+  tickets: {
+    name: 'Tickets',
+    emoji: '🎫',
+    description: 'Support, bug reports, transcripts',
+    fields: [
+      { id: 'enabled', label: 'Activé (true/false)', placeholder: 'true', required: true },
+      { id: 'category', label: 'Catégorie tickets (ID)', placeholder: '1234567890', required: false },
+      { id: 'support_role', label: 'Rôle support (ID)', placeholder: '1234567890', required: false },
+      { id: 'transcript_channel', label: 'Salon transcripts (ID)', placeholder: '1234567890', required: false },
+      { id: 'auto_close_hours', label: 'Auto-fermeture heures (1-168)', placeholder: '24', required: false },
+    ],
+  },
+  giveaways: {
+    name: 'Giveaways',
+    emoji: '🎉',
+    description: 'Concours automatiques, multi-gagnants',
+    fields: [
+      { id: 'enabled', label: 'Activé (true/false)', placeholder: 'true', required: true },
+      { id: 'ping_role', label: 'Rôle à ping (ID)', placeholder: '1234567890', required: false },
+      { id: 'min_account_age_days', label: 'Âge compte min jours (0-365)', placeholder: '7', required: false },
+      { id: 'min_server_age_days', label: 'Âge serveur min jours (0-90)', placeholder: '1', required: false },
+    ],
+  },
+};
+
 export class ConfigCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('config')
-    .setDescription('⚙️ Configure bot modules for this server')
+    .setDescription('⚙️ Configurer les modules du bot')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .setDMPermission(false)
-    
-    // Moderation module
-    .addSubcommand((sub) =>
-      sub
-        .setName('moderation')
-        .setDescription('Configure moderation module')
-        .addBooleanOption((opt) => opt.setName('enabled').setDescription('Enable/disable moderation module'))
-        .addChannelOption((opt) =>
-          opt
-            .setName('log_channel')
-            .setDescription('Channel for moderation logs')
-            .addChannelTypes(ChannelType.GuildText)
-        )
-        .addRoleOption((opt) => opt.setName('mute_role').setDescription('Role to assign when muting users'))
-        .addIntegerOption((opt) =>
-          opt.setName('max_warns').setDescription('Max warnings before auto-action').setMinValue(1).setMaxValue(10)
-        )
-        .addBooleanOption((opt) => opt.setName('auto_mod').setDescription('Enable auto-moderation'))
-        .addIntegerOption((opt) =>
-          opt
-            .setName('spam_threshold')
-            .setDescription('Messages per 5s to trigger anti-spam')
-            .setMinValue(3)
-            .setMaxValue(20)
-        )
-    )
-    
-    // Economy module
-    .addSubcommand((sub) =>
-      sub
-        .setName('economy')
-        .setDescription('Configure economy module')
-        .addBooleanOption((opt) => opt.setName('enabled').setDescription('Enable/disable economy module'))
-        .addStringOption((opt) =>
-          opt.setName('currency_name').setDescription('Name of the currency (e.g., "coins")')
-        )
-        .addStringOption((opt) =>
-          opt.setName('currency_symbol').setDescription('Symbol of the currency (e.g., "🪙")')
-        )
-        .addIntegerOption((opt) =>
-          opt
-            .setName('daily_amount')
-            .setDescription('Daily reward amount')
-            .setMinValue(100)
-            .setMaxValue(10000)
-        )
-        .addIntegerOption((opt) =>
-          opt.setName('work_min').setDescription('Minimum work reward').setMinValue(10).setMaxValue(1000)
-        )
-        .addIntegerOption((opt) =>
-          opt.setName('work_max').setDescription('Maximum work reward').setMinValue(100).setMaxValue(10000)
-        )
-    )
-    
-    // Leveling module
-    .addSubcommand((sub) =>
-      sub
-        .setName('leveling')
-        .setDescription('Configure leveling module')
-        .addBooleanOption((opt) => opt.setName('enabled').setDescription('Enable/disable leveling module'))
-        .addIntegerOption((opt) =>
-          opt
-            .setName('xp_per_message')
-            .setDescription('XP gained per message')
-            .setMinValue(10)
-            .setMaxValue(100)
-        )
-        .addIntegerOption((opt) =>
-          opt
-            .setName('xp_cooldown')
-            .setDescription('Cooldown between XP gains (seconds)')
-            .setMinValue(30)
-            .setMaxValue(300)
-        )
-        .addChannelOption((opt) =>
-          opt
-            .setName('level_up_channel')
-            .setDescription('Channel for level-up announcements')
-            .addChannelTypes(ChannelType.GuildText)
-        )
-        .addBooleanOption((opt) =>
-          opt.setName('stack_roles').setDescription('Stack role rewards (keep previous roles)')
-        )
-    )
-    
-    // Music module
-    .addSubcommand((sub) =>
-      sub
-        .setName('music')
-        .setDescription('Configure music module')
-        .addBooleanOption((opt) => opt.setName('enabled').setDescription('Enable/disable music module'))
-        .addIntegerOption((opt) =>
-          opt
-            .setName('default_volume')
-            .setDescription('Default music volume (1-100)')
-            .setMinValue(1)
-            .setMaxValue(100)
-        )
-        .addIntegerOption((opt) =>
-          opt
-            .setName('max_queue_size')
-            .setDescription('Maximum queue size')
-            .setMinValue(10)
-            .setMaxValue(500)
-        )
-        .addBooleanOption((opt) => opt.setName('allow_filters').setDescription('Allow audio filters (bass boost, etc.)'))
-        .addRoleOption((opt) => opt.setName('dj_role').setDescription('DJ role (bypass some restrictions)'))
-    )
-    
-    // AI module
-    .addSubcommand((sub) =>
-      sub
-        .setName('ai')
-        .setDescription('Configure AI module (Gemini)')
-        .addBooleanOption((opt) => opt.setName('enabled').setDescription('Enable/disable AI module'))
-        .addChannelOption((opt) =>
-          opt
-            .setName('chat_channel')
-            .setDescription('Channel for AI auto-responses')
-            .addChannelTypes(ChannelType.GuildText)
-        )
-        .addBooleanOption((opt) => opt.setName('auto_moderate').setDescription('Enable AI auto-moderation'))
-        .addNumberOption((opt) =>
-          opt
-            .setName('toxicity_threshold')
-            .setDescription('Toxicity threshold (0.0-1.0, float value for AI analysis)')
-            .setMinValue(0.0)
-            .setMaxValue(1.0)
-        )
-        .addIntegerOption((opt) =>
-          opt
-            .setName('response_chance')
-            .setDescription('Chance of AI responding in chat channel (%)')
-            .setMinValue(0)
-            .setMaxValue(100)
-        )
-    )
-    
-    // RPG module
-    .addSubcommand((sub) =>
-      sub
-        .setName('rpg')
-        .setDescription('Configure RPG module')
-        .addBooleanOption((opt) => opt.setName('enabled').setDescription('Enable/disable RPG module'))
-        .addIntegerOption((opt) =>
-          opt
-            .setName('start_gold')
-            .setDescription('Starting gold for new players')
-            .setMinValue(0)
-            .setMaxValue(10000)
-        )
-        .addIntegerOption((opt) =>
-          opt
-            .setName('start_health')
-            .setDescription('Starting health for new players')
-            .setMinValue(50)
-            .setMaxValue(500)
-        )
-        .addIntegerOption((opt) =>
-          opt
-            .setName('daily_reward')
-            .setDescription('Daily RPG reward')
-            .setMinValue(100)
-            .setMaxValue(5000)
-        )
-        .addChannelOption((opt) =>
-          opt
-            .setName('quest_channel')
-            .setDescription('Channel for quest announcements')
-            .addChannelTypes(ChannelType.GuildText)
-        )
-    )
-    
-    // Tickets module
-    .addSubcommand((sub) =>
-      sub
-        .setName('tickets')
-        .setDescription('Configure tickets module')
-        .addBooleanOption((opt) => opt.setName('enabled').setDescription('Enable/disable tickets module'))
-        .addChannelOption((opt) =>
-          opt
-            .setName('category')
-            .setDescription('Category for ticket channels')
-            .addChannelTypes(ChannelType.GuildCategory)
-        )
-        .addRoleOption((opt) => opt.setName('support_role').setDescription('Support role (can view tickets)'))
-        .addChannelOption((opt) =>
-          opt
-            .setName('transcript_channel')
-            .setDescription('Channel for ticket transcripts')
-            .addChannelTypes(ChannelType.GuildText)
-        )
-        .addIntegerOption((opt) =>
-          opt
-            .setName('auto_close_hours')
-            .setDescription('Auto-close tickets after X hours of inactivity')
-            .setMinValue(1)
-            .setMaxValue(168)
-        )
-        .addIntegerOption((opt) =>
-          opt
-            .setName('max_per_user')
-            .setDescription('Max open tickets per user')
-            .setMinValue(1)
-            .setMaxValue(10)
-        )
-    )
-    
-    // Giveaways module
-    .addSubcommand((sub) =>
-      sub
-        .setName('giveaways')
-        .setDescription('Configure giveaways module')
-        .addBooleanOption((opt) => opt.setName('enabled').setDescription('Enable/disable giveaways module'))
-        .addRoleOption((opt) => opt.setName('ping_role').setDescription('Role to ping for new giveaways'))
-        .addIntegerOption((opt) =>
-          opt
-            .setName('min_account_age_days')
-            .setDescription('Minimum account age to participate (days)')
-            .setMinValue(0)
-            .setMaxValue(365)
-        )
-        .addIntegerOption((opt) =>
-          opt
-            .setName('min_server_age_days')
-            .setDescription('Minimum server join age to participate (days)')
-            .setMinValue(0)
-            .setMaxValue(90)
-        )
-    ) as SlashCommandBuilder;
+    .setDMPermission(false) as SlashCommandBuilder;
 
   module = 'admin';
   guildOnly = true;
 
   async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
-    const subcommand = interaction.options.getSubcommand();
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId('config_module_select')
+      .setPlaceholder('🔧 Sélectionner un module à configurer')
+      .addOptions(
+        Object.entries(MODULES).map(([key, module]) => ({
+          label: module.name,
+          description: module.description,
+          value: key,
+          emoji: module.emoji,
+        }))
+      );
+
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setTitle('⚙️ Configuration des Modules')
+      .setDescription(
+        '**Sélectionnez le module que vous souhaitez configurer dans le menu déroulant ci-dessous.**\n\n' +
+        '**Modules disponibles :**\n' +
+        Object.values(MODULES).map(m => `${m.emoji} **${m.name}** — ${m.description}`).join('\n')
+      )
+      .setFooter({ text: 'Les modifications sont sauvegardées instantanément' })
+      .setTimestamp();
+
+    await interaction.reply({
+      embeds: [embed],
+      components: [row],
+      flags: ['Ephemeral'],
+    });
+
+    // Listen for select menu interaction
+    const collector = interaction.channel?.createMessageComponentCollector({
+      filter: (i) => i.user.id === interaction.user.id && i.customId === 'config_module_select',
+      time: 120_000, // 2 minutes
+    });
+
+    collector?.on('collect', async (selectInteraction: StringSelectMenuInteraction) => {
+      const moduleKey = selectInteraction.values[0];
+      const moduleConfig = MODULES[moduleKey];
+
+      // Build modal
+      const modal = new ModalBuilder()
+        .setCustomId(`config_modal_${moduleKey}`)
+        .setTitle(`🔧 Configuration ${moduleConfig.name}`);
+
+      const rows: ActionRowBuilder<TextInputBuilder>[] = [];
+
+      for (const field of moduleConfig.fields) {
+        const input = new TextInputBuilder()
+          .setCustomId(field.id)
+          .setLabel(field.label)
+          .setPlaceholder(field.placeholder)
+          .setRequired(field.required)
+          .setStyle(field.style || TextInputStyle.Short);
+
+        if (field.maxLength) {
+          input.setMaxLength(field.maxLength);
+        }
+
+        rows.push(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+      }
+
+      modal.addComponents(...rows);
+
+      await selectInteraction.showModal(modal);
+
+      // Listen for modal submit
+      const modalFilter = (i: ModalSubmitInteraction) =>
+        i.customId === `config_modal_${moduleKey}` && i.user.id === interaction.user.id;
+
+      try {
+        const modalSubmit = await selectInteraction.awaitModalSubmit({
+          filter: modalFilter,
+          time: 300_000, // 5 minutes
+        });
+
+        await this.handleModalSubmit(modalSubmit, moduleKey, context);
+      } catch (error) {
+        // Modal timeout or error (user closed it)
+        logger.debug('Modal submit timeout or cancelled');
+      }
+    });
+  }
+
+  private async handleModalSubmit(
+    interaction: ModalSubmitInteraction,
+    moduleKey: string,
+    context: ICommandContext
+  ): Promise<void> {
     const guildId = interaction.guildId!;
+    const moduleConfig = MODULES[moduleKey];
+
+    await interaction.deferReply({ flags: ['Ephemeral'] });
 
     const client = await context.database.getClient();
     try {
       await client.query('BEGIN');
 
-      // Ensure guild exists to avoid FK violation (only guild_id and owner_id columns exist)
+      // Ensure guild exists
       await client.query(
         `INSERT INTO guilds (guild_id, owner_id)
          VALUES ($1, $2)
@@ -266,362 +249,81 @@ export class ConfigCommand implements ICommand {
         [guildId, interaction.guild!.ownerId]
       );
 
-      // Lock row to prevent race conditions
+      // Lock row
       const currentConfig = await client.query(
         'SELECT config FROM guild_modules WHERE guild_id = $1 AND module_name = $2 FOR UPDATE',
-        [guildId, subcommand]
+        [guildId, moduleKey]
       );
 
       let settings = currentConfig.rows[0]?.config || {};
       const updates: string[] = [];
 
-      // Process all options based on subcommand
-      switch (subcommand) {
-        case 'moderation':
-          if (interaction.options.getBoolean('enabled') !== null) {
-            settings.enabled = interaction.options.getBoolean('enabled');
-            updates.push(`Enabled: **${settings.enabled}**`);
-          }
-          
-          // Verify channel permissions
-          if (interaction.options.getChannel('log_channel')) {
-            const logChannel = interaction.options.getChannel('log_channel') as TextChannel;
-            const permissions = logChannel.permissionsFor(interaction.guild!.members.me!);
-            
-            if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
-              await client.query('ROLLBACK');
-              await interaction.reply({
-                content: `❌ I don't have permission to send messages in <#${logChannel.id}>.`,
-                flags: ['Ephemeral'],
-              });
-              return;
-            }
-            
-            settings.log_channel = logChannel.id;
-            updates.push(`Log Channel: <#${settings.log_channel}>`);
-          }
-          
-          if (interaction.options.getRole('mute_role')) {
-            settings.mute_role = interaction.options.getRole('mute_role')!.id;
-            updates.push(`Mute Role: <@&${settings.mute_role}>`);
-          }
-          if (interaction.options.getInteger('max_warns')) {
-            settings.max_warns = interaction.options.getInteger('max_warns');
-            updates.push(`Max Warns: **${settings.max_warns}**`);
-          }
-          if (interaction.options.getBoolean('auto_mod') !== null) {
-            settings.auto_mod = interaction.options.getBoolean('auto_mod');
-            updates.push(`Auto-Mod: **${settings.auto_mod}**`);
-          }
-          if (interaction.options.getInteger('spam_threshold')) {
-            settings.spam_threshold = interaction.options.getInteger('spam_threshold');
-            updates.push(`Spam Threshold: **${settings.spam_threshold}**`);
-          }
-          break;
+      // Process each field
+      for (const field of moduleConfig.fields) {
+        const value = interaction.fields.getTextInputValue(field.id).trim();
+        if (!value && !field.required) continue;
 
-        case 'economy':
-          if (interaction.options.getBoolean('enabled') !== null) {
-            settings.enabled = interaction.options.getBoolean('enabled');
-            updates.push(`Enabled: **${settings.enabled}**`);
-          }
-          if (interaction.options.getString('currency_name')) {
-            settings.currency_name = interaction.options.getString('currency_name');
-            updates.push(`Currency Name: **${settings.currency_name}**`);
-          }
-          if (interaction.options.getString('currency_symbol')) {
-            settings.currency_symbol = interaction.options.getString('currency_symbol');
-            updates.push(`Currency Symbol: **${settings.currency_symbol}**`);
-          }
-          if (interaction.options.getInteger('daily_amount')) {
-            settings.daily_amount = interaction.options.getInteger('daily_amount');
-            updates.push(`Daily Amount: **${settings.daily_amount}**`);
-          }
-          
-          // Validate work_min <= work_max
-          const workMin = interaction.options.getInteger('work_min');
-          const workMax = interaction.options.getInteger('work_max');
-          
-          if (workMin && workMax && workMin > workMax) {
+        // Parse and validate
+        const parsed = this.parseValue(field.id, value, settings);
+        if (parsed.error) {
+          await client.query('ROLLBACK');
+          await interaction.editReply({ content: `❌ ${parsed.error}` });
+          return;
+        }
+
+        // Validate permissions for channel/category fields
+        if (parsed.needsPermissionCheck && parsed.value) {
+          const permCheck = await this.validateChannelPermissions(
+            interaction,
+            parsed.value as string,
+            field.id
+          );
+          if (permCheck.error) {
             await client.query('ROLLBACK');
-            await interaction.reply({
-              content: `❌ Work minimum (${workMin}) cannot be greater than work maximum (${workMax}).`,
-              flags: ['Ephemeral'],
-            });
+            await interaction.editReply({ content: `❌ ${permCheck.error}` });
             return;
           }
-          
-          if (workMin && settings.work_max && workMin > settings.work_max) {
-            await client.query('ROLLBACK');
-            await interaction.reply({
-              content: `❌ Work minimum (${workMin}) cannot be greater than current work maximum (${settings.work_max}).`,
-              flags: ['Ephemeral'],
-            });
-            return;
-          }
-          
-          if (workMax && settings.work_min && workMax < settings.work_min) {
-            await client.query('ROLLBACK');
-            await interaction.reply({
-              content: `❌ Work maximum (${workMax}) cannot be less than current work minimum (${settings.work_min}).`,
-              flags: ['Ephemeral'],
-            });
-            return;
-          }
-          
-          if (workMin) {
-            settings.work_min = workMin;
-            updates.push(`Work Min: **${settings.work_min}**`);
-          }
-          if (workMax) {
-            settings.work_max = workMax;
-            updates.push(`Work Max: **${settings.work_max}**`);
-          }
-          break;
+        }
 
-        case 'leveling':
-          if (interaction.options.getBoolean('enabled') !== null) {
-            settings.enabled = interaction.options.getBoolean('enabled');
-            updates.push(`Enabled: **${settings.enabled}**`);
-          }
-          if (interaction.options.getInteger('xp_per_message')) {
-            settings.xp_per_message = interaction.options.getInteger('xp_per_message');
-            updates.push(`XP per Message: **${settings.xp_per_message}**`);
-          }
-          if (interaction.options.getInteger('xp_cooldown')) {
-            settings.xp_cooldown = interaction.options.getInteger('xp_cooldown');
-            updates.push(`XP Cooldown: **${settings.xp_cooldown}s**`);
-          }
-          
-          if (interaction.options.getChannel('level_up_channel')) {
-            const levelUpChannel = interaction.options.getChannel('level_up_channel') as TextChannel;
-            const permissions = levelUpChannel.permissionsFor(interaction.guild!.members.me!);
-            
-            if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
-              await client.query('ROLLBACK');
-              await interaction.reply({
-                content: `❌ I don't have permission to send messages in <#${levelUpChannel.id}>.`,
-                flags: ['Ephemeral'],
-              });
-              return;
-            }
-            
-            settings.level_up_channel = levelUpChannel.id;
-            updates.push(`Level-Up Channel: <#${settings.level_up_channel}>`);
-          }
-          
-          if (interaction.options.getBoolean('stack_roles') !== null) {
-            settings.stack_roles = interaction.options.getBoolean('stack_roles');
-            updates.push(`Stack Roles: **${settings.stack_roles}**`);
-          }
-          break;
-
-        case 'music':
-          if (interaction.options.getBoolean('enabled') !== null) {
-            settings.enabled = interaction.options.getBoolean('enabled');
-            updates.push(`Enabled: **${settings.enabled}**`);
-          }
-          if (interaction.options.getInteger('default_volume')) {
-            settings.default_volume = interaction.options.getInteger('default_volume');
-            updates.push(`Default Volume: **${settings.default_volume}%**`);
-          }
-          if (interaction.options.getInteger('max_queue_size')) {
-            settings.max_queue_size = interaction.options.getInteger('max_queue_size');
-            updates.push(`Max Queue Size: **${settings.max_queue_size}**`);
-          }
-          if (interaction.options.getBoolean('allow_filters') !== null) {
-            settings.allow_filters = interaction.options.getBoolean('allow_filters');
-            updates.push(`Allow Filters: **${settings.allow_filters}**`);
-          }
-          if (interaction.options.getRole('dj_role')) {
-            settings.dj_role = interaction.options.getRole('dj_role')!.id;
-            updates.push(`DJ Role: <@&${settings.dj_role}>`);
-          }
-          break;
-
-        case 'ai':
-          if (interaction.options.getBoolean('enabled') !== null) {
-            settings.enabled = interaction.options.getBoolean('enabled');
-            updates.push(`Enabled: **${settings.enabled}**`);
-          }
-          
-          if (interaction.options.getChannel('chat_channel')) {
-            const chatChannel = interaction.options.getChannel('chat_channel') as TextChannel;
-            const permissions = chatChannel.permissionsFor(interaction.guild!.members.me!);
-            
-            if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
-              await client.query('ROLLBACK');
-              await interaction.reply({
-                content: `❌ I don't have permission to send messages in <#${chatChannel.id}>.`,
-                flags: ['Ephemeral'],
-              });
-              return;
-            }
-            
-            settings.chat_channel = chatChannel.id;
-            updates.push(`Chat Channel: <#${settings.chat_channel}>`);
-          }
-          
-          if (interaction.options.getBoolean('auto_moderate') !== null) {
-            settings.auto_moderate = interaction.options.getBoolean('auto_moderate');
-            updates.push(`Auto-Moderate: **${settings.auto_moderate}**`);
-          }
-          if (interaction.options.getNumber('toxicity_threshold') !== null) {
-            settings.toxicity_threshold = interaction.options.getNumber('toxicity_threshold');
-            updates.push(`Toxicity Threshold: **${settings.toxicity_threshold}**`);
-          }
-          if (interaction.options.getInteger('response_chance')) {
-            settings.response_chance = interaction.options.getInteger('response_chance');
-            updates.push(`Response Chance: **${settings.response_chance}%**`);
-          }
-          break;
-
-        case 'rpg':
-          if (interaction.options.getBoolean('enabled') !== null) {
-            settings.enabled = interaction.options.getBoolean('enabled');
-            updates.push(`Enabled: **${settings.enabled}**`);
-          }
-          if (interaction.options.getInteger('start_gold')) {
-            settings.start_gold = interaction.options.getInteger('start_gold');
-            updates.push(`Starting Gold: **${settings.start_gold}**`);
-          }
-          if (interaction.options.getInteger('start_health')) {
-            settings.start_health = interaction.options.getInteger('start_health');
-            updates.push(`Starting Health: **${settings.start_health}**`);
-          }
-          if (interaction.options.getInteger('daily_reward')) {
-            settings.daily_reward = interaction.options.getInteger('daily_reward');
-            updates.push(`Daily Reward: **${settings.daily_reward}**`);
-          }
-          
-          if (interaction.options.getChannel('quest_channel')) {
-            const questChannel = interaction.options.getChannel('quest_channel') as TextChannel;
-            const permissions = questChannel.permissionsFor(interaction.guild!.members.me!);
-            
-            if (!permissions?.has(['SendMessages', 'ViewChannel'])) {
-              await client.query('ROLLBACK');
-              await interaction.reply({
-                content: `❌ I don't have permission to send messages in <#${questChannel.id}>.`,
-                flags: ['Ephemeral'],
-              });
-              return;
-            }
-            
-            settings.quest_channel = questChannel.id;
-            updates.push(`Quest Channel: <#${settings.quest_channel}>`);
-          }
-          break;
-
-        case 'tickets':
-          if (interaction.options.getBoolean('enabled') !== null) {
-            settings.enabled = interaction.options.getBoolean('enabled');
-            updates.push(`Enabled: **${settings.enabled}**`);
-          }
-          
-          if (interaction.options.getChannel('category')) {
-            const category = interaction.options.getChannel('category') as CategoryChannel;
-            const permissions = category.permissionsFor(interaction.guild!.members.me!);
-            
-            if (!permissions?.has(['ManageChannels', 'ViewChannel'])) {
-              await client.query('ROLLBACK');
-              await interaction.reply({
-                content: `❌ I don't have permission to manage channels in category <#${category.id}>.`,
-                flags: ['Ephemeral'],
-              });
-              return;
-            }
-            
-            settings.category = category.id;
-            updates.push(`Category: <#${settings.category}>`);
-          }
-          
-          if (interaction.options.getRole('support_role')) {
-            settings.support_role = interaction.options.getRole('support_role')!.id;
-            updates.push(`Support Role: <@&${settings.support_role}>`);
-          }
-          
-          if (interaction.options.getChannel('transcript_channel')) {
-            const transcriptChannel = interaction.options.getChannel('transcript_channel') as TextChannel;
-            const permissions = transcriptChannel.permissionsFor(interaction.guild!.members.me!);
-            
-            if (!permissions?.has(['SendMessages', 'ViewChannel', 'AttachFiles'])) {
-              await client.query('ROLLBACK');
-              await interaction.reply({
-                content: `❌ I don't have permission to send files in <#${transcriptChannel.id}>.`,
-                flags: ['Ephemeral'],
-              });
-              return;
-            }
-            
-            settings.transcript_channel = transcriptChannel.id;
-            updates.push(`Transcript Channel: <#${settings.transcript_channel}>`);
-          }
-          
-          if (interaction.options.getInteger('auto_close_hours')) {
-            settings.auto_close_hours = interaction.options.getInteger('auto_close_hours');
-            updates.push(`Auto-Close: **${settings.auto_close_hours}h**`);
-          }
-          if (interaction.options.getInteger('max_per_user')) {
-            settings.max_per_user = interaction.options.getInteger('max_per_user');
-            updates.push(`Max Per User: **${settings.max_per_user}**`);
-          }
-          break;
-
-        case 'giveaways':
-          if (interaction.options.getBoolean('enabled') !== null) {
-            settings.enabled = interaction.options.getBoolean('enabled');
-            updates.push(`Enabled: **${settings.enabled}**`);
-          }
-          if (interaction.options.getRole('ping_role')) {
-            settings.ping_role = interaction.options.getRole('ping_role')!.id;
-            updates.push(`Ping Role: <@&${settings.ping_role}>`);
-          }
-          if (interaction.options.getInteger('min_account_age_days') !== null) {
-            settings.min_account_age_days = interaction.options.getInteger('min_account_age_days');
-            updates.push(`Min Account Age: **${settings.min_account_age_days} days**`);
-          }
-          if (interaction.options.getInteger('min_server_age_days') !== null) {
-            settings.min_server_age_days = interaction.options.getInteger('min_server_age_days');
-            updates.push(`Min Server Age: **${settings.min_server_age_days} days**`);
-          }
-          break;
+        if (parsed.value !== undefined) {
+          settings[field.id] = parsed.value;
+          updates.push(parsed.display || `${field.label}: **${parsed.value}**`);
+        }
       }
 
       if (updates.length === 0) {
         await client.query('ROLLBACK');
-        await interaction.reply({
-          content: '❌ No options provided. Please specify at least one option to update.',
-          flags: ['Ephemeral'],
-        });
+        await interaction.editReply({ content: '❌ Aucune modification détectée.' });
         return;
       }
 
-      // Update database within transaction (config column, not guild_settings)
+      // Update database
       await client.query(
         `INSERT INTO guild_modules (guild_id, module_name, config, updated_at)
          VALUES ($1, $2, $3, NOW())
          ON CONFLICT (guild_id, module_name)
          DO UPDATE SET config = $3, updated_at = NOW()`,
-        [guildId, subcommand, JSON.stringify(settings)]
+        [guildId, moduleKey, JSON.stringify(settings)]
       );
 
       await client.query('COMMIT');
 
       const embed = new EmbedBuilder()
         .setColor(0x00ff00)
-        .setTitle(`✅ ${subcommand.charAt(0).toUpperCase() + subcommand.slice(1)} Configuration Updated`)
+        .setTitle(`✅ ${moduleConfig.emoji} ${moduleConfig.name} — Configuration mise à jour`)
         .setDescription(updates.join('\n'))
-        .setFooter({ text: `Updated by ${interaction.user.tag}` })
+        .setFooter({ text: `Mis à jour par ${interaction.user.tag}` })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
 
-      logger.info(`Config updated for ${subcommand} in guild ${guildId} by ${interaction.user.tag}`);
+      logger.info(`Config updated for ${moduleKey} in guild ${guildId} by ${interaction.user.tag}`);
 
-      // Non-blocking audit log (runs after response)
+      // Audit log (non-blocking)
       try {
         await context.database.query(
           'INSERT INTO audit_logs (guild_id, user_id, action_type, metadata) VALUES ($1, $2, $3, $4)',
-          [guildId, interaction.user.id, 'CONFIG_UPDATED', JSON.stringify({ module: subcommand, updates })]
+          [guildId, interaction.user.id, 'CONFIG_UPDATED', JSON.stringify({ module: moduleKey, updates })]
         );
       } catch (auditError) {
         logger.warn('Failed to create audit log (non-critical):', auditError);
@@ -629,12 +331,122 @@ export class ConfigCommand implements ICommand {
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('Error updating config:', error);
-      await interaction.reply({
-        content: '❌ An error occurred while updating configuration.',
-        flags: ['Ephemeral'],
-      });
+      await interaction.editReply({ content: '❌ Erreur lors de la mise à jour de la configuration.' });
     } finally {
       client.release();
+    }
+  }
+
+  private parseValue(
+    fieldId: string,
+    value: string,
+    currentSettings: Record<string, unknown>
+  ): {
+    value?: unknown;
+    display?: string;
+    error?: string;
+    needsPermissionCheck?: boolean;
+  } {
+    // Boolean fields
+    if (fieldId === 'enabled' || fieldId === 'auto_moderate' || fieldId === 'stack_roles' || fieldId === 'allow_filters') {
+      if (value !== 'true' && value !== 'false') {
+        return { error: `${fieldId} doit être "true" ou "false"` };
+      }
+      return { value: value === 'true', display: `${fieldId}: **${value}**` };
+    }
+
+    // Integer fields
+    const intFields = [
+      'max_warns', 'spam_threshold', 'daily_amount', 'xp_per_message', 'xp_cooldown',
+      'default_volume', 'max_queue_size', 'response_chance', 'start_gold', 'start_health',
+      'daily_reward', 'auto_close_hours', 'min_account_age_days', 'min_server_age_days'
+    ];
+    if (intFields.includes(fieldId)) {
+      const num = parseInt(value, 10);
+      if (isNaN(num)) {
+        return { error: `${fieldId} doit être un nombre entier` };
+      }
+      return { value: num, display: `${fieldId}: **${num}**` };
+    }
+
+    // Float fields
+    if (fieldId === 'toxicity_threshold') {
+      const num = parseFloat(value);
+      if (isNaN(num) || num < 0 || num > 1) {
+        return { error: 'Seuil de toxicité doit être entre 0.0 et 1.0' };
+      }
+      return { value: num, display: `Seuil toxicité: **${num}**` };
+    }
+
+    // Work range (special case)
+    if (fieldId === 'work_range') {
+      const match = value.match(/^(\d+)-(\d+)$/);
+      if (!match) {
+        return { error: 'Format invalide pour work_range (ex: 50-500)' };
+      }
+      const [_, minStr, maxStr] = match;
+      const min = parseInt(minStr, 10);
+      const max = parseInt(maxStr, 10);
+      if (min > max) {
+        return { error: `work_min (${min}) ne peut pas être supérieur à work_max (${max})` };
+      }
+      return {
+        value: { work_min: min, work_max: max },
+        display: `Récompense work: **${min}-${max}**`,
+      };
+    }
+
+    // Channel/Role/Category IDs
+    const idFields = [
+      'log_channel', 'mute_role', 'level_up_channel', 'dj_role', 'chat_channel',
+      'quest_channel', 'category', 'support_role', 'transcript_channel', 'ping_role'
+    ];
+    if (idFields.includes(fieldId)) {
+      if (!/^\d{17,20}$/.test(value)) {
+        return { error: `${fieldId} doit être un ID Discord valide (17-20 chiffres)` };
+      }
+      const needsCheck = fieldId.includes('channel') || fieldId === 'category';
+      const display = fieldId.includes('role')
+        ? `${fieldId}: <@&${value}>`
+        : `${fieldId}: <#${value}>`;
+      return { value, display, needsPermissionCheck: needsCheck };
+    }
+
+    // String fields
+    return { value, display: `${fieldId}: **${value}**` };
+  }
+
+  private async validateChannelPermissions(
+    interaction: ModalSubmitInteraction,
+    channelId: string,
+    fieldId: string
+  ): Promise<{ error?: string }> {
+    try {
+      const channel = await interaction.guild!.channels.fetch(channelId);
+      if (!channel) {
+        return { error: `Salon/Catégorie ${channelId} introuvable` };
+      }
+
+      const me = interaction.guild!.members.me!;
+
+      if (channel.type === ChannelType.GuildCategory) {
+        const perms = channel.permissionsFor(me);
+        if (!perms?.has(['ManageChannels', 'ViewChannel'])) {
+          return { error: `Je n'ai pas la permission de gérer la catégorie <#${channelId}>` };
+        }
+      } else if (channel.type === ChannelType.GuildText) {
+        const perms = channel.permissionsFor(me);
+        const needed = fieldId === 'transcript_channel'
+          ? ['SendMessages', 'ViewChannel', 'AttachFiles']
+          : ['SendMessages', 'ViewChannel'];
+        if (!perms?.has(needed)) {
+          return { error: `Je n'ai pas les permissions nécessaires dans <#${channelId}>` };
+        }
+      }
+
+      return {};
+    } catch (error) {
+      return { error: `Impossible de vérifier le salon/catégorie ${channelId}` };
     }
   }
 }
