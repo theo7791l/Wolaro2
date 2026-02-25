@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 import { logger } from '../../../utils/logger.js';
 
@@ -72,7 +72,7 @@ export class ChatCommand implements ICommand {
       logger.error('Error configuring AI chat:', error);
       await interaction.reply({
         content: '❌ Erreur lors de la configuration du chat IA.',
-        flags: ['Ephemeral'],
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
