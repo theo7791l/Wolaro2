@@ -32,8 +32,7 @@ export class DailyCommand implements ICommand {
         if (hoursSinceDaily < 24) {
           const hoursRemaining = Math.ceil(24 - hoursSinceDaily);
           await interaction.reply({
-            content: `⏰ Vous avez déjà réclamé votre récompense quotidienne. Revenez dans ${hoursRemaining}h.`,
-            ephemeral: true,
+            content: `⏰ Vous avez déjà réclamé votre récompense quotidienne. Revenez dans ${hoursRemaining}h.`
           });
           return;
         }
@@ -80,8 +79,7 @@ export class DailyCommand implements ICommand {
       await interaction.reply({ embeds: [embed] });
     } catch (error) {
       await interaction.reply({
-        content: '❌ Impossible de réclamer la récompense quotidienne.',
-        ephemeral: true,
+        content: '❌ Impossible de réclamer la récompense quotidienne.'
       });
     }
   }

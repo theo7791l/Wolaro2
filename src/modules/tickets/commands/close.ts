@@ -28,8 +28,7 @@ export class CloseCommand implements ICommand {
 
     if (ticket.length === 0) {
       await interaction.reply({
-        content: '❌ Cette commande ne peut être utilisée que dans un ticket ouvert.',
-        ephemeral: true,
+        content: '❌ Cette commande ne peut être utilisée que dans un ticket ouvert.'
       });
       return;
     }

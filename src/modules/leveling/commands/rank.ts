@@ -25,7 +25,7 @@ export class RankCommand implements ICommand {
         'Erreur',
         'Les bots n\'ont pas de niveaux.'
       );
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed] });
       return;
     }
 
@@ -85,7 +85,7 @@ export class RankCommand implements ICommand {
         'Erreur',
         'Une erreur est survenue lors de la récupération du niveau.'
       );
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed] });
     }
   }
 
