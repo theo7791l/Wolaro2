@@ -119,8 +119,10 @@ export class AIMessageHandler implements IEvent {
 
       if (!shouldRespond) return;
 
-      // Show typing indicator
-      await message.channel.sendTyping();
+      // Show typing indicator (only if channel supports it)
+      if ('sendTyping' in message.channel) {
+        await message.channel.sendTyping();
+      }
 
       // Get conversation context (last N messages)
       const contextLimit = config.context_messages || 10;

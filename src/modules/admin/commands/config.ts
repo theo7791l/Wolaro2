@@ -13,6 +13,7 @@ import {
   ChannelType,
   TextChannel,
   CategoryChannel,
+  PermissionResolvable,
 } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
 import { logger } from '../../../utils/logger.js';
@@ -431,12 +432,12 @@ export class ConfigCommand implements ICommand {
 
       if (channel.type === ChannelType.GuildCategory) {
         const perms = channel.permissionsFor(me);
-        if (!perms?.has(['ManageChannels', 'ViewChannel'])) {
+        if (!perms?.has(['ManageChannels', 'ViewChannel'] as PermissionResolvable[])) {
           return { error: `Je n'ai pas la permission de gérer la catégorie <#${channelId}>` };
         }
       } else if (channel.type === ChannelType.GuildText) {
         const perms = channel.permissionsFor(me);
-        const needed = fieldId === 'transcript_channel'
+        const needed: PermissionResolvable[] = fieldId === 'transcript_channel'
           ? ['SendMessages', 'ViewChannel', 'AttachFiles']
           : ['SendMessages', 'ViewChannel'];
         if (!perms?.has(needed)) {
