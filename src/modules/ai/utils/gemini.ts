@@ -55,26 +55,39 @@ export class GeminiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        logger.error('Gemini API error:', {
+        
+        // Log détaillé pour déboguer
+        logger.error('Gemini API error details:', {
           status: response.status,
           statusText: response.statusText,
           error: errorData,
           model: this.model,
+          apiKeyPrefix: this.apiKey.substring(0, 12),
           url: url.replace(this.apiKey, 'REDACTED'),
         });
         
-        // Messages d'erreur plus clairs
+        // Messages d'erreur plus clairs avec détails
+        let errorMessage = '';
+        
         if (response.status === 400) {
-          throw new Error('❌ Clé API Gemini invalide ou requête mal formée. Vérifiez votre GEMINI_API_KEY dans .env');
+          const details = errorData?.error?.message || JSON.stringify(errorData);
+          errorMessage = `❌ Requête invalide (400): ${details}\n\u2139️ Vérifiez votre GEMINI_API_KEY dans .env`;
         } else if (response.status === 403) {
-          throw new Error('❌ Accès refusé à l\'API Gemini. Vérifiez que votre clé API a les bonnes permissions.');
+          const details = errorData?.error?.message || 'Accès refusé';
+          errorMessage = `❌ Accès refusé (403): ${details}\n\u2139️ Vérifiez que votre clé API Gemini a les bonnes permissions`;
         } else if (response.status === 404) {
-          throw new Error(`❌ Modèle ${this.model} non trouvé. Votre clé API Gemini est peut-être invalide ou le modèle n\'est pas disponible.`);
+          errorMessage = `❌ Modèle "${this.model}" non trouvé (404)\n\u2139️ Votre clé API Gemini est invalide ou expirée`;
         } else if (response.status === 429) {
-          throw new Error('⏳ Limite de requêtes atteinte. Attendez quelques minutes.');
+          const details = errorData?.error?.message || 'Trop de requêtes';
+          errorMessage = `⏳ Limite de requêtes atteinte (429): ${details}\n\u2139️ Attendez quelques minutes ou vérifiez votre quota Gemini API`;
+        } else if (response.status === 500 || response.status === 503) {
+          errorMessage = `⚠️ Erreur serveur Gemini (${response.status})\n\u2139️ Réessayez dans quelques instants`;
         } else {
-          throw new Error(`❌ Erreur API Gemini: ${response.status} ${response.statusText}`);
+          const details = errorData?.error?.message || response.statusText;
+          errorMessage = `❌ Erreur API Gemini (${response.status}): ${details}`;
         }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json() as any;
@@ -87,14 +100,20 @@ export class GeminiClient {
       // Vérifier que la réponse contient bien le texte
       if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
         logger.error('Gemini response structure invalid:', JSON.stringify(data));
-        throw new Error('❌ Réponse API Gemini invalide (pas de contenu)');
+        throw new Error('❌ Réponse API Gemini invalide (pas de contenu)\n\u2139️ La réponse ne contient pas de texte généré');
       }
       
       return data.candidates[0].content.parts[0].text;
     } catch (error: any) {
-      logger.error('Gemini API error:', error.message || error);
-      // Propager l'erreur avec le message détaillé
-      throw error;
+      // Si c'est déjà une erreur formatée, on la propage directement
+      if (error.message && error.message.includes('❌')) {
+        logger.error('Gemini API error:', error.message);
+        throw error;
+      }
+      
+      // Sinon, erreur réseau ou autre
+      logger.error('Gemini API unexpected error:', error);
+      throw new Error(`❌ Erreur inattendue: ${error.message || 'Impossible de contacter l\'API Gemini'}`);
     }
   }
 
@@ -102,6 +121,11 @@ export class GeminiClient {
     try {
       // Download image
       const imageResponse = await fetch(imageUrl);
+      
+      if (!imageResponse.ok) {
+        throw new Error(`Impossible de télécharger l'image: ${imageResponse.statusText}`);
+      }
+      
       const imageBuffer = await imageResponse.arrayBuffer();
       const base64Image = Buffer.from(imageBuffer).toString('base64');
 
@@ -132,15 +156,25 @@ export class GeminiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        logger.error('Gemini Vision API error:', errorData);
-        throw new Error(`Erreur API Gemini Vision: ${response.statusText}`);
+        logger.error('Gemini Vision API error:', {
+          status: response.status,
+          error: errorData,
+        });
+        
+        const details = errorData?.error?.message || response.statusText;
+        throw new Error(`Erreur API Gemini Vision (${response.status}): ${details}`);
       }
 
       const data = await response.json() as any;
+      
+      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+        throw new Error('Réponse API Gemini Vision invalide');
+      }
+      
       return data.candidates[0].content.parts[0].text;
     } catch (error: any) {
       logger.error('Gemini Vision API error:', error);
-      throw new Error('Impossible d\'analyser l\'image');
+      throw new Error(`❌ Impossible d'analyser l'image: ${error.message}`);
     }
   }
 
