@@ -1,8 +1,5 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import play from 'play-dl';
 import { logger } from '../../../utils/logger';
-
-const execAsync = promisify(exec);
 
 export interface NewPipeSearchResult {
   id: string;
@@ -22,44 +19,28 @@ export interface NewPipeAudioInfo {
 
 export class NewPipeExtractor {
   /**
-   * Recherche des vidéos sur YouTube via yt-dlp (NewPipe backend)
+   * Recherche des vidéos sur YouTube via play-dl
    */
   async search(query: string, limit: number = 10): Promise<NewPipeSearchResult[]> {
     try {
       logger.debug(`Searching YouTube for: ${query}`);
 
-      // Utiliser yt-dlp pour rechercher (NewPipe utilise le même backend)
-      const command = `yt-dlp "ytsearch${limit}:${query}" --dump-json --no-warnings --default-search "ytsearch" --skip-download`;
+      // Utiliser play-dl pour rechercher
+      const searched = await play.search(query, { limit });
 
-      const { stdout } = await execAsync(command, {
-        maxBuffer: 1024 * 1024 * 10, // 10MB buffer
-        timeout: 30000, // 30s timeout
-      });
-
-      // Chaque ligne est un JSON
-      const lines = stdout.trim().split('\n').filter(line => line.trim());
-      const results: NewPipeSearchResult[] = [];
-
-      for (const line of lines) {
-        try {
-          const data = JSON.parse(line);
-          results.push({
-            id: data.id || '',
-            title: data.title || 'Sans titre',
-            uploader: data.uploader || data.channel || 'Inconnu',
-            duration: this.formatDuration(data.duration || 0),
-            url: data.webpage_url || `https://www.youtube.com/watch?v=${data.id}`,
-            thumbnail: data.thumbnail || '',
-          });
-        } catch (parseError) {
-          logger.warn('Failed to parse search result:', parseError);
-        }
-      }
+      const results: NewPipeSearchResult[] = searched.map((video) => ({
+        id: video.id || '',
+        title: video.title || 'Sans titre',
+        uploader: video.channel?.name || 'Inconnu',
+        duration: this.formatDuration(video.durationInSec || 0),
+        url: video.url,
+        thumbnail: video.thumbnails?.[0]?.url || '',
+      }));
 
       logger.info(`Found ${results.length} results for: ${query}`);
       return results;
     } catch (error: any) {
-      logger.error('NewPipe search error:', error);
+      logger.error('Play-dl search error:', error);
       throw new Error(`Impossible de rechercher: ${error.message}`);
     }
   }
@@ -71,49 +52,26 @@ export class NewPipeExtractor {
     try {
       logger.debug(`Extracting audio URL for: ${videoUrl}`);
 
-      // Extraire uniquement l'audio avec la meilleure qualité
-      const command = `yt-dlp "${videoUrl}" -f "bestaudio" --get-url --get-title --get-duration --dump-json`;
+      // Vérifier le type d'URL
+      const urlType = play.yt_validate(videoUrl);
+      
+      if (urlType !== 'video') {
+        throw new Error('URL invalide, seules les vidéos YouTube sont supportées');
+      }
 
-      const { stdout } = await execAsync(command, {
-        maxBuffer: 1024 * 1024 * 5,
-        timeout: 20000,
+      // Obtenir les infos de la vidéo
+      const info = await play.video_info(videoUrl);
+      
+      // Obtenir le stream audio
+      const stream = await play.stream(videoUrl, {
+        quality: 2, // Audio haute qualité
       });
 
-      const lines = stdout.trim().split('\n');
-      
-      // La dernière ligne est généralement le JSON avec toutes les infos
-      let jsonData: any = {};
-      for (const line of lines) {
-        try {
-          jsonData = JSON.parse(line);
-          break;
-        } catch {
-          // Pas un JSON, continuer
-        }
-      }
-
-      // Si on a le JSON, on peut extraire les infos
-      if (jsonData.url) {
-        return {
-          url: jsonData.url,
-          title: jsonData.title || 'Sans titre',
-          duration: this.formatDuration(jsonData.duration || 0),
-          uploader: jsonData.uploader || jsonData.channel || 'Inconnu',
-        };
-      }
-
-      // Sinon, fallback sur les lignes simples
-      const audioUrl = lines.find(line => line.startsWith('http')) || '';
-      
-      if (!audioUrl) {
-        throw new Error('Aucune URL audio trouvée');
-      }
-
       return {
-        url: audioUrl,
-        title: 'Sans titre',
-        duration: '00:00',
-        uploader: 'Inconnu',
+        url: stream.stream.url,
+        title: info.video_details.title || 'Sans titre',
+        duration: this.formatDuration(info.video_details.durationInSec || 0),
+        uploader: info.video_details.channel?.name || 'Inconnu',
       };
     } catch (error: any) {
       logger.error('Failed to extract audio URL:', error);
@@ -138,13 +96,15 @@ export class NewPipeExtractor {
   }
 
   /**
-   * Vérifie si yt-dlp est installé
+   * Vérifie si play-dl est installé
    */
   async checkInstallation(): Promise<boolean> {
     try {
-      await execAsync('yt-dlp --version');
-      return true;
-    } catch {
+      // Vérifier si on peut accéder à play-dl
+      const test = await play.search('test', { limit: 1 });
+      return test.length >= 0; // Retourne true même si 0 résultats
+    } catch (error) {
+      logger.error('play-dl not available:', error);
       return false;
     }
   }
