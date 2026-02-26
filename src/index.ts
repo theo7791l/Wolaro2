@@ -1,14 +1,15 @@
 /**
- * Wolaro2 - Main Entry Point
+ * Wolaro2 - Main Entry Point (FIXED)
  * Discord bot avec système de protection avancée
  */
 
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
-import { Pool } from 'pg';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils/logger';
+import { DatabaseManager } from './database/manager';
+import { RedisManager } from './cache/redis';
 import { MigrationsManager } from './database/migrations';
 import protectionModule from './modules/moderation/protection/index';
 
@@ -27,7 +28,8 @@ if (!process.env.CLIENT_ID && process.env.DISCORD_CLIENT_ID) {
 // Extend Client type to include commands collection
 interface ExtendedClient extends Client {
   commands?: Collection<string, any>;
-  dbPool?: Pool;
+  database?: DatabaseManager;
+  redis?: RedisManager;
 }
 
 // Vérifier les variables d'environnement obligatoires
@@ -64,28 +66,13 @@ const client: ExtendedClient = new Client({
 // Initialize commands collection
 client.commands = new Collection();
 
-// Create database pool - séparer DATABASE_URL et paramètres individuels pour éviter les conflits
-const dbPoolConfig = process.env.DATABASE_URL
-  ? {
-      connectionString: process.env.DATABASE_URL,
-      max: parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    }
-  : {
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      max: parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    };
+// FIX: Create DatabaseManager instance (not raw Pool)
+const database = new DatabaseManager();
+client.database = database;
 
-const dbPool = new Pool(dbPoolConfig);
-
-client.dbPool = dbPool;
+// FIX: Create RedisManager instance
+const redis = new RedisManager();
+client.redis = redis;
 
 // Load commands
 function loadCommands() {
@@ -154,10 +141,10 @@ async function main() {
   try {
     logger.info('Starting Wolaro2...');
 
-    // Test database connection (OBLIGATOIRE)
+    // FIX: Test database connection with DatabaseManager
     logger.info('Testing database connection...');
     try {
-      await dbPool.query('SELECT NOW()');
+      await database.connect();
       logger.info('✅ Database connected');
     } catch (error) {
       logger.error('❌ Failed to connect to database:', error);
@@ -169,8 +156,10 @@ async function main() {
     // Run migrations automatically
     logger.info('Running database migrations...');
     try {
-      const migrations = new MigrationsManager(dbPool);
+      const dbClient = await database.getClient();
+      const migrations = new MigrationsManager(dbClient as any);
       await migrations.runMigrations();
+      dbClient.release();
       logger.info('✅ Migrations completed');
     } catch (error) {
       logger.error('❌ Failed to run migrations:', error);
@@ -208,7 +197,7 @@ client.once('ready', () => {
   logger.info(`Serving ${client.guilds.cache.size} guilds`);
 });
 
-// Handle interactions
+// FIX: Handle interactions with proper context
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -216,10 +205,11 @@ client.on('interactionCreate', async (interaction) => {
   if (!command) return;
 
   try {
+    // FIX: Pass DatabaseManager and RedisManager instances
     await command.execute(interaction, {
       client,
-      database: dbPool,
-      redis: null, // TODO: Add Redis support
+      database: database,
+      redis: redis,
     });
   } catch (error) {
     logger.error(`Error executing ${interaction.commandName}:`, error);
@@ -240,7 +230,7 @@ client.on('interactionCreate', async (interaction) => {
 process.on('SIGINT', async () => {
   logger.info('Shutting down...');
   await protectionModule.shutdown();
-  await dbPool.end();
+  await database.disconnect();
   client.destroy();
   process.exit(0);
 });
@@ -248,7 +238,7 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
   logger.info('Shutting down...');
   await protectionModule.shutdown();
-  await dbPool.end();
+  await database.disconnect();
   client.destroy();
   process.exit(0);
 });
