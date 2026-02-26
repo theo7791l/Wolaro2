@@ -25,6 +25,7 @@ export class MusicPlayer {
   private queue: QueueItem[] = [];
   private currentTrack: QueueItem | null = null;
   private isPlaying: boolean = false;
+  private readyLock = false;
 
   constructor() {
     this.player = createAudioPlayer();
@@ -51,34 +52,91 @@ export class MusicPlayer {
   }
 
   /**
-   * Rejoindre un salon vocal
+   * Rejoindre un salon vocal avec gestion anti-timeout
    */
   async join(channel: VoiceBasedChannel): Promise<VoiceConnection> {
     try {
       logger.info(`Attempting to join voice channel: ${channel.name}`);
 
+      // Si déjà connecté, ne pas recréer la connexion
+      if (this.connection && this.connection.state.status !== VoiceConnectionStatus.Destroyed) {
+        logger.info('Already connected, reusing existing connection');
+        return this.connection;
+      }
+
       this.connection = joinVoiceChannel({
         channelId: channel.id,
         guildId: channel.guild.id,
         adapterCreator: channel.guild.voiceAdapterCreator as any,
+        selfDeaf: true, // Se mettre sourd pour éviter de recevoir l'audio des autres
+        selfMute: false, // Ne pas se mute pour pouvoir parler (jouer de la musique)
       });
 
-      // Gérer les événements de connexion
-      this.connection.on('stateChange', (oldState, newState) => {
+      // Gérer la reconnexion automatique
+      this.connection.on('stateChange', async (oldState, newState) => {
         logger.debug(`Voice connection state: ${oldState.status} -> ${newState.status}`);
+
+        // Gestion de la reconnexion si Disconnected
+        if (newState.status === VoiceConnectionStatus.Disconnected) {
+          try {
+            await Promise.race([
+              entersState(this.connection!, VoiceConnectionStatus.Signalling, 5000),
+              entersState(this.connection!, VoiceConnectionStatus.Connecting, 5000),
+            ]);
+            // Semble pouvoir se reconnecter, attendre qu'il se reconnecte
+          } catch {
+            // Impossible de se reconnecter, détruire la connexion
+            logger.warn('Failed to reconnect, destroying connection');
+            this.connection?.destroy();
+            this.connection = null;
+          }
+        } else if (newState.status === VoiceConnectionStatus.Destroyed) {
+          // Connexion détruite, nettoyer
+          logger.warn('Connection destroyed');
+          this.stop();
+          this.connection = null;
+        } else if (
+          !this.readyLock &&
+          (newState.status === VoiceConnectionStatus.Connecting ||
+            newState.status === VoiceConnectionStatus.Signalling)
+        ) {
+          // En train de se connecter, verrouiller et attendre Ready
+          this.readyLock = true;
+          try {
+            await entersState(this.connection!, VoiceConnectionStatus.Ready, 20000);
+          } catch {
+            if (this.connection?.state.status !== VoiceConnectionStatus.Destroyed) {
+              this.connection?.destroy();
+            }
+            this.connection = null;
+          } finally {
+            this.readyLock = false;
+          }
+        }
       });
 
       this.connection.on('error', (error) => {
         logger.error('Voice connection error:', error);
       });
 
-      // Augmenter le timeout à 60 secondes
+      // Attendre l'état Ready avec timeout réduit à 15 secondes
       try {
-        await entersState(this.connection, VoiceConnectionStatus.Ready, 60000);
+        await entersState(this.connection, VoiceConnectionStatus.Ready, 15000);
         logger.info(`✅ Successfully joined voice channel: ${channel.name}`);
       } catch (error) {
-        logger.error('Failed to enter Ready state after 60s:', error);
-        throw new Error('Timeout lors de la connexion au salon vocal (60s)');
+        logger.error('Failed to enter Ready state after 15s:', error);
+        
+        // Essayer de se connecter quand même si on est en Connecting
+        if (this.connection.state.status === VoiceConnectionStatus.Connecting) {
+          logger.warn('Still connecting, waiting 5 more seconds...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          if (this.connection.state.status !== VoiceConnectionStatus.Ready) {
+            throw new Error('Timeout lors de la connexion au salon vocal (20s)');
+          }
+        } else {
+          throw new Error('Timeout lors de la connexion au salon vocal (15s)');
+        }
       }
 
       // S'abonner au player
@@ -119,8 +177,8 @@ export class MusicPlayer {
       logger.info(`Added to queue: ${audioInfo.title}`);
 
       // Si rien n'est en lecture, commencer
-      if (!this.isPlaying) {
-        this.playNext();
+      if (!this.isPlaying && !this.currentTrack) {
+        await this.playNext();
       }
 
       return item;
@@ -167,7 +225,7 @@ export class MusicPlayer {
       // Essayer la suivante si disponible
       if (this.queue.length > 0) {
         logger.info('Trying next track in queue...');
-        this.playNext();
+        await this.playNext();
       } else {
         this.currentTrack = null;
       }
