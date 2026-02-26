@@ -12,7 +12,7 @@ import { z } from 'zod';
 
 export const AIConfigSchema = z.object({
   enabled: z.boolean().default(true),
-  geminiApiKey: z.string().optional(),
+  groqApiKey: z.string().optional(),
   chatEnabled: z.boolean().default(true),
   chatChannels: z.array(z.string()).default([]),
   autoModEnabled: z.boolean().default(false),
@@ -25,8 +25,8 @@ export const AIConfigSchema = z.object({
 
 export default class AIModule implements IModule {
   name = 'ai';
-  description = 'Intelligence artificielle avec Gemini pour chatbot, support et auto-modération';
-  version = '1.1.0';
+  description = 'Intelligence artificielle avec Groq AI (Llama 3.3) pour chatbot, support et auto-modération';
+  version = '1.2.0';
   author = 'Wolaro';
   configSchema = AIConfigSchema;
   defaultConfig = {
@@ -45,7 +45,7 @@ export default class AIModule implements IModule {
     new ChatCommand(),
     new ImageCommand(),
     new AutoModCommand(),
-    new SupportCommand(), // 🆕 Assistant support Wolaro
+    new SupportCommand(),
   ];
 
   events = [
