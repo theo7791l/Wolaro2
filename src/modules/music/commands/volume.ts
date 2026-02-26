@@ -57,10 +57,7 @@ export class VolumeCommand implements ICommand {
       
       player.setVolume(volumeDecimal);
 
-      await interaction.reply(
-        `🔊 Volume réglé à **${volume}%**\n` +
-        `⚠️ Le changement s'appliquera à la prochaine musique.`
-      );
+      await interaction.reply(`🔊 Volume réglé à **${volume}%**`);
     } catch (error: any) {
       logger.error('Error in volume command:', error);
       await interaction.reply({
