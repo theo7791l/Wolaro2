@@ -15,12 +15,12 @@ import play from 'play-dl';
 import { logger } from '../../../utils/logger';
 import { NewPipeAudioInfo, newpipe } from './newpipe';
 
-// Configurer FFmpeg avec ffmpeg-static
+// Configurer FFmpeg avec ffmpeg-static via variable d'environnement
 try {
   const ffmpegStatic = require('ffmpeg-static');
   if (ffmpegStatic) {
-    play.setFFmpegPath(ffmpegStatic);
-    logger.info(`🎵 FFmpeg configured from ffmpeg-static: ${ffmpegStatic}`);
+    process.env.FFMPEG_PATH = ffmpegStatic;
+    logger.info(`🎵 FFmpeg configured: ${ffmpegStatic}`);
   }
 } catch (error) {
   logger.warn('⚠️ ffmpeg-static not found, using system FFmpeg');
