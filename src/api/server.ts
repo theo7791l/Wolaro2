@@ -9,12 +9,12 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { standardJsonValidator } from './middleware/json-depth-validator';
 
-// Routes - mixed imports (named and default)
+// Routes - named exports only
 import { authRouter } from './routes/auth';
 import { guildRouter } from './routes/guild';
 import { moduleRouter } from './routes/module';
-import panelRouter from './routes/panel';
-import discordRouter from './routes/discord';
+import { panelRouter } from './routes/panel';
+import { discordRouter } from './routes/discord';
 import { adminRouter } from './routes/admin';
 import { analyticsRouter } from './routes/analytics';
 
@@ -52,7 +52,6 @@ export class APIServer {
     }));
 
     // SECURITY FIX: Conditional CORS based on environment
-    // Remove localhost origins in production to prevent CORS bypass
     const allowedOrigins = process.env.NODE_ENV === 'production'
       ? [
           'https://wolaro.fr',
@@ -78,16 +77,15 @@ export class APIServer {
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
     // SECURITY FIX: JSON depth validation middleware
-    // Protects against CVE-2026-AsyncLocalStorage DoS attacks
     this.app.use(standardJsonValidator);
 
-    // Inject dependencies into app.locals (used by all route handlers)
+    // Inject dependencies into app.locals
     this.app.locals.database = this.database;
     this.app.locals.redis = this.redis;
     this.app.locals.pubsub = this.pubsub;
     this.app.locals.client = this.client;
 
-    // Request logging with duration tracking
+    // Request logging
     this.app.use((req: Request, res: Response, next: NextFunction) => {
       const start = Date.now();
       res.on('finish', () => {
@@ -107,7 +105,6 @@ export class APIServer {
         timestamp: new Date().toISOString(),
         version: '1.0.0',
         uptime: process.uptime(),
-        pubsub: 'active',
         environment: process.env.NODE_ENV || 'development',
       });
     });
@@ -117,7 +114,7 @@ export class APIServer {
     this.app.use('/api/guilds', guildRouter);
     this.app.use('/api/modules', moduleRouter);
     this.app.use('/api/panel', panelRouter);
-    this.app.use('/api/discord', discordRouter); // Discord data enrichment
+    this.app.use('/api/discord', discordRouter);
     this.app.use('/api/admin', adminRouter);
     this.app.use('/api/analytics', analyticsRouter);
 
@@ -126,28 +123,7 @@ export class APIServer {
       res.json({
         name: 'Wolaro API',
         version: '1.0.0',
-        documentation: 'https://wolaro.fr/docs',
-        panel: 'https://wolaro.fr/panel',
         environment: process.env.NODE_ENV || 'development',
-        features: {
-          realtime: true,
-          pubsub: true,
-          discord_enrichment: true,
-          security: {
-            jwt_validation: 'strict',
-            json_depth_limit: 10,
-            rate_limiting: 'enabled',
-          },
-        },
-        endpoints: {
-          auth: '/api/auth',
-          guilds: '/api/guilds',
-          modules: '/api/modules',
-          panel: '/api/panel',
-          discord: '/api/discord',
-          admin: '/api/admin',
-          analytics: '/api/analytics',
-        },
       });
     });
 
@@ -165,14 +141,12 @@ export class APIServer {
     this.app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
       logger.error('API Error:', err);
       
-      // SECURITY FIX: Don't leak error details in production
       const isDevelopment = process.env.NODE_ENV === 'development';
       
       res.status(500).json({
         success: false,
         error: 'Internal server error',
         message: isDevelopment ? err.message : 'An unexpected error occurred',
-        stack: isDevelopment ? err.stack : undefined,
       });
     });
   }
@@ -184,11 +158,6 @@ export class APIServer {
     this.app.listen(port, host, () => {
       logger.info(`API Server started on ${host}:${port}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`Panel API: http://localhost:${port}/api/panel`);
-      logger.info(`Discord API: http://localhost:${port}/api/discord`);
-      logger.info(`Production URL: https://wolaro.fr`);
-      logger.info(`Redis Pub/Sub: ACTIVE`);
-      logger.info(`Security: JWT strict validation, JSON depth limit: 10`);
     });
   }
 

@@ -97,7 +97,7 @@ moduleRouter.post('/:guildId/:moduleName/toggle', async (req: AuthRequest, res) 
       success: true,
       module: moduleName,
       enabled,
-    }, guildId);
+    });
   } catch (error) {
     logger.error('Error toggling module:', error);
     return res.status(500).json({ error: 'Failed to toggle module' });
@@ -133,7 +133,7 @@ moduleRouter.put('/:guildId/:moduleName/config', async (req: AuthRequest, res) =
       success: true,
       module: moduleName,
       config,
-    }, guildId);
+    });
   } catch (error) {
     logger.error('Error updating module config:', error);
     return res.status(500).json({ error: 'Failed to update module configuration' });

@@ -12,7 +12,7 @@ import { logger } from '../utils/logger';
 import { adminRouter as adminRoutes } from './routes/admin';
 import { guildRouter as guildRoutes } from './routes/guild';
 import { moduleRouter as moduleRoutes } from './routes/module';
-import panelRoutes from './routes/panel';
+import { panelRouter as panelRoutes } from './routes/panel';
 import { rateLimitMiddleware } from './middleware/rate-limit';
 
 const app = express();
