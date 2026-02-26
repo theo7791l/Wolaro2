@@ -1,8 +1,8 @@
 /**
- * Captcha System - Fixed imports
+ * Captcha System - Version unifiée et corrigée
  */
 
-import { GuildMember, AttachmentBuilder, EmbedBuilder, Guild, Message } from 'discord.js';
+import { GuildMember, AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import { ProtectionDatabase } from '../database';
 import { logger } from '../../../../utils/logger';
 import type { CaptchaSession } from '../types';
@@ -22,6 +22,7 @@ export class CaptchaSystem {
   private readonly CAPTCHA_LENGTH = 6;
   private readonly MAX_ATTEMPTS = 3;
   private readonly TIMEOUT = 300000; // 5 minutes
+  private readonly CHARACTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
   constructor(private db: ProtectionDatabase) {}
 
@@ -29,10 +30,9 @@ export class CaptchaSystem {
    * Generate captcha code
    */
   private generateCode(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
     for (let i = 0; i < this.CAPTCHA_LENGTH; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+      code += this.CHARACTERS.charAt(Math.floor(Math.random() * this.CHARACTERS.length));
     }
     return code;
   }
@@ -116,19 +116,26 @@ export class CaptchaSystem {
         embed.setImage('attachment://captcha.png');
         await member.send({ embeds: [embed], files: [attachment] });
       } else {
+        // Fallback texte
         embed.addFields({
           name: '📝 Code Captcha',
           value: `\`\`\`\n${code}\`\`\``,
           inline: false,
         });
+        embed.setDescription(
+          (embed.data.description ?? '') +
+          '\n\n⚠️ **Recopiez exactement le code ci-dessous**'
+        );
         await member.send({ embeds: [embed] });
       }
 
+      // Kick automatique si pas vérifié à temps
       setTimeout(async () => {
         if (this.pendingSessions.has(member.id)) {
           this.pendingSessions.delete(member.id);
           try {
-            await member.kick('Captcha non complété');
+            await member.kick('Captcha non complété dans les temps');
+            logger.info(`Kicked ${member.user.tag} for captcha timeout`);
           } catch (error) {
             logger.error('Error kicking for captcha timeout:', error);
           }
@@ -144,39 +151,52 @@ export class CaptchaSystem {
   }
 
   /**
-   * Verify captcha
+   * Verify captcha (async pour compatibilité universelle)
    */
-  verifyCaptcha(memberId: string, response: string): { success: boolean; message: string } {
+  async verifyCaptcha(memberId: string, response: string): Promise<{ success: boolean; message: string }> {
     const session = this.pendingSessions.get(memberId);
 
     if (!session) {
-      return { success: false, message: '❌ Aucun captcha en attente' };
+      return { success: false, message: '❌ Aucun captcha en attente ou expiré' };
     }
 
     if (Date.now() > session.expires_at.getTime()) {
       this.pendingSessions.delete(memberId);
-      return { success: false, message: '⏱️ Captcha expiré' };
+      return { success: false, message: '⏱️ Le captcha a expiré' };
     }
 
     if (response.toUpperCase() === session.code) {
       this.pendingSessions.delete(memberId);
-      return { success: true, message: '✅ Captcha vérifié !' };
+      return { success: true, message: '✅ Captcha vérifié avec succès !' };
     }
 
     session.attempts++;
 
     if (session.attempts >= this.MAX_ATTEMPTS) {
       this.pendingSessions.delete(memberId);
-      return { success: false, message: '❌ Trop de tentatives' };
+      return {
+        success: false,
+        message: `❌ Trop de tentatives échouées (${this.MAX_ATTEMPTS}/${this.MAX_ATTEMPTS})`,
+      };
     }
 
     return {
       success: false,
-      message: `❌ Code incorrect (${this.MAX_ATTEMPTS - session.attempts} restantes)`,
+      message: `❌ Code incorrect. Tentatives restantes: ${this.MAX_ATTEMPTS - session.attempts}/${this.MAX_ATTEMPTS}`,
     };
   }
 
+  /**
+   * Check if member has pending captcha
+   */
   hasPendingCaptcha(memberId: string): boolean {
     return this.pendingSessions.has(memberId);
+  }
+
+  /**
+   * Cancel captcha session
+   */
+  cancelCaptcha(memberId: string): void {
+    this.pendingSessions.delete(memberId);
   }
 }
