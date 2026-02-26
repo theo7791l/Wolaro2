@@ -1,5 +1,5 @@
 /**
- * Deploy Commands - Support TypeScript + JavaScript
+ * Deploy Commands - Support TypeScript + JavaScript + Sous-dossiers
  */
 
 import { REST, Routes } from 'discord.js';
@@ -39,21 +39,34 @@ if (!process.env.CLIENT_ID) {
   process.exit(1);
 }
 
-const commandFolders = fs.readdirSync(foldersPath);
+/**
+ * Scan récursif pour trouver toutes les commandes, même dans les sous-dossiers
+ */
+function scanCommandsRecursive(basePath: string, moduleName: string): void {
+  if (!fs.existsSync(basePath)) return;
 
-console.log('🔍 Scan automatique des commandes...');
+  const items = fs.readdirSync(basePath);
 
-for (const folder of commandFolders) {
-  const modulePath = path.join(foldersPath, folder);
-  
-  // Vérifier si c'est un dossier
-  if (!fs.statSync(modulePath).isDirectory()) continue;
+  for (const item of items) {
+    const itemPath = path.join(basePath, item);
+    const stat = fs.statSync(itemPath);
 
-  const commandsPath = path.join(modulePath, 'commands');
+    if (stat.isDirectory()) {
+      // Si c'est un dossier "commands", scanner les fichiers
+      if (item === 'commands') {
+        scanCommandFiles(itemPath, moduleName);
+      } else {
+        // Sinon, continuer la récursion (pour les sous-modules comme "protection")
+        scanCommandsRecursive(itemPath, moduleName);
+      }
+    }
+  }
+}
 
-  if (!fs.existsSync(commandsPath)) continue;
-
-  // Chercher les fichiers .js (compilés) ou .ts (développement)
+/**
+ * Scanne les fichiers de commandes dans un dossier
+ */
+function scanCommandFiles(commandsPath: string, moduleName: string): void {
   const commandFiles = fs
     .readdirSync(commandsPath)
     .filter((file) => file.endsWith('.js') || file.endsWith('.ts'));
@@ -122,7 +135,7 @@ for (const folder of commandFolders) {
 
         commands.push(commandData);
         const commandName = commandData.name || 'unknown';
-        console.log(`  ✅ /${commandName.padEnd(20)} │ module: ${folder}`);
+        console.log(`  ✅ /${commandName.padEnd(20)} │ module: ${moduleName}`);
       } else {
         console.log(`  ⚠️  ${file} n'a pas de structure valide`);
       }
@@ -130,6 +143,20 @@ for (const folder of commandFolders) {
       console.log(`  ⚠️  Impossible de charger ${file} : ${error.message}`);
     }
   }
+}
+
+const commandFolders = fs.readdirSync(foldersPath);
+
+console.log('🔍 Scan automatique des commandes (récursif)...');
+
+for (const folder of commandFolders) {
+  const modulePath = path.join(foldersPath, folder);
+  
+  // Vérifier si c'est un dossier
+  if (!fs.statSync(modulePath).isDirectory()) continue;
+
+  // Scanner récursivement pour trouver tous les dossiers "commands"
+  scanCommandsRecursive(modulePath, folder);
 }
 
 console.log(`📦 ${commands.length} commandes trouvées.`);
