@@ -83,7 +83,9 @@ export class AIMessageHandler implements IEvent {
     apiKey: string
   ): Promise<void> {
     try {
-      await message.channel.sendTyping();
+      if ('sendTyping' in message.channel) {
+        await message.channel.sendTyping();
+      }
 
       const contextLimit = 15;
       const messages = await message.channel.messages.fetch({ limit: contextLimit });
