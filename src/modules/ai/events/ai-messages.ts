@@ -12,22 +12,22 @@ toute l'architecture, le code source et la documentation de Wolaro2.
 Ton rôle : Aider les développeurs à implémenter des fonctionnalités,
 déboguer, optimiser, et générer du code de qualité production.
 
-╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-🏛️ ARCHITECTURE WOLARO2
-╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+==================================================
+ARCHITECTURE WOLARO2
+==================================================
 
 ## Stack Technique
-- **Runtime**: Node.js 20+ avec TypeScript 5.x
-- **Framework Discord**: discord.js v14
-- **Base de données**: PostgreSQL 15+ (pg package)
-- **Cache**: Redis 7+ (optionnel via RedisManager)
-- **Build**: TypeScript -> JavaScript dans dist/
+- Runtime: Node.js 20+ avec TypeScript 5.x
+- Framework Discord: discord.js v14
+- Base de données: PostgreSQL 15+ (pg package)
+- Cache: Redis 7+ (optionnel via RedisManager)
+- Build: TypeScript -> JavaScript dans dist/
 
 ## Structure Modulaire
 
 Chaque module suit ce pattern :
 
-\`\`\`typescript
+\\`\\`\\`typescript
 // src/modules/[nom]/index.ts
 export default class MonModule implements IModule {
   name = 'mon_module';
@@ -41,13 +41,13 @@ export default class MonModule implements IModule {
   
   constructor(client, database, redis) {}
 }
-\`\`\`
+\\`\\`\\`
 
 ## Système de Base de Données
 
 ### DatabaseManager API
 
-\`\`\`typescript
+\\`\\`\\`typescript
 // Requêtes SQL
 const rows = await context.database.query(
   'SELECT * FROM users WHERE user_id = $1',
@@ -61,27 +61,27 @@ await context.database.logAction(
   { key: 'value' },  // Métadonnées JSON
   guildId
 );
-\`\`\`
+\\`\\`\\`
 
 ### Tables Principales
 
-- **guilds** : Configuration par serveur
-- **guild_modules** : Config JSON de chaque module (JSONB)
-- **users** : Profils utilisateurs globaux
-- **guild_members** : Données membres par serveur (XP, coins, etc.)
-- **audit_logs** : Logs de toutes les actions
-- **moderation_cases** : Cas de modération (ban, kick, warn)
-- **protection_config** : Configuration anti-raid/spam
-- **economy_transactions** : Historique économie
-- **rpg_profiles**, **rpg_inventory**, **quests** : Système RPG
-- **tickets** : Système de support
-- **giveaways**, **giveaway_entries** : Concours
+- guilds : Configuration par serveur
+- guild_modules : Config JSON de chaque module (JSONB)
+- users : Profils utilisateurs globaux
+- guild_members : Données membres par serveur (XP, coins, etc.)
+- audit_logs : Logs de toutes les actions
+- moderation_cases : Cas de modération (ban, kick, warn)
+- protection_config : Configuration anti-raid/spam
+- economy_transactions : Historique économie
+- rpg_profiles, rpg_inventory, quests : Système RPG
+- tickets : Système de support
+- giveaways, giveaway_entries : Concours
 
 ## Module IA (Groq)
 
 ### Architecture Hybride Multi-Modèles
 
-\`\`\`typescript
+\\`\\`\\`typescript
 // src/modules/ai/utils/groq.ts
 const groq = new GroqClient(apiKey);
 
@@ -102,33 +102,33 @@ await groq.generateText(prompt, {
 await groq.generateText(prompt, {
   useCase: 'dev'        // GPT-OSS-120B
 });
-\`\`\`
+\\`\\`\\`
 
 ## Bonnes Pratiques
 
 ### 1. Gestion des Interactions
 
-\`\`\`typescript
+\\`\\`\\`typescript
 // TOUJOURS déférer si traitement > 3s
 await interaction.deferReply({ ephemeral: true });
 
 // Puis répondre
 await interaction.editReply({ content: 'Done!' });
-\`\`\`
+\\`\\`\\`
 
 ### 2. Embeds Discord
 
-\`\`\`typescript
+\\`\\`\\`typescript
 const embed = new EmbedBuilder()
   .setColor(0x5865f2)
-  .setTitle('🚀 Titre')
+  .setTitle('Titre')
   .setDescription('Description...')
   .setTimestamp();
-\`\`\`
+\\`\\`\\`
 
 ### 3. Configuration Modules
 
-\`\`\`typescript
+\\`\\`\\`typescript
 // Récupérer config
 const rows = await context.database.query(
   'SELECT config FROM guild_modules WHERE guild_id = $1 AND module_name = $2',
@@ -138,39 +138,39 @@ const config = rows[0]?.config || {};
 
 // Sauvegarder config
 await context.database.query(
-  \`INSERT INTO guild_modules (guild_id, module_name, config)
+  \\`INSERT INTO guild_modules (guild_id, module_name, config)
    VALUES ($1, $2, $3)
    ON CONFLICT (guild_id, module_name) 
-   DO UPDATE SET config = $3, updated_at = NOW()\`,
+   DO UPDATE SET config = $3, updated_at = NOW()\\`,
   [guildId, 'ai', JSON.stringify(newConfig)]
 );
-\`\`\`
+\\`\\`\\`
 
-╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-🛠️ TON RÔLE EN TANT QUE XAVIER
-╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+==================================================
+TON ROLE EN TANT QUE XAVIER
+==================================================
 
-1. **Génération de Code**
+1. Generation de Code
    - Fournis du code TypeScript complet et fonctionnel
    - Respecte les patterns existants de Wolaro2
    - Inclus gestion d'erreurs et types corrects
 
-2. **Debugging & Optimisation**
+2. Debugging & Optimisation
    - Analyse les erreurs et propose des solutions
    - Suggère des optimisations de performance
 
-3. **Architecture & Design**
+3. Architecture & Design
    - Conseille sur l'organisation du code
    - Respecte les principes SOLID
 
-4. **Documentation**
+4. Documentation
    - Explique le fonctionnement du code
    - Fournis des exemples d'utilisation
 
-Sois **précis**, **concis**, et **actionnable**.
-Pour du code, utilise des blocs markdown avec \`\`\`typescript
+Sois precis, concis, et actionnable.
+Pour du code, utilise des blocs markdown avec \\`\\`\\`typescript
 
-Tu es l'expert ultime de Wolaro2. Let's code! 🚀
+Tu es l'expert ultime de Wolaro2. Let's code!
 `;
 
 export class AIMessageHandler implements IEvent {
@@ -207,7 +207,7 @@ export class AIMessageHandler implements IEvent {
         return;
       }
 
-      // 🧑‍💻 XAVIER DEV CHANNEL - Priorité maximale
+      // XAVIER DEV CHANNEL - Priorité maximale
       if (config.devChannel && message.channel.id === config.devChannel) {
         await this.handleXavierResponse(message, config, context, apiKey);
         return; // Ne pas traiter d'autres handlers
@@ -244,19 +244,19 @@ export class AIMessageHandler implements IEvent {
         .reverse()
         .filter((m) => !m.author.bot || m.author.id === context.client.user.id)
         .slice(-contextLimit)
-        .map((m) => `${m.author.username}: ${m.content}`)
+        .map((m) => m.author.username + ': ' + m.content)
         .join('\n');
 
       // Generate response avec GPT-OSS-120B (Xavier)
       const groq = new GroqClient(apiKey);
       
-      const fullPrompt = `Conversation actuelle:\n${conversationHistory}\n\nRéponds à la dernière question/demande de ${message.author.username} en tant qu'expert développeur Wolaro2.`;
+      const fullPrompt = 'Conversation actuelle:\n' + conversationHistory + '\n\nReponds a la derniere question/demande de ' + message.author.username + ' en tant qu\'expert developpeur Wolaro2.';
 
       const response = await groq.generateText(fullPrompt, {
-        maxTokens: 3000,        // Permet de générer beaucoup de code
-        temperature: 0.3,       // Réponses précises
+        maxTokens: 3000,
+        temperature: 0.3,
         systemPrompt: XAVIER_DEV_PROMPT,
-        useCase: 'dev',         // Utilise GPT-OSS-120B
+        useCase: 'dev',
       });
 
       // Split response si trop long (limite Discord: 2000 chars)
@@ -266,21 +266,19 @@ export class AIMessageHandler implements IEvent {
         await message.reply(chunk);
       }
 
-      logger.info(
-        `Xavier responded in ${message.guild!.name}#${(message.channel as TextChannel).name} to ${message.author.tag}`
-      );
+      logger.info('Xavier responded in ' + message.guild!.name + '#' + (message.channel as TextChannel).name + ' to ' + message.author.tag);
     } catch (error: any) {
       logger.error('Error in Xavier response:', error);
       
       // Informer l'utilisateur en cas d'erreur
       if (error.message && error.message.includes('429')) {
         await message.reply(
-          '⚠️ **Xavier est temporairement indisponible** (quota de 1000 req/jour atteint).\n' +
-          'Réessayez dans quelques heures ou utilisez `/ask` pour des questions simples.'
+          'WARNING: Xavier est temporairement indisponible (quota de 1000 req/jour atteint).\n' +
+          'Reessayez dans quelques heures ou utilisez /ask pour des questions simples.'
         ).catch(() => {});
       } else {
         await message.reply(
-          `❌ Une erreur est survenue : \`${error.message || 'Erreur inconnue'}\`
+          'ERROR: Une erreur est survenue: ' + (error.message || 'Erreur inconnue')
         ).catch(() => {});
       }
     }
@@ -297,17 +295,17 @@ export class AIMessageHandler implements IEvent {
       const toxicityScore = await groq.analyzeToxicity(message.content);
       const threshold = config.autoModThreshold || 0.8;
 
-      logger.debug(`Toxicity analysis: ${toxicityScore.toFixed(2)} (threshold: ${threshold})`);
+      logger.debug('Toxicity analysis: ' + toxicityScore.toFixed(2) + ' (threshold: ' + threshold + ')');
 
       if (toxicityScore >= threshold) {
         await message.delete().catch((err) => {
           logger.error('Failed to delete toxic message:', err);
         });
 
+        const warningMsg = 'WARNING: ' + message.author.toString() + ', votre message a ete supprime (contenu inapproprie detecte par l\'IA - score: ' + (toxicityScore * 100).toFixed(0) + '%).';
+        
         await (message.channel as TextChannel)
-          .send(
-            `⚠️ ${message.author}, votre message a été supprimé (contenu inapproprié détecté par l'IA — score: ${(toxicityScore * 100).toFixed(0)}%).`
-          )
+          .send(warningMsg)
           .then((msg: Message) => setTimeout(() => msg.delete().catch(() => {}), 8000))
           .catch((err) => logger.error('Failed to send warning:', err));
 
@@ -323,9 +321,7 @@ export class AIMessageHandler implements IEvent {
           message.guild!.id
         );
 
-        logger.warn(
-          `AI auto-mod deleted message from ${message.author.tag} in ${message.guild!.name}: toxicity ${toxicityScore.toFixed(2)} >= ${threshold}`
-        );
+        logger.warn('AI auto-mod deleted message from ' + message.author.tag + ' in ' + message.guild!.name + ': toxicity ' + toxicityScore.toFixed(2) + ' >= ' + threshold);
       }
     } catch (error) {
       logger.error('Error in auto-moderation:', error);
@@ -344,9 +340,7 @@ export class AIMessageHandler implements IEvent {
       const randomRoll = Math.random();
       const shouldRespond = mentioned || randomRoll < responseChance;
 
-      logger.debug(
-        `Chat trigger check: mentioned=${mentioned}, chance=${responseChance}, roll=${randomRoll.toFixed(2)}, respond=${shouldRespond}`
-      );
+      logger.debug('Chat trigger check: mentioned=' + mentioned + ', chance=' + responseChance + ', roll=' + randomRoll.toFixed(2) + ', respond=' + shouldRespond);
 
       if (!shouldRespond) return;
 
@@ -360,15 +354,15 @@ export class AIMessageHandler implements IEvent {
         .reverse()
         .filter((m) => !m.author.bot || m.author.id === context.client.user.id)
         .slice(-contextLimit)
-        .map((m) => `${m.author.username}: ${m.content}`)
+        .map((m) => m.author.username + ': ' + m.content)
         .join('\n');
 
       const groq = new GroqClient(apiKey);
       const systemPrompt =
         config.system_prompt ||
-        "Tu es Wolaro, un assistant Discord utile et amical. Réponds de manière concise et naturelle en français. N'utilise pas de markdown gras (**) dans tes réponses.";
+        "Tu es Wolaro, un assistant Discord utile et amical. Reponds de maniere concise et naturelle en francais. N'utilise pas de markdown gras (**) dans tes reponses.";
 
-      const fullPrompt = `Contexte de conversation récente:\n${contextMessages}\n\nRéponds au dernier message de ${message.author.username} de manière naturelle et engageante.`;
+      const fullPrompt = 'Contexte de conversation recente:\n' + contextMessages + '\n\nReponds au dernier message de ' + message.author.username + ' de maniere naturelle et engageante.';
 
       const response = await groq.generateText(fullPrompt, {
         maxTokens: 800,
@@ -379,9 +373,7 @@ export class AIMessageHandler implements IEvent {
 
       await message.reply(response.substring(0, 2000));
 
-      logger.info(
-        `AI chat response sent in ${message.guild!.name}#${(message.channel as TextChannel).name} (triggered by: ${mentioned ? 'mention' : 'random'})`
-      );
+      logger.info('AI chat response sent in ' + message.guild!.name + '#' + (message.channel as TextChannel).name + ' (triggered by: ' + (mentioned ? 'mention' : 'random') + ')');
     } catch (error) {
       logger.error('Error generating chat response:', error);
     }
