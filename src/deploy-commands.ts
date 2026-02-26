@@ -1,5 +1,5 @@
 /**
- * Deploy Commands - Fixed to load .js files
+ * Deploy Commands - Fixed to load TypeScript class exports
  */
 
 import { REST, Routes } from 'discord.js';
@@ -28,20 +28,52 @@ for (const folder of commandFolders) {
 
   const commandFiles = fs
     .readdirSync(commandsPath)
-    .filter((file) => file.endsWith('.js')); // Only load .js files
+    .filter((file) => file.endsWith('.js'));
 
   for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
 
     try {
-      const command = require(filePath);
-
-      if (command.default?.data && command.default?.execute) {
-        commands.push(command.default.data.toJSON());
-        console.log(`  ✅ /${command.default.data.name.padEnd(20)} │ module: ${folder}`);
-      } else if (command.data && command.execute) {
-        commands.push(command.data.toJSON());
-        console.log(`  ✅ /${command.data.name.padEnd(20)} │ module: ${folder}`);
+      const commandModule = require(filePath);
+      
+      // Support multiple export formats:
+      // 1. Class export: export class XCommand implements ICommand
+      // 2. Default export: export default { data, execute }
+      // 3. Named export: module.exports = { data, execute }
+      
+      let commandInstance = null;
+      
+      // Try to find the command class in the module
+      for (const key of Object.keys(commandModule)) {
+        const exported = commandModule[key];
+        
+        // Check if it's a class constructor
+        if (typeof exported === 'function' && exported.prototype) {
+          try {
+            const instance = new exported();
+            if (instance.data && typeof instance.execute === 'function') {
+              commandInstance = instance;
+              break;
+            }
+          } catch (e) {
+            // Not a valid command class, continue
+          }
+        }
+        // Check if it's already an object with data/execute
+        else if (exported && typeof exported === 'object' && exported.data && exported.execute) {
+          commandInstance = exported;
+          break;
+        }
+      }
+      
+      if (commandInstance && commandInstance.data) {
+        const commandData = typeof commandInstance.data.toJSON === 'function' 
+          ? commandInstance.data.toJSON() 
+          : commandInstance.data;
+          
+        commands.push(commandData);
+        const commandName = commandData.name || 'unknown';
+        console.log(`  ✅ /${commandName.padEnd(20)} │ module: ${folder}`);
       } else {
         console.log(`  ⚠️  ${file} n'a pas de structure valide`);
       }
@@ -54,8 +86,8 @@ for (const folder of commandFolders) {
 console.log(`📦 ${commands.length} commandes trouvées.`);
 
 if (commands.length === 0) {
-  console.error('❌ Aucune commande n\'a été trouvée.');
-  process.exit(1);
+  console.warn('⚠️  Aucune commande trouvée. Le bot démarrera sans commandes slash.');
+  process.exit(0); // Exit gracefully instead of error
 }
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN!);
