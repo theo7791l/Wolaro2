@@ -1,6 +1,6 @@
 /**
  * Wolaro2 - Discord Bot Multi-tenant avec Architecture Modulaire
- * System de chargement manuel des modules - VERSION CORRIGÉE v2
+ * System de chargement manuel des modules - VERSION CORRIGÉE v3
  */
 
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
@@ -10,7 +10,6 @@ import { DatabaseManager } from './database/manager';
 import { RedisManager } from './cache/redis';
 import * as fs from 'fs';
 import * as path from 'path';
-import protectionModule from './modules/moderation/protection';
 
 // ==============================================
 // CLIENT SETUP
@@ -62,11 +61,7 @@ async function start() {
 
     logger.info(`✅ Redis ${redisManager.isConnected() ? 'connected' : 'disabled (optional)'}`);
 
-    // Initialize protection module
-    await protectionModule.initialize(client, databaseManager);
-    logger.info('✅ Protection module initialized');
-
-    // Load all modules
+    // Load all modules (including protection)
     await loadAllModules();
     logger.info('✅ All modules loaded');
 
@@ -387,7 +382,6 @@ async function onGuildLeave(guild: any) {
 process.on('SIGINT', async () => {
   logger.info('🛑 Shutting down gracefully...');
 
-  await protectionModule.shutdown();
   await databaseManager.disconnect();
 
   process.exit(0);
