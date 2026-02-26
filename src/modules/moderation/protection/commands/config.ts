@@ -142,7 +142,7 @@ export class ProtectionConfigCommand implements ICommand {
     } catch (error) {
       logger.error('Error in protection config command:', error);
       await interaction.reply({
-        content: '❌ Erreur lors de la mise à jour de la configuration. Vérifiez les logs.',
+        content: `❌ Erreur lors de la mise à jour de la configuration: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
         ephemeral: true
       });
     }
@@ -177,10 +177,11 @@ export class ProtectionConfigCommand implements ICommand {
 
         customWords.push(mot);
         
+        // ✅ Correction: PostgreSQL accepte directement les tableaux JS avec node-postgres
         await context.database.query(
           `INSERT INTO protection_config (guild_id, badwords_custom_list)
-           VALUES ($1, $2)
-           ON CONFLICT (guild_id) DO UPDATE SET badwords_custom_list = $2`,
+           VALUES ($1, $2::text[])
+           ON CONFLICT (guild_id) DO UPDATE SET badwords_custom_list = EXCLUDED.badwords_custom_list`,
           [guildId, customWords]
         );
 
@@ -208,8 +209,8 @@ export class ProtectionConfigCommand implements ICommand {
         
         await context.database.query(
           `INSERT INTO protection_config (guild_id, badwords_custom_list)
-           VALUES ($1, $2)
-           ON CONFLICT (guild_id) DO UPDATE SET badwords_custom_list = $2`,
+           VALUES ($1, $2::text[])
+           ON CONFLICT (guild_id) DO UPDATE SET badwords_custom_list = EXCLUDED.badwords_custom_list`,
           [guildId, customWords]
         );
 
@@ -256,8 +257,8 @@ export class ProtectionConfigCommand implements ICommand {
 
         await context.database.query(
           `INSERT INTO protection_config (guild_id, badwords_custom_list)
-           VALUES ($1, $2)
-           ON CONFLICT (guild_id) DO UPDATE SET badwords_custom_list = $2`,
+           VALUES ($1, $2::text[])
+           ON CONFLICT (guild_id) DO UPDATE SET badwords_custom_list = EXCLUDED.badwords_custom_list`,
           [guildId, []]
         );
 
