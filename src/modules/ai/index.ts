@@ -6,6 +6,7 @@ import { AskCommand } from './commands/ask';
 import { ChatCommand } from './commands/chat';
 import { AutoModCommand } from './commands/automod';
 import { SupportCommand } from './commands/support';
+import { AIDevCommand } from './commands/aidev';
 import { AIMessageHandler } from './events/ai-messages';
 import { z } from 'zod';
 
@@ -24,8 +25,8 @@ export const AIConfigSchema = z.object({
 
 export default class AIModule implements IModule {
   name = 'ai';
-  description = 'Intelligence artificielle avec Groq AI (architecture hybride multi-modèles)';
-  version = '1.3.0';
+  description = 'Intelligence artificielle avec Groq AI (architecture hybride multi-modèles + Xavier dev assistant)';
+  version = '1.4.0';
   author = 'Wolaro';
   configSchema = AIConfigSchema;
   defaultConfig = {
@@ -44,6 +45,7 @@ export default class AIModule implements IModule {
     new ChatCommand(),
     new AutoModCommand(),
     new SupportCommand(),
+    new AIDevCommand(),
   ];
 
   events = [
