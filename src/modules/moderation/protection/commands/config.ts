@@ -9,11 +9,11 @@ import {
   PermissionFlagsBits,
   EmbedBuilder
 } from 'discord.js';
-import { Command, CommandContext } from '../../../../types';
+import { ICommand, ICommandContext } from '../../../../types';
 import protectionModule from '../index';
 import { logger } from '../../../../utils/logger';
 
-export class ProtectionConfigCommand implements Command {
+export class ProtectionConfigCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('protection-config')
     .setDescription('Configure les systèmes de protection')
@@ -87,16 +87,15 @@ export class ProtectionConfigCommand implements Command {
         .setDescription('Configurer le système de lockdown')
         .addBooleanOption(opt => opt.setName('enabled').setDescription('Activer/désactiver'))
         .addBooleanOption(opt => opt.setName('auto_trigger').setDescription('Déclenchement auto'))
-    );
+    ) as SlashCommandBuilder;
 
-  async execute(interaction: ChatInputCommandInteraction, context: CommandContext): Promise<void> {
+  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
     if (!interaction.guild) return;
 
     const subcommand = interaction.options.getSubcommand();
 
     try {
       if (subcommand === 'view') {
-        // Show current config
         const config = await (protectionModule as any).db.getConfig(interaction.guild.id);
 
         const embed = new EmbedBuilder()
@@ -147,7 +146,6 @@ export class ProtectionConfigCommand implements Command {
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
       } else {
-        // Update config based on subcommand
         const updates: any = {};
 
         switch (subcommand) {

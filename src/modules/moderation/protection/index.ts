@@ -32,8 +32,9 @@ export class ProtectionModule {
 
   async initialize(client: Client, database: DatabaseManager): Promise<void> {
     try {
-      // Utiliser le nouveau DatabaseManager au lieu de l'ancien Pool
-      this.db = new ProtectionDatabase(database.getPool());
+      // Accéder au Pool via getClient puis récupérer le pool interne
+      // Workaround: utiliser (database as any).pool car pool est private
+      this.db = new ProtectionDatabase((database as any).pool);
 
       // Initialize systems dans le bon ordre (captcha avant antiRaid)
       this.badWords = new BadWordsSystem(this.db);

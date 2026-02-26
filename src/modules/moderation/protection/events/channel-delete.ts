@@ -1,20 +1,17 @@
 import { GuildChannel } from 'discord.js';
 import { logger } from '../../../../utils/logger';
-import { EventHandler, EventContext } from '../../../../types';
+import { IEvent } from '../../../../types';
 import protectionModule from '../index';
 
-export class ProtectionChannelDeleteHandler implements EventHandler {
+export class ProtectionChannelDeleteHandler implements IEvent {
   name = 'channelDelete';
 
-  async execute(channel: GuildChannel, context: EventContext): Promise<void> {
+  async execute(channel: GuildChannel): Promise<void> {
     try {
       if (!channel.guild) return;
 
-      // Check anti-nuke
-      const shouldBlock = await protectionModule.antiNuke.checkChannelDelete(channel);
-      if (shouldBlock) {
-        await protectionModule.antiNuke.handleNuke(channel.guild);
-      }
+      // Anti-nuke will handle channel deletion tracking internally
+      await protectionModule.antiNuke.handleChannelDelete(channel.guild, channel);
     } catch (error) {
       logger.error('Error handling channel delete:', error);
     }

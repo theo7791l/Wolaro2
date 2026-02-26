@@ -1,18 +1,15 @@
 import { Role } from 'discord.js';
 import { logger } from '../../../../utils/logger';
-import { EventHandler, EventContext } from '../../../../types';
+import { IEvent } from '../../../../types';
 import protectionModule from '../index';
 
-export class ProtectionRoleDeleteHandler implements EventHandler {
+export class ProtectionRoleDeleteHandler implements IEvent {
   name = 'roleDelete';
 
-  async execute(role: Role, context: EventContext): Promise<void> {
+  async execute(role: Role): Promise<void> {
     try {
-      // Check anti-nuke
-      const shouldBlock = await protectionModule.antiNuke.checkRoleDelete(role);
-      if (shouldBlock) {
-        await protectionModule.antiNuke.handleNuke(role.guild);
-      }
+      // Anti-nuke will handle role deletion tracking internally
+      await protectionModule.antiNuke.handleRoleDelete(role.guild, role);
     } catch (error) {
       logger.error('Error handling role delete:', error);
     }

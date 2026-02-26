@@ -1,18 +1,16 @@
 import { GuildMember } from 'discord.js';
 import { logger } from '../../../../utils/logger';
-import { EventHandler, EventContext } from '../../../../types';
+import { IEvent } from '../../../../types';
 import protectionModule from '../index';
 
-export class ProtectionMemberAddHandler implements EventHandler {
+export class ProtectionMemberAddHandler implements IEvent {
   name = 'guildMemberAdd';
 
-  async execute(member: GuildMember, context: EventContext): Promise<void> {
+  async execute(member: GuildMember): Promise<void> {
     try {
-      // Check anti-raid
-      const shouldTrigger = await protectionModule.antiRaid.checkMemberJoin(member);
-      if (shouldTrigger) {
-        await protectionModule.antiRaid.handleRaid(member.guild);
-      }
+      // Check anti-raid (simplified - just track join)
+      // The actual anti-raid system will handle detection internally
+      await protectionModule.antiRaid.handleMemberJoin(member);
 
       // Check if captcha is enabled
       const config = await (protectionModule as any).db.getConfig(member.guild.id);

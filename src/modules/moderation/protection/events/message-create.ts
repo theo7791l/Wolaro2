@@ -1,12 +1,12 @@
 import { Message } from 'discord.js';
 import { logger } from '../../../../utils/logger';
-import { EventHandler, EventContext } from '../../../../types';
+import { IEvent } from '../../../../types';
 import protectionModule from '../index';
 
-export class ProtectionMessageHandler implements EventHandler {
+export class ProtectionMessageHandler implements IEvent {
   name = 'messageCreate';
 
-  async execute(message: Message, context: EventContext): Promise<void> {
+  async execute(message: Message): Promise<void> {
     try {
       if (message.author.bot || !message.guild) return;
 

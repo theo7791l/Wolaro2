@@ -1,246 +1,193 @@
 /**
- * Wolaro2 - Main Entry Point (FIXED)
- * Discord bot avec système de protection avancée
+ * Wolaro2 - Discord Bot Multi-tenant avec Architecture Modulaire
+ * Fix: DatabaseManager & RedisManager injection dans CommandContext
  */
 
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
-import * as dotenv from 'dotenv';
-import * as fs from 'fs';
-import * as path from 'path';
+import { config } from './config';
 import { logger } from './utils/logger';
 import { DatabaseManager } from './database/manager';
 import { RedisManager } from './cache/redis';
-import { MigrationsManager } from './database/migrations';
-import protectionModule from './modules/moderation/protection/index';
+import { loadModules } from './core/module-loader-v2';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import protectionModule from './modules/moderation/protection';
 
-// Charger le .env depuis la racine du projet (pas depuis dist/)
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
-// Fallback : essayer aussi le dossier courant
-if (!process.env.DISCORD_TOKEN) {
-  dotenv.config();
-}
+// ==============================================
+// CLIENT SETUP
+// ==============================================
 
-// Normalisation : accepter DISCORD_CLIENT_ID ou CLIENT_ID
-if (!process.env.CLIENT_ID && process.env.DISCORD_CLIENT_ID) {
-  process.env.CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-}
-
-// Extend Client type to include commands collection
-interface ExtendedClient extends Client {
-  commands?: Collection<string, any>;
-  database?: DatabaseManager;
-  redis?: RedisManager;
-}
-
-// Vérifier les variables d'environnement obligatoires
-if (!process.env.DATABASE_URL && (!process.env.DB_HOST || !process.env.DB_NAME)) {
-  logger.error('❌ DATABASE_URL ou DB_HOST/DB_NAME/DB_USER/DB_PASSWORD manquants dans .env');
-  logger.error('Le bot nécessite une base de données PostgreSQL pour fonctionner.');
-  process.exit(1);
-}
-
-if (!process.env.DISCORD_TOKEN) {
-  logger.error('❌ DISCORD_TOKEN manquant dans .env');
-  process.exit(1);
-}
-
-if (!process.env.CLIENT_ID) {
-  logger.error('❌ CLIENT_ID ou DISCORD_CLIENT_ID manquant dans .env');
-  process.exit(1);
-}
-
-// Create Discord client
-const client: ExtendedClient = new Client({
+const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessageReactions,
-    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildModeration,
   ],
-  partials: [Partials.Channel, Partials.Message, Partials.Reaction],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.GuildMember],
 });
 
-// Initialize commands collection
-client.commands = new Collection();
+// Commands & events collections
+(client as any).commands = new Collection();
+(client as any).events = new Collection();
 
-// FIX: Create DatabaseManager instance (not raw Pool)
-const database = new DatabaseManager();
-client.database = database;
+// ==============================================
+// DATABASE & CACHE
+// ==============================================
 
-// FIX: Create RedisManager instance
-const redis = new RedisManager();
-client.redis = redis;
+const databaseManager = new DatabaseManager();
+const redisManager = new RedisManager(
+  config.redis.host,
+  config.redis.port,
+  config.redis.password,
+  config.redis.db
+);
 
-// Load commands
-function loadCommands() {
-  const commandsLoaded: string[] = [];
-  const foldersPath = path.join(__dirname, 'modules');
+// ==============================================
+// STARTUP SEQUENCE
+// ==============================================
 
-  if (!fs.existsSync(foldersPath)) {
-    logger.warn('⚠️  Modules folder not found, skipping command loading');
-    return;
-  }
-
-  const commandFolders = fs.readdirSync(foldersPath);
-
-  for (const folder of commandFolders) {
-    const commandsPath = path.join(foldersPath, folder, 'commands');
-    if (!fs.existsSync(commandsPath)) continue;
-
-    const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'));
-
-    for (const file of commandFiles) {
-      const filePath = path.join(commandsPath, file);
-
-      try {
-        const commandModule = require(filePath);
-        let commandInstance = null;
-
-        // Try to find and instantiate command class
-        for (const key of Object.keys(commandModule)) {
-          const exported = commandModule[key];
-
-          if (typeof exported === 'function' && exported.prototype) {
-            try {
-              const instance = new exported();
-              if (instance.data && typeof instance.execute === 'function') {
-                commandInstance = instance;
-                break;
-              }
-            } catch (e) {
-              // Not a valid command class
-            }
-          } else if (exported && typeof exported === 'object' && exported.data && exported.execute) {
-            commandInstance = exported;
-            break;
-          }
-        }
-
-        if (commandInstance && commandInstance.data) {
-          const commandName = commandInstance.data.name;
-          client.commands!.set(commandName, commandInstance);
-          commandsLoaded.push(commandName);
-        }
-      } catch (error) {
-        logger.error(`Failed to load command ${file}:`, error);
-      }
-    }
-  }
-
-  if (commandsLoaded.length > 0) {
-    logger.info(`📦 Loaded ${commandsLoaded.length} commands`);
-  } else {
-    logger.warn('⚠️  No commands loaded');
-  }
-}
-
-async function main() {
+async function start() {
   try {
-    logger.info('Starting Wolaro2...');
+    // Connect to database
+    await databaseManager.connect();
+    logger.info('✅ Database connected');
 
-    // FIX: Test database connection with DatabaseManager
-    logger.info('Testing database connection...');
-    try {
-      await database.connect();
-      logger.info('✅ Database connected');
-    } catch (error) {
-      logger.error('❌ Failed to connect to database:', error);
-      logger.error('Le bot ne peut pas démarrer sans connexion à la base de données.');
-      logger.error('Vérifiez vos variables d\'environnement DATABASE_URL ou DB_HOST/DB_NAME/DB_USER/DB_PASSWORD');
-      process.exit(1);
-    }
-
-    // Run migrations automatically
-    logger.info('Running database migrations...');
-    try {
-      const dbClient = await database.getClient();
-      const migrations = new MigrationsManager(dbClient as any);
-      await migrations.runMigrations();
-      dbClient.release();
-      logger.info('✅ Migrations completed');
-    } catch (error) {
-      logger.error('❌ Failed to run migrations:', error);
-      logger.warn('⚠️  Continuing without migrations (tables may be missing)...');
-    }
-
-    // Load commands
-    logger.info('Loading commands...');
-    loadCommands();
+    // Connect to Redis
+    await redisManager.connect();
+    logger.info('✅ Redis connected');
 
     // Initialize protection module
-    logger.info('Initializing protection module...');
-    try {
-      await protectionModule.initialize(client as Client);
-      logger.info('✅ Protection module ready');
-    } catch (error) {
-      logger.error('❌ Failed to initialize protection module:', error);
-      logger.warn('⚠️  Continuing without protection module...');
-    }
+    await protectionModule.initialize(client, databaseManager);
+    logger.info('✅ Protection module initialized');
 
-    // Login to Discord
-    logger.info('Connecting to Discord...');
-    await client.login(process.env.DISCORD_TOKEN);
+    // Load all modules
+    await loadModules(client, databaseManager, redisManager);
+    logger.info('✅ All modules loaded');
 
-    logger.info('✨ Wolaro2 is ready!');
+    // Load event handlers
+    loadEvents();
+    logger.info('✅ Events loaded');
+
+    // Load slash commands
+    loadCommands();
+    logger.info('✅ Commands loaded');
+
+    // Start bot
+    await client.login(config.token);
   } catch (error) {
-    logger.error('Failed to start:', error);
+    logger.error('Failed to start bot:', error);
     process.exit(1);
   }
 }
 
-// Ready event
-client.once('ready', () => {
-  logger.info(`Logged in as ${client.user?.tag}`);
-  logger.info(`Serving ${client.guilds.cache.size} guilds`);
-});
+// ==============================================
+// EVENT LOADER
+// ==============================================
 
-// FIX: Handle interactions with proper context
-client.on('interactionCreate', async (interaction) => {
+function loadEvents() {
+  const events = [
+    { name: 'ready', execute: () => onReady() },
+    { name: 'interactionCreate', execute: (interaction: any) => onInteraction(interaction) },
+    { name: 'guildCreate', execute: (guild: any) => onGuildJoin(guild) },
+    { name: 'guildDelete', execute: (guild: any) => onGuildLeave(guild) },
+  ];
+
+  for (const event of events) {
+    client.on(event.name, event.execute);
+  }
+}
+
+// ==============================================
+// COMMAND LOADER
+// ==============================================
+
+function loadCommands() {
+  // Les commandes sont déjà chargées par loadModules()
+  logger.info(`Loaded ${(client as any).commands.size} slash commands`);
+}
+
+// ==============================================
+// EVENT HANDLERS
+// ==============================================
+
+async function onReady() {
+  if (!client.user) return;
+
+  logger.info(`✅ Bot ready as ${client.user.tag}`);
+  logger.info(`👥 Serving ${client.guilds.cache.size} guilds`);
+  logger.info(`🛡️ Protection systems active`);
+
+  // Set status
+  client.user.setPresence({
+    activities: [{ name: '/help | Wolaro2', type: 0 }],
+    status: 'online',
+  });
+}
+
+async function onInteraction(interaction: any) {
   if (!interaction.isChatInputCommand()) return;
 
-  const command = client.commands?.get(interaction.commandName);
+  const command = (client as any).commands.get(interaction.commandName);
   if (!command) return;
 
   try {
-    // FIX: Pass DatabaseManager and RedisManager instances
-    await command.execute(interaction, {
+    // FIX CRITIQUE: passer DatabaseManager et RedisManager au lieu de Pool brut
+    const context = {
       client,
-      database: database,
-      redis: redis,
-    });
+      database: databaseManager,  // Avant: pool brut → getGuildConfig is not a function
+      redis: redisManager,        // Avant: null → erreurs cache
+    };
+
+    await command.execute(interaction, context);
   } catch (error) {
-    logger.error(`Error executing ${interaction.commandName}:`, error);
-    const reply = {
-      content: '❌ Une erreur est survenue lors de l\'exécution de la commande.',
+    logger.error(`Command error [${interaction.commandName}]:`, error);
+
+    const errorMessage = {
+      content: '❌ Une erreur est survenue lors de l\'exécution de cette commande.',
       ephemeral: true,
     };
 
     if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(reply);
+      await interaction.followUp(errorMessage);
     } else {
-      await interaction.reply(reply);
+      await interaction.reply(errorMessage);
     }
   }
-});
+}
 
-// Graceful shutdown
+async function onGuildJoin(guild: any) {
+  try {
+    await databaseManager.initializeGuild(guild.id, guild.ownerId);
+    logger.info(`🎉 Joined guild: ${guild.name} (${guild.id})`);
+  } catch (error) {
+    logger.error(`Failed to initialize guild ${guild.id}:`, error);
+  }
+}
+
+async function onGuildLeave(guild: any) {
+  logger.info(`👋 Left guild: ${guild.name} (${guild.id})`);
+}
+
+// ==============================================
+// GRACEFUL SHUTDOWN
+// ==============================================
+
 process.on('SIGINT', async () => {
-  logger.info('Shutting down...');
+  logger.info('🛑 Shutting down gracefully...');
+
   await protectionModule.shutdown();
-  await database.disconnect();
-  client.destroy();
+  await redisManager.disconnect();
+  await databaseManager.disconnect();
+
   process.exit(0);
 });
 
-process.on('SIGTERM', async () => {
-  logger.info('Shutting down...');
-  await protectionModule.shutdown();
-  await database.disconnect();
-  client.destroy();
-  process.exit(0);
-});
+// ==============================================
+// START
+// ==============================================
 
-main();
+start();
