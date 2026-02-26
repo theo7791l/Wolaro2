@@ -5,7 +5,8 @@ import { config } from './config';
 
 if (cluster.isPrimary) {
   const cpuCount = os.cpus().length;
-  const workerCount = config.cluster.shardCount === 'auto' ? cpuCount : config.cluster.shardCount;
+  // Fix: typage explicite pour workerCount
+  const workerCount: number = config.cluster.shardCount === 'auto' ? cpuCount : Number(config.cluster.shardCount);
 
   logger.info(`Master cluster setting up ${workerCount} workers...`);
 
