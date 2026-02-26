@@ -88,20 +88,36 @@ async function loadAllModules() {
 
     try {
       const moduleData = require(indexPath);
-      const module = moduleData.default || moduleData;
+      let module = moduleData.default || moduleData;
 
-      if (module.commands) {
-        for (const command of module.commands) {
-          (client as any).commands.set(command.data.name, command);
+      // Si c'est une classe (constructeur), l'instancier
+      if (typeof module === 'function' && module.prototype) {
+        module = new module(client, databaseManager, redisManager);
+        
+        // Appeler initialize si la méthode existe
+        if (module.initialize && typeof module.initialize === 'function') {
+          await module.initialize();
         }
       }
 
-      if (module.events) {
+      // Charger les commandes
+      if (module.commands && Array.isArray(module.commands)) {
+        for (const command of module.commands) {
+          if (command.data && command.data.name) {
+            (client as any).commands.set(command.data.name, command);
+          }
+        }
+      }
+
+      // Charger les événements
+      if (module.events && Array.isArray(module.events)) {
         for (const event of module.events) {
-          if (event.once) {
-            client.once(event.name, (...args) => event.execute(...args));
-          } else {
-            client.on(event.name, (...args) => event.execute(...args));
+          if (event.name && event.execute) {
+            if (event.once) {
+              client.once(event.name, (...args) => event.execute(...args));
+            } else {
+              client.on(event.name, (...args) => event.execute(...args));
+            }
           }
         }
       }
@@ -142,7 +158,11 @@ async function onInteraction(interaction: any) {
   if (!interaction.isChatInputCommand()) return;
 
   const command = (client as any).commands.get(interaction.commandName);
-  if (!command) return;
+  
+  if (!command) {
+    logger.warn(`Unknown command: ${interaction.commandName}`);
+    return;
+  }
 
   try {
     const context = {
