@@ -1,6 +1,6 @@
 import { IEvent } from '../../../types';
 import { Message, TextChannel } from 'discord.js';
-import { GeminiClient } from '../utils/gemini';
+import { GroqClient } from '../utils/groq';
 import { logger } from '../../../utils/logger';
 
 export class AIMessageHandler implements IEvent {
@@ -31,10 +31,10 @@ export class AIMessageHandler implements IEvent {
       // Module must be enabled
       if (!config?.enabled) return;
 
-      // Use global API key from environment
-      const apiKey = process.env.GEMINI_API_KEY;
+      // Use global API key from environment (GROQ_API_KEY maintenant)
+      const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) {
-        logger.warn('GEMINI_API_KEY not set in environment, skipping AI features');
+        logger.warn('GROQ_API_KEY not set in environment, skipping AI features');
         return;
       }
 
@@ -61,8 +61,8 @@ export class AIMessageHandler implements IEvent {
     apiKey: string
   ): Promise<void> {
     try {
-      const gemini = new GeminiClient(apiKey);
-      const toxicityScore = await gemini.analyzeToxicity(message.content);
+      const groq = new GroqClient(apiKey);
+      const toxicityScore = await groq.analyzeToxicity(message.content);
 
       // ✅ FIX: Utiliser autoModThreshold (pas toxicity_threshold)
       const threshold = config.autoModThreshold || 0.8;
@@ -144,14 +144,14 @@ export class AIMessageHandler implements IEvent {
         .join('\n');
 
       // Generate response
-      const gemini = new GeminiClient(apiKey);
+      const groq = new GroqClient(apiKey);
       const systemPrompt =
         config.system_prompt ||
         "Tu es Wolaro, un assistant Discord utile et amical. Réponds de manière concise et naturelle en français. N'utilise pas de markdown gras (**) dans tes réponses.";
 
       const fullPrompt = `Contexte de conversation récente:\n${contextMessages}\n\nRéponds au dernier message de ${message.author.username} de manière naturelle et engageante.`;
 
-      const response = await gemini.generateText(fullPrompt, {
+      const response = await groq.generateText(fullPrompt, {
         maxTokens: 800,
         temperature: config.temperature || 0.8,
         systemPrompt,
