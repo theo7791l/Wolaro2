@@ -67,9 +67,10 @@ function scanCommandsRecursive(basePath: string, moduleName: string): void {
  * Scanne les fichiers de commandes dans un dossier
  */
 function scanCommandFiles(commandsPath: string, moduleName: string): void {
+  // Filtrer uniquement les .js, IGNORER les .d.ts (fichiers de déclaration TypeScript)
   const commandFiles = fs
     .readdirSync(commandsPath)
-    .filter((file) => file.endsWith('.js') || file.endsWith('.ts'));
+    .filter((file) => file.endsWith('.js') && !file.endsWith('.d.ts'));
 
   for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
