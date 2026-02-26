@@ -19,6 +19,11 @@ if (!process.env.DISCORD_TOKEN) {
   dotenv.config();
 }
 
+// Normalisation : accepter DISCORD_CLIENT_ID ou CLIENT_ID
+if (!process.env.CLIENT_ID && process.env.DISCORD_CLIENT_ID) {
+  process.env.CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+}
+
 // Extend Client type to include commands collection
 interface ExtendedClient extends Client {
   commands?: Collection<string, any>;
@@ -38,7 +43,7 @@ if (!process.env.DISCORD_TOKEN) {
 }
 
 if (!process.env.CLIENT_ID) {
-  logger.error('❌ CLIENT_ID manquant dans .env');
+  logger.error('❌ CLIENT_ID ou DISCORD_CLIENT_ID manquant dans .env');
   process.exit(1);
 }
 
