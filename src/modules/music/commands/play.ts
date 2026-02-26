@@ -1,176 +1,124 @@
-import {
-  SlashCommandBuilder,
-  ChatInputCommandInteraction,
-  GuildMember,
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ComponentType,
-  TextChannel,
-  Message,
-} from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, GuildMember } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
+import { getMusicManager } from '../manager';
 import { logger } from '../../../utils/logger';
-import { newpipe, NewPipeSearchResult } from '../utils/newpipe';
-import { getPlayer } from '../utils/player';
 
 export class PlayCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Jouer une musique depuis YouTube avec NewPipe')
+    .setDescription('Jouer une musique depuis YouTube, Spotify, Deezer ou SoundCloud')
     .addStringOption((option) =>
       option
-        .setName('titre')
-        .setDescription('Titre de la musique à rechercher')
-        .setRequired(true),
+        .setName('query')
+        .setDescription('URL ou recherche')
+        .setRequired(true)
+        .setAutocomplete(true),
     ) as SlashCommandBuilder;
 
   module = 'music';
   guildOnly = true;
   cooldown = 3;
 
-  async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
+  async execute(interaction: ChatInputCommandInteraction, _context: ICommandContext): Promise<void> {
     const member = interaction.member as GuildMember;
     const voiceChannel = member.voice.channel;
 
     if (!voiceChannel) {
       await interaction.reply({
-        content: '❌ Vous devez être dans un salon vocal pour utiliser cette commande.',
+        content: '❌ Vous devez être dans un salon vocal.',
         ephemeral: true,
       });
       return;
     }
 
-    const query = interaction.options.getString('titre', true);
+    const query = interaction.options.getString('query', true);
 
     await interaction.deferReply();
 
     try {
-      // Rechercher sur YouTube
-      await interaction.editReply(`🔍 Recherche de "**${query}**" sur YouTube...`);
-      const results = await newpipe.search(query, 10);
+      const manager = getMusicManager();
+      
+      // Créer ou récupérer le player
+      let player = manager.players.get(interaction.guildId!);
+      
+      if (!player) {
+        player = manager.create({
+          guild: interaction.guildId!,
+          voiceChannel: voiceChannel.id,
+          textChannel: interaction.channelId,
+          selfDeafen: true,
+        });
+      }
 
-      if (results.length === 0) {
+      // Connecter si nécessaire
+      if (player.state !== 'CONNECTED') {
+        player.connect();
+      }
+
+      // Rechercher la musique
+      const res = await manager.search(
+        query,
+        interaction.user
+      );
+
+      if (res.loadType === 'LOAD_FAILED' || res.loadType === 'NO_MATCHES') {
         await interaction.editReply('❌ Aucun résultat trouvé.');
+        
+        if (!player.queue.current) {
+          player.destroy();
+        }
+        
         return;
       }
 
-      // Créer l'embed avec les résultats
-      const embed = this.createResultsEmbed(results, query);
+      if (res.loadType === 'PLAYLIST_LOADED') {
+        player.queue.add(res.tracks);
 
-      await interaction.editReply({
-        content: '🎵 **Résultats de recherche** - Répondez avec un numéro entre **1** et **10** :',
-        embeds: [embed],
-      });
+        await interaction.editReply(
+          `🎶 Playlist ajoutée : **${res.playlist?.name}** (${res.tracks.length} pistes)`
+        );
+      } else {
+        const track = res.tracks[0];
+        player.queue.add(track);
 
-      // Vérifier que c'est un TextChannel
-      const channel = interaction.channel;
-      if (!channel || !('awaitMessages' in channel)) {
-        await interaction.followUp({
-          content: '❌ Cette commande ne peut être utilisée que dans un salon textuel.',
-          ephemeral: true,
-        });
-        return;
+        await interaction.editReply(
+          `🎵 Ajouté à la file : **${track.title}** par **${track.author}**`
+        );
       }
 
-      // Attendre une réponse numérique (1-10)
-      const filter = (msg: Message) => {
-        const num = parseInt(msg.content);
-        return msg.author.id === interaction.user.id && num >= 1 && num <= results.length;
-      };
-
-      try {
-        const collected = await channel.awaitMessages({
-          filter,
-          max: 1,
-          time: 60000, // 60 secondes
-          errors: ['time'],
-        });
-
-        const choice = parseInt(collected.first()!.content);
-        const selected = results[choice - 1];
-
-        // Supprimer le message de choix de l'utilisateur
-        await collected.first()!.delete().catch(() => {});
-
-        // Jouer la musique sélectionnée
-        await this.playTrack(interaction, voiceChannel, selected, context);
-      } catch (error) {
-        await interaction.followUp({
-          content: '⏰ **Temps écoulé** - Vous n\'avez pas répondu à temps.',
-          ephemeral: true,
-        });
+      // Jouer si rien n'est en cours
+      if (!player.playing && !player.paused) {
+        player.play();
       }
     } catch (error: any) {
       logger.error('Error in play command:', error);
-      await interaction.editReply(`❌ Erreur: ${error.message}`);
+      await interaction.editReply(
+        `❌ Erreur lors de la lecture : ${error.message}`
+      ).catch(() => {});
     }
   }
 
-  private createResultsEmbed(results: NewPipeSearchResult[], query: string): EmbedBuilder {
-    const embed = new EmbedBuilder()
-      .setColor(0x1DB954)
-      .setTitle(`🔎 Résultats pour "${query}"`)
-      .setDescription(results.map((r, i) => 
-        `**${i + 1}.** [${r.title}](${r.url})\n` +
-        `⏱️ ${r.duration} | 👤 ${r.uploader}`
-      ).join('\n\n'))
-      .setFooter({ text: 'Répondez avec un numéro entre 1 et 10 pour choisir' })
-      .setTimestamp();
+  async autocomplete(interaction: any): Promise<void> {
+    const focusedValue = interaction.options.getFocused();
 
-    return embed;
-  }
+    if (!focusedValue || focusedValue.length < 2) {
+      await interaction.respond([]);
+      return;
+    }
 
-  private async playTrack(
-    interaction: ChatInputCommandInteraction,
-    voiceChannel: any,
-    track: NewPipeSearchResult,
-    context: ICommandContext
-  ): Promise<void> {
     try {
-      await interaction.followUp(`🔄 Chargement de **${track.title}**...`);
+      const manager = getMusicManager();
+      const res = await manager.search(focusedValue, interaction.user);
 
-      // Récupérer le player de la guild
-      const player = getPlayer(interaction.guildId!);
+      const choices = res.tracks.slice(0, 10).map((track) => ({
+        name: `${track.title} - ${track.author}`.substring(0, 100),
+        value: track.uri,
+      }));
 
-      // Rejoindre le salon vocal si pas déjà connecté
-      if (!player.isConnected()) {
-        await player.join(voiceChannel);
-        await interaction.followUp(`✅ Connecté au salon **${voiceChannel.name}**`);
-      }
-
-      // Ajouter à la queue et jouer
-      const queueItem = await player.addToQueue(track.url, interaction.user.id);
-
-      const currentTrack = player.getCurrentTrack();
-      
-      if (currentTrack && currentTrack.info.url !== queueItem.info.url) {
-        // Ajouté à la queue
-        const position = player.getQueue().length + 1;
-        await interaction.followUp(
-          `✅ **${track.title}** ajouté à la queue !\n` +
-          `📍 Position: **#${position}**\n` +
-          `⏱️ Durée: **${queueItem.info.duration}**`
-        );
-      } else {
-        // Lecture immédiate
-        const embed = new EmbedBuilder()
-          .setColor(0x1DB954)
-          .setTitle('🎵 Lecture en cours')
-          .setDescription(`**${queueItem.info.title}**`)
-          .addFields(
-            { name: '⏱️ Durée', value: queueItem.info.duration, inline: true },
-            { name: '👤 Chaîne', value: queueItem.info.uploader, inline: true },
-            { name: '🎶 Demandé par', value: `<@${interaction.user.id}>`, inline: true }
-          )
-          .setTimestamp();
-
-        await interaction.followUp({ embeds: [embed] });
-      }
-    } catch (error: any) {
-      logger.error('Failed to play track:', error);
-      await interaction.followUp(`❌ Impossible de jouer cette musique: ${error.message}`);
+      await interaction.respond(choices);
+    } catch (error) {
+      logger.error('Autocomplete error:', error);
+      await interaction.respond([]);
     }
   }
 }
