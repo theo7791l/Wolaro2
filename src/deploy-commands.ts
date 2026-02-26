@@ -1,5 +1,5 @@
 /**
- * Deploy Commands - Fixed to load TypeScript class exports
+ * Deploy Commands - Fixed dotenv path resolution
  */
 
 import { REST, Routes } from 'discord.js';
@@ -7,13 +7,28 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 
-dotenv.config();
+// Charger le .env depuis la racine du projet (pas depuis dist/)
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+// Fallback : essayer aussi le dossier courant
+if (!process.env.DISCORD_TOKEN) {
+  dotenv.config();
+}
 
 const commands: any[] = [];
 const foldersPath = path.join(__dirname, 'modules');
 
 if (!fs.existsSync(foldersPath)) {
   console.error('❌ Le dossier dist/modules n\'existe pas. Veuillez compiler le projet avec "npm run build" d\'abord.');
+  process.exit(1);
+}
+
+if (!process.env.DISCORD_TOKEN) {
+  console.error('❌ DISCORD_TOKEN manquant dans .env');
+  process.exit(1);
+}
+
+if (!process.env.CLIENT_ID) {
+  console.error('❌ CLIENT_ID manquant dans .env');
   process.exit(1);
 }
 
@@ -36,18 +51,11 @@ for (const folder of commandFolders) {
     try {
       const commandModule = require(filePath);
       
-      // Support multiple export formats:
-      // 1. Class export: export class XCommand implements ICommand
-      // 2. Default export: export default { data, execute }
-      // 3. Named export: module.exports = { data, execute }
-      
       let commandInstance = null;
       
-      // Try to find the command class in the module
       for (const key of Object.keys(commandModule)) {
         const exported = commandModule[key];
         
-        // Check if it's a class constructor
         if (typeof exported === 'function' && exported.prototype) {
           try {
             const instance = new exported();
@@ -58,9 +66,7 @@ for (const folder of commandFolders) {
           } catch (e) {
             // Not a valid command class, continue
           }
-        }
-        // Check if it's already an object with data/execute
-        else if (exported && typeof exported === 'object' && exported.data && exported.execute) {
+        } else if (exported && typeof exported === 'object' && exported.data && exported.execute) {
           commandInstance = exported;
           break;
         }
@@ -87,7 +93,7 @@ console.log(`📦 ${commands.length} commandes trouvées.`);
 
 if (commands.length === 0) {
   console.warn('⚠️  Aucune commande trouvée. Le bot démarrera sans commandes slash.');
-  process.exit(0); // Exit gracefully instead of error
+  process.exit(0);
 }
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN!);
