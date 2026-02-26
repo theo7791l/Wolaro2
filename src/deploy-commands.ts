@@ -1,5 +1,5 @@
 /**
- * Deploy Commands - Fixed dotenv path resolution + DISCORD_CLIENT_ID alias
+ * Deploy Commands - Support TypeScript + JavaScript
  */
 
 import { REST, Routes } from 'discord.js';
@@ -23,7 +23,9 @@ const commands: any[] = [];
 const foldersPath = path.join(__dirname, 'modules');
 
 if (!fs.existsSync(foldersPath)) {
-  console.error('❌ Le dossier dist/modules n\'existe pas. Veuillez compiler le projet avec "npm run build" d\'abord.');
+  console.error('❌ Le dossier modules n\'existe pas.');
+  console.error('   En développement : exécutez "npm run dev"');
+  console.error('   En production : exécutez "npm run build" puis "npm run deploy"');
   process.exit(1);
 }
 
@@ -42,13 +44,19 @@ const commandFolders = fs.readdirSync(foldersPath);
 console.log('🔍 Scan automatique des commandes...');
 
 for (const folder of commandFolders) {
-  const commandsPath = path.join(foldersPath, folder, 'commands');
+  const modulePath = path.join(foldersPath, folder);
+  
+  // Vérifier si c'est un dossier
+  if (!fs.statSync(modulePath).isDirectory()) continue;
+
+  const commandsPath = path.join(modulePath, 'commands');
 
   if (!fs.existsSync(commandsPath)) continue;
 
+  // Chercher les fichiers .js (compilés) ou .ts (développement)
   const commandFiles = fs
     .readdirSync(commandsPath)
-    .filter((file) => file.endsWith('.js'));
+    .filter((file) => file.endsWith('.js') || file.endsWith('.ts'));
 
   for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
@@ -58,22 +66,51 @@ for (const folder of commandFolders) {
 
       let commandInstance = null;
 
-      for (const key of Object.keys(commandModule)) {
-        const exported = commandModule[key];
-
-        if (typeof exported === 'function' && exported.prototype) {
+      // Méthode 1 : export default
+      if (commandModule.default) {
+        const exported = commandModule.default;
+        
+        // Si c'est une classe
+        if (typeof exported === 'function') {
           try {
             const instance = new exported();
             if (instance.data && typeof instance.execute === 'function') {
               commandInstance = instance;
-              break;
             }
           } catch (e) {
-            // Not a valid command class, continue
+            // Si l'instanciation échoue, vérifier si c'est un objet direct
+            if (exported.data && exported.execute) {
+              commandInstance = exported;
+            }
           }
-        } else if (exported && typeof exported === 'object' && exported.data && exported.execute) {
+        }
+        // Si c'est déjà un objet
+        else if (typeof exported === 'object' && exported.data && exported.execute) {
           commandInstance = exported;
-          break;
+        }
+      }
+
+      // Méthode 2 : exports nommés - chercher toutes les possibilités
+      if (!commandInstance) {
+        for (const key of Object.keys(commandModule)) {
+          if (key === 'default') continue;
+          
+          const exported = commandModule[key];
+
+          if (typeof exported === 'function') {
+            try {
+              const instance = new exported();
+              if (instance.data && typeof instance.execute === 'function') {
+                commandInstance = instance;
+                break;
+              }
+            } catch (e) {
+              // Pas une classe valide, continuer
+            }
+          } else if (exported && typeof exported === 'object' && exported.data && exported.execute) {
+            commandInstance = exported;
+            break;
+          }
         }
       }
 
