@@ -3,6 +3,9 @@
  * System de chargement manuel des modules - VERSION CORRIGÉE v3
  */
 
+// IMPORTANT : Charger libsodium-wrappers AVANT discord.js/voice
+import sodium from 'libsodium-wrappers';
+
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
 import { config } from './config';
 import { logger } from './utils/logger';
@@ -55,6 +58,10 @@ const globalContext = {
 
 async function start() {
   try {
+    // Initialiser libsodium AVANT tout le reste
+    await sodium.ready;
+    logger.info('✅ Libsodium initialized for voice encryption');
+
     // Connect to database
     await databaseManager.connect();
     logger.info('✅ Database connected');
