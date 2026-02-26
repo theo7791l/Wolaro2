@@ -1,7 +1,6 @@
-import { Manager } from 'erela.js';
+import { Manager } from 'erela.js-apple';
 import { Client, TextChannel } from 'discord.js';
 import { logger } from '../../utils/logger';
-import Deezer from 'erela.js-deezer';
 
 export let musicManager: Manager;
 
@@ -20,7 +19,6 @@ export function initializeMusicManager(client: Client) {
       const guild = client.guilds.cache.get(id);
       if (guild) guild.shard.send(payload);
     },
-    plugins: [new Deezer()],
   });
 
   // Events
@@ -75,7 +73,7 @@ export function initializeMusicManager(client: Client) {
   // Init manager
   musicManager.init(client.user?.id || '');
   
-  logger.info('🎵 Music manager initialized with Lavalink');
+  logger.info('🎵 Music manager initialized with Lavalink (erela.js-apple)');
 }
 
 export function getMusicManager(): Manager {
