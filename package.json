@@ -41,7 +41,8 @@
     "ytdl-core": "^4.11.5",
     "@distube/ytdl-core": "^4.14.4",
     "openai": "^4.73.1",
-    "@google/generative-ai": "^0.21.0"
+    "@google/generative-ai": "^0.21.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
