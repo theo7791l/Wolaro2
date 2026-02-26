@@ -38,8 +38,9 @@ export class AIMessageHandler implements IEvent {
         return;
       }
 
-      // Check if auto-moderation is enabled
-      if (config.auto_moderate === true) {
+      // ✅ FIX: Vérifier autoModEnabled (pas auto_moderate)
+      // Correspond maintenant à ce que /automod sauvegarde en BDD
+      if (config.autoModEnabled === true) {
         await this.handleAutoModeration(message, config, context, apiKey);
       }
 
@@ -63,7 +64,8 @@ export class AIMessageHandler implements IEvent {
       const gemini = new GeminiClient(apiKey);
       const toxicityScore = await gemini.analyzeToxicity(message.content);
 
-      const threshold = config.toxicity_threshold || 0.8;
+      // ✅ FIX: Utiliser autoModThreshold (pas toxicity_threshold)
+      const threshold = config.autoModThreshold || 0.8;
 
       logger.debug(`Toxicity analysis: ${toxicityScore.toFixed(2)} (threshold: ${threshold})`);
 
