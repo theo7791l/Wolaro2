@@ -11,6 +11,14 @@ import { LockdownCommand } from './commands/lockdown';
 import { ModerationEventHandler } from './events/moderation-events';
 import { z } from 'zod';
 
+// Import du sous-module protection
+import protectionModule from './protection';
+import { ProtectionConfigCommand } from './protection/commands/config';
+import { ProtectionMessageHandler } from './protection/events/message-create';
+import { ProtectionMemberAddHandler } from './protection/events/member-add';
+import { ProtectionChannelDeleteHandler } from './protection/events/channel-delete';
+import { ProtectionRoleDeleteHandler } from './protection/events/role-delete';
+
 export const ModerationConfigSchema = z.object({
   autoMod: z.boolean().default(true),
   autoTimeout: z.boolean().default(true),
@@ -44,10 +52,17 @@ export default class ModerationModule implements IModule {
     new TimeoutCommand(),
     new ClearCommand(),
     new LockdownCommand(),
+    // Commandes du sous-module protection
+    new ProtectionConfigCommand(),
   ];
 
   events = [
     new ModerationEventHandler(),
+    // Événements du sous-module protection
+    new ProtectionMessageHandler(),
+    new ProtectionMemberAddHandler(),
+    new ProtectionChannelDeleteHandler(),
+    new ProtectionRoleDeleteHandler(),
   ];
 
   constructor(
@@ -55,4 +70,13 @@ export default class ModerationModule implements IModule {
     private database: DatabaseManager,
     private redis: RedisManager
   ) {}
+
+  async initialize(): Promise<void> {
+    // Initialiser le sous-module protection
+    await protectionModule.initialize(this.client, this.database);
+  }
+
+  async shutdown(): Promise<void> {
+    await protectionModule.shutdown();
+  }
 }
