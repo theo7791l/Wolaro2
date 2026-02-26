@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
-import { GeminiClient } from '../utils/gemini';
+import { GroqClient } from '../utils/groq';
 
 export class ImageCommand implements ICommand {
   data = new SlashCommandBuilder()
@@ -39,18 +39,21 @@ export class ImageCommand implements ICommand {
 
     try {
       // Use global API key from environment
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GROQ_API_KEY;
 
       if (!apiKey) {
         await interaction.editReply('❌ Le module IA n\'est pas configuré.');
         return;
       }
 
-      const gemini = new GeminiClient(apiKey);
-      const response = await gemini.analyzeImage(image.url, question);
-
+      // Note: Groq/Llama ne supporte pas directement l'analyse d'image
+      // Cette fonctionnalité nécessite un modèle multimodal (Gemini/GPT-4V)
+      // Pour l'instant, on retourne une erreur explicative
       await interaction.editReply({
-        content: `🔍 **Analyse de l'image:**\n\n${response}`,
+        content: '⚠️ **Analyse d\'image temporairement indisponible**\n\n' +
+          'Groq (Llama 3.3) ne supporte pas l\'analyse d\'images pour le moment.\n' +
+          'Cette fonctionnalité sera réactivée avec un modèle multimodal (GPT-4V ou Gemini Vision).\n\n' +
+          'Utilisez `/ask` pour des questions textuelles ! 🚀',
       });
     } catch (error: any) {
       await interaction.editReply(`❌ Erreur: ${error.message || 'Impossible d\'analyser l\'image'}`);

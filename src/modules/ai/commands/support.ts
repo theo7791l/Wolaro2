@@ -1,11 +1,11 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
-import { GeminiClient } from '../utils/gemini';
+import { GroqClient } from '../utils/groq';
 
 // ============================================================
 // Système de prompt : connaissance complète de Wolaro
-// Gemini répond UNIQUEMENT sur le bot, en français, de façon
-// précise et concise.
+// Groq (Llama 3.3) répond UNIQUEMENT sur le bot, en français,
+// de façon précise et concise.
 // ============================================================
 const WOLARO_SYSTEM_PROMPT = `
 Tu es WolaroAssist, l'assistant support officiel du bot Discord Wolaro.
@@ -69,12 +69,12 @@ Fonctionnalités : XP auto sur messages, rôles-récompenses, cartes de profil
   /config tickets    → catégorie, rôle support, auto-close
   /config giveaways  → rôle ping, âge min compte/serveur
 
-6️⃣  IA GEMINI (5 commandes)
-• /ask [question]                  → Poser une question libre à Gemini
+6️⃣  IA GROQ (5 commandes) - Llama 3.3 70B
+• /ask [question]                  → Poser une question libre à Groq
 • /aichat                          → Chat conversationnel (contexte 10 msgs)
-• /aiimage [url] [question]        → Analyser une image
 • /automod                         → Configurer l'auto-modération IA
 • /support [question]              → Aide sur Wolaro (cette commande !)
+⚡ Groq: 30 req/min, 14,400 req/jour GRATUIT
 
 7️⃣  RPG (6 commandes)
 • /rpgprofile                      → Voir son profil RPG
@@ -105,7 +105,7 @@ Fonctionnalités : vérif âge compte/serveur, bouton interactif, embed dynamiqu
 🚀 INSTALLATION
 ══════════════════════════════════════
 Prérequis : Node.js 20+, PostgreSQL 15+, Redis 7+, Discord Bot Token
-Option IA  : GEMINI_API_KEY (optionnel mais recommandé)
+Option IA  : GROQ_API_KEY (gratuit sur https://console.groq.com/keys)
 
 Docker (recommandé) :
   git clone https://github.com/theo7791l/Wolaro2.git
@@ -122,6 +122,8 @@ Manuel :
 ══════════════════════════════════════
 DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET,
 DISCORD_PUBLIC_KEY, DB_PASSWORD, API_JWT_SECRET, ENCRYPTION_KEY
+
+Optionnel : GROQ_API_KEY (module IA)
 
 ══════════════════════════════════════
 🛡️ SÉCURITÉ
@@ -143,7 +145,7 @@ export class SupportCommand implements ICommand {
     .addStringOption((option) =>
       option
         .setName('question')
-        .setDescription('Ta question (ex: comment créer un ticket ? comment fonctionne l\'économie ?)')
+        .setDescription('Ta question (ex: comment créer un ticket ? comment fonctionne l\'IA ?)')
         .setRequired(true)
         .setMaxLength(500)
     ) as SlashCommandBuilder;
@@ -158,15 +160,16 @@ export class SupportCommand implements ICommand {
     await interaction.deferReply();
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GROQ_API_KEY;
 
       if (!apiKey) {
         const embed = new EmbedBuilder()
           .setColor(0xff6b6b)
           .setTitle('⚠️ Module IA non configuré')
           .setDescription(
-            'La variable `GEMINI_API_KEY` n\'est pas définie sur ce bot.\n' +
-            'Contactez un administrateur pour l\'activer.'
+            'La variable `GROQ_API_KEY` n\'est pas définie sur ce bot.\n' +
+            'Contactez un administrateur pour l\'activer.\n\n' +
+            '🆓 Obtenir une clé gratuite : https://console.groq.com/keys'
           )
           .setTimestamp();
         await interaction.editReply({ embeds: [embed] });
@@ -176,8 +179,8 @@ export class SupportCommand implements ICommand {
       // Construire le prompt complet : contexte Wolaro + question
       const fullPrompt = `${WOLARO_SYSTEM_PROMPT}\n\n---\n\nQuestion de l'utilisateur : ${question}`;
 
-      const gemini = new GeminiClient(apiKey);
-      const response = await gemini.generateText(fullPrompt, {
+      const groq = new GroqClient(apiKey);
+      const response = await groq.generateText(fullPrompt, {
         maxTokens: 1500,
         temperature: 0.35, // Réponses précises et cohérentes
       });
@@ -194,7 +197,7 @@ export class SupportCommand implements ICommand {
       const embed = new EmbedBuilder()
         .setColor(0x5865f2) // Bleu Discord brand
         .setAuthor({
-          name: 'WolaroAssist — Support IA',
+          name: 'WolaroAssist — Support IA (Groq Llama 3.3)',
           iconURL: interaction.client.user?.displayAvatarURL(),
         })
         .setDescription(description)
@@ -225,7 +228,7 @@ export class SupportCommand implements ICommand {
         .setTitle('❌ Erreur IA')
         .setDescription(
           `Impossible de contacter l'IA : \`${error.message || 'Erreur inconnue'}\`\n\n` +
-          'Vérifiez que la clé `GEMINI_API_KEY` est valide et que le quota n\'est pas dépassé.'
+          'Vérifiez que la clé `GROQ_API_KEY` est valide et que le quota n\'est pas dépassé.'
         )
         .setTimestamp();
 
