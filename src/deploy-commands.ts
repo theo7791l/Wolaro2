@@ -1,5 +1,5 @@
 /**
- * Deploy Commands - Fixed dotenv path resolution
+ * Deploy Commands - Fixed dotenv path resolution + DISCORD_CLIENT_ID alias
  */
 
 import { REST, Routes } from 'discord.js';
@@ -12,6 +12,11 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 // Fallback : essayer aussi le dossier courant
 if (!process.env.DISCORD_TOKEN) {
   dotenv.config();
+}
+
+// Normalisation : accepter DISCORD_CLIENT_ID ou CLIENT_ID
+if (!process.env.CLIENT_ID && process.env.DISCORD_CLIENT_ID) {
+  process.env.CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 }
 
 const commands: any[] = [];
@@ -28,7 +33,7 @@ if (!process.env.DISCORD_TOKEN) {
 }
 
 if (!process.env.CLIENT_ID) {
-  console.error('❌ CLIENT_ID manquant dans .env');
+  console.error('❌ CLIENT_ID ou DISCORD_CLIENT_ID manquant dans .env');
   process.exit(1);
 }
 
@@ -50,12 +55,12 @@ for (const folder of commandFolders) {
 
     try {
       const commandModule = require(filePath);
-      
+
       let commandInstance = null;
-      
+
       for (const key of Object.keys(commandModule)) {
         const exported = commandModule[key];
-        
+
         if (typeof exported === 'function' && exported.prototype) {
           try {
             const instance = new exported();
@@ -71,12 +76,13 @@ for (const folder of commandFolders) {
           break;
         }
       }
-      
+
       if (commandInstance && commandInstance.data) {
-        const commandData = typeof commandInstance.data.toJSON === 'function' 
-          ? commandInstance.data.toJSON() 
-          : commandInstance.data;
-          
+        const commandData =
+          typeof commandInstance.data.toJSON === 'function'
+            ? commandInstance.data.toJSON()
+            : commandInstance.data;
+
         commands.push(commandData);
         const commandName = commandData.name || 'unknown';
         console.log(`  ✅ /${commandName.padEnd(20)} │ module: ${folder}`);
