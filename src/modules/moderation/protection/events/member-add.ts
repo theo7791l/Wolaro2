@@ -11,8 +11,11 @@ export class ProtectionMemberAddHandler implements IEvent {
       // Anti-raid analysis
       const riskAnalysis = await protectionModule.antiRaid.analyzeMemberJoin(member);
       
-      if (riskAnalysis.isRaid) {
-        logger.warn(`Potential raid detected in ${member.guild.name}`);
+      if (riskAnalysis.isRisk) {
+        logger.warn(
+          `High-risk member join detected in ${member.guild.name}: ` +
+          `${member.user.tag} (score: ${riskAnalysis.riskScore})`
+        );
         // Le système anti-raid gère automatiquement les actions
       }
 
