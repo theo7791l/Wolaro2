@@ -131,17 +131,20 @@ export class MusicPlayer {
       } catch (error) {
         logger.error('Failed to enter Ready state after 15s:', error);
         
-        // Vérifier si on est toujours en train de se connecter
+        // Donner 5 secondes supplémentaires si toujours en train de se connecter
+        const currentStatus = this.connection?.state.status;
         if (
           this.connection &&
-          (this.connection.state.status === VoiceConnectionStatus.Connecting ||
-           this.connection.state.status === VoiceConnectionStatus.Signalling)
+          (currentStatus === VoiceConnectionStatus.Connecting ||
+           currentStatus === VoiceConnectionStatus.Signalling)
         ) {
           logger.warn('Still connecting, waiting 5 more seconds...');
-          await new Promise(resolve => setTimeout(resolve, 5000));
           
-          // Vérifier si on a finalement réussi à se connecter
-          if (!this.connection || this.connection.state.status !== VoiceConnectionStatus.Ready) {
+          try {
+            await entersState(this.connection, VoiceConnectionStatus.Ready, 5000);
+            logger.info(`✅ Successfully joined voice channel after extra wait: ${channel.name}`);
+          } catch {
+            // Échec définitif après 20s total
             throw new Error('Timeout lors de la connexion au salon vocal (20s)');
           }
         } else {
