@@ -1,250 +1,141 @@
-import { Router, Request, Response } from 'express';
-import { DatabaseManager } from '../../database/manager';
-import { Client, ChannelType } from 'discord.js';
-import { authMiddleware } from '../middleware/auth';
-import { standardRateLimiter } from '../middleware/rateLimiter';
+import { Router } from 'express';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { Client } from 'discord.js';
 import { logger } from '../../utils/logger';
 
-const router = Router();
+export const discordRouter = Router();
+
+discordRouter.use(authMiddleware);
 
 /**
- * Discord Data Enrichment API
- * Fetches real Discord data (channels, roles, members) using bot token
- * Returns names instead of IDs for panel display
+ * Get user guilds from Discord
+ * GET /api/discord/guilds
  */
-
-// Get guild channels with names
-router.get('/guilds/:guildId/channels', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+discordRouter.get('/guilds', async (req: AuthRequest, res) => {
   try {
-    const { guildId } = req.params;
-    const userId = (req as any).user.id;
-    const database: DatabaseManager = req.app.locals.database;
     const client: Client = req.app.locals.client;
 
-    // Verify user has access
-    const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
-       UNION
-       SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
-    );
+    const userGuilds = client.guilds.cache
+      .filter((g) => g.members.cache.has(req.user!.id))
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        icon: g.iconURL(),
+        memberCount: g.memberCount,
+      }));
 
-    if (hasAccess.length === 0) {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied',
-      });
-    }
-
-    // Fetch guild from Discord
-    const guild = await client.guilds.fetch(guildId).catch(() => null);
-
-    if (!guild) {
-      return res.status(404).json({
-        success: false,
-        error: 'Bot is not in this guild',
-      });
-    }
-
-    // Fetch all channels
-    const channels = await guild.channels.fetch();
-
-    // Format channels by type
-    const formattedChannels = {
-      text: [] as any[],
-      voice: [] as any[],
-      category: [] as any[],
-      announcement: [] as any[],
-      forum: [] as any[],
-      stage: [] as any[],
-    };
-
-    channels.forEach((channel) => {
-      if (!channel) return;
-      const channelData = {
-        id: channel.id,
-        name: channel.name,
-        type: channel.type,
-        position: channel.position,
-        parentId: channel.parentId || null,
-      };
-
-      switch (channel.type) {
-        case ChannelType.GuildText:
-          formattedChannels.text.push(channelData);
-          break;
-        case ChannelType.GuildVoice:
-          formattedChannels.voice.push(channelData);
-          break;
-        case ChannelType.GuildCategory:
-          formattedChannels.category.push(channelData);
-          break;
-        case ChannelType.GuildAnnouncement:
-          formattedChannels.announcement.push(channelData);
-          break;
-        case ChannelType.GuildForum:
-          formattedChannels.forum.push(channelData);
-          break;
-        case ChannelType.GuildStageVoice:
-          formattedChannels.stage.push(channelData);
-          break;
-      }
-    });
-
-    // Sort by position
-    Object.keys(formattedChannels).forEach((type) => {
-      (formattedChannels as any)[type].sort((a: any, b: any) => a.position - b.position);
-    });
-
-    return res.json({
-      success: true,
-      data: formattedChannels,
-      total: channels.size,
-    });
-  } catch (error: any) {
-    logger.error('Error fetching channels:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch channels',
-    });
+    return res.json({ guilds: userGuilds });
+  } catch (error) {
+    logger.error('Error fetching user guilds:', error);
+    return res.status(500).json({ error: 'Failed to fetch guilds' });
   }
 });
 
-// Get guild roles with names
-router.get('/guilds/:guildId/roles', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+/**
+ * Get guild info
+ * GET /api/discord/guilds/:guildId
+ */
+discordRouter.get('/guilds/:guildId', async (req: AuthRequest, res) => {
   try {
-    const { guildId } = req.params;
-    const userId = (req as any).user.id;
-    const database: DatabaseManager = req.app.locals.database;
+    const guildId = String(req.params.guildId);
     const client: Client = req.app.locals.client;
 
-    // Verify user has access
-    const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
-       UNION
-       SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
-    );
-
-    if (hasAccess.length === 0) {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied',
-      });
-    }
-
-    // Fetch guild from Discord
     const guild = await client.guilds.fetch(guildId).catch(() => null);
 
     if (!guild) {
-      return res.status(404).json({
-        success: false,
-        error: 'Bot is not in this guild',
-      });
+      return res.status(404).json({ error: 'Guild not found' });
     }
 
-    // Fetch all roles
-    const roles = await guild.roles.fetch();
+    const member = await guild.members.fetch(req.user!.id).catch(() => null);
 
-    // Format roles
-    const formattedRoles = roles.map((role) => ({
-      id: role.id,
-      name: role.name,
-      color: role.hexColor,
-      position: role.position,
-      permissions: role.permissions.bitfield.toString(),
-      mentionable: role.mentionable,
-      hoist: role.hoist,
-      managed: role.managed,
-      members: role.members.size,
-    }));
-
-    // Sort by position (highest first)
-    formattedRoles.sort((a, b) => b.position - a.position);
+    if (!member) {
+      return res.status(403).json({ error: 'You are not a member of this guild' });
+    }
 
     return res.json({
-      success: true,
-      data: formattedRoles,
-      total: roles.size,
+      id: guild.id,
+      name: guild.name,
+      icon: guild.iconURL(),
+      memberCount: guild.memberCount,
+      ownerId: guild.ownerId,
+      isOwner: guild.ownerId === req.user!.id,
+      isAdmin: member.permissions.has('Administrator'),
     });
-  } catch (error: any) {
-    logger.error('Error fetching roles:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch roles',
-    });
+  } catch (error) {
+    logger.error('Error fetching guild info:', error);
+    return res.status(500).json({ error: 'Failed to fetch guild information' });
   }
 });
 
-// Get guild members (with search)
-router.get('/guilds/:guildId/members', standardRateLimiter, authMiddleware, async (req: Request, res: Response) => {
+/**
+ * Get guild channels
+ * GET /api/discord/guilds/:guildId/channels
+ */
+discordRouter.get('/guilds/:guildId/channels', async (req: AuthRequest, res) => {
   try {
-    const { guildId } = req.params;
-    const userId = (req as any).user.id;
-    const database: DatabaseManager = req.app.locals.database;
+    const guildId = String(req.params.guildId);
     const client: Client = req.app.locals.client;
-    const { limit = 100, search } = req.query;
 
-    // Verify user has access
-    const hasAccess = await database.query(
-      `SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2 AND permissions @> ARRAY['ADMINISTRATOR']::varchar[]
-       UNION
-       SELECT 1 FROM guilds WHERE guild_id = $1 AND owner_id = $2`,
-      [guildId, userId]
-    );
-
-    if (hasAccess.length === 0) {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied',
-      });
-    }
-
-    // Fetch guild from Discord
     const guild = await client.guilds.fetch(guildId).catch(() => null);
 
     if (!guild) {
-      return res.status(404).json({
-        success: false,
-        error: 'Bot is not in this guild',
-      });
+      return res.status(404).json({ error: 'Guild not found' });
     }
 
-    // Fetch members
-    const members = await guild.members.fetch({ limit: Math.min(parseInt(limit as string) || 100, 1000) });
+    const member = await guild.members.fetch(req.user!.id).catch(() => null);
 
-    // Format members
-    let formattedMembers = members.map((member) => ({
-      id: member.id,
-      username: member.user.username,
-      displayName: member.displayName,
-      avatar: member.user.displayAvatarURL(),
-      roles: member.roles.cache.map((r) => ({ id: r.id, name: r.name, color: r.hexColor })),
-      joinedAt: member.joinedAt?.toISOString(),
-      bot: member.user.bot,
-    }));
-
-    // Search filter
-    if (search) {
-      const searchLower = (search as string).toLowerCase();
-      formattedMembers = formattedMembers.filter(
-        (m) => m.username.toLowerCase().includes(searchLower) || m.displayName.toLowerCase().includes(searchLower)
-      );
+    if (!member || !member.permissions.has('ManageChannels')) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
-    return res.json({
-      success: true,
-      data: formattedMembers,
-      total: formattedMembers.length,
-      guildTotal: guild.memberCount,
-    });
-  } catch (error: any) {
-    logger.error('Error fetching members:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch members',
-    });
+    const channels = guild.channels.cache
+      .filter((c) => c.isTextBased())
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        type: c.type,
+      }));
+
+    return res.json({ channels });
+  } catch (error) {
+    logger.error('Error fetching guild channels:', error);
+    return res.status(500).json({ error: 'Failed to fetch channels' });
   }
 });
 
-export default router;
+/**
+ * Get guild roles
+ * GET /api/discord/guilds/:guildId/roles
+ */
+discordRouter.get('/guilds/:guildId/roles', async (req: AuthRequest, res) => {
+  try {
+    const guildId = String(req.params.guildId);
+    const client: Client = req.app.locals.client;
+
+    const guild = await client.guilds.fetch(guildId).catch(() => null);
+
+    if (!guild) {
+      return res.status(404).json({ error: 'Guild not found' });
+    }
+
+    const member = await guild.members.fetch(req.user!.id).catch(() => null);
+
+    if (!member || !member.permissions.has('ManageRoles')) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    const roles = guild.roles.cache
+      .filter((r) => !r.managed && r.id !== guild.id)
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        color: r.hexColor,
+        position: r.position,
+      }));
+
+    return res.json({ roles });
+  } catch (error) {
+    logger.error('Error fetching guild roles:', error);
+    return res.status(500).json({ error: 'Failed to fetch roles' });
+  }
+});

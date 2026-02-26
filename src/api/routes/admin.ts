@@ -40,7 +40,7 @@ adminRouter.get('/guilds', async (req: AuthRequest, res) => {
  */
 adminRouter.get('/impersonate/:guildId', async (req: AuthRequest, res) => {
   try {
-    const { guildId } = req.params;
+    const guildId = String(req.params.guildId);
     const database: DatabaseManager = req.app.locals.database;
 
     const config = await database.getGuildConfig(guildId);
@@ -69,7 +69,7 @@ adminRouter.get('/impersonate/:guildId', async (req: AuthRequest, res) => {
  */
 adminRouter.post('/blacklist/:guildId', async (req: AuthRequest, res) => {
   try {
-    const { guildId } = req.params;
+    const guildId = String(req.params.guildId);
     const { reason } = req.body;
 
     if (!reason) {

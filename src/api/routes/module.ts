@@ -1,63 +1,66 @@
 import { Router } from 'express';
-import { authMiddleware, guildAccessMiddleware, AuthRequest } from '../middleware/auth';
-import { lenientRateLimiter, standardRateLimiter } from '../middleware/rateLimiter';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { DatabaseManager } from '../../database/manager';
 import { RedisManager } from '../../cache/redis';
-import { WebSocketServer } from '../../websocket/server';
 import { logger } from '../../utils/logger';
 
 export const moduleRouter = Router();
+
+moduleRouter.use(authMiddleware);
+
+const websocket = {
+  notifyModuleToggle: (guildId: string, moduleName: string, enabled: boolean) => {
+    logger.debug(`WS notify: module ${moduleName} ${enabled ? 'enabled' : 'disabled'} in ${guildId}`);
+  },
+  notifyConfigUpdate: (guildId: string, data: any) => {
+    logger.debug(`WS notify: config updated in ${guildId}`);
+  },
+};
 
 /**
  * Get available modules
  * GET /api/modules
  */
-moduleRouter.get('/', lenientRateLimiter, async (req, res) => {
+moduleRouter.get('/', async (req: AuthRequest, res) => {
   try {
     const modules = [
       {
         name: 'moderation',
         displayName: 'Modération',
-        description: 'Système de modération avancé avec anti-raid, auto-mod et logs',
+        description: 'Outils de modération avancés',
         icon: '🛡️',
-        category: 'Sécurité',
+        category: 'core',
       },
       {
         name: 'economy',
         displayName: 'Économie',
-        description: 'Système économique avec boutique, inventaire et échanges',
+        description: 'Système d\'économie virtuelle',
         icon: '💰',
-        category: 'Divertissement',
+        category: 'fun',
       },
       {
         name: 'leveling',
-        displayName: 'Niveaux & XP',
-        description: 'Système de progression avec levels, XP et récompenses',
-        icon: '🎯',
-        category: 'Engagement',
+        displayName: 'Niveaux',
+        description: 'Système de niveaux et XP',
+        icon: '📊',
+        category: 'engagement',
       },
       {
         name: 'music',
         displayName: 'Musique',
-        description: 'Lecteur de musique avec playlist et contrôles avancés',
+        description: 'Lecteur de musique',
         icon: '🎵',
-        category: 'Divertissement',
+        category: 'fun',
       },
       {
         name: 'ai',
         displayName: 'Intelligence Artificielle',
-        description: 'Chatbot IA, auto-modération intelligente et analyse',
+        description: 'Chatbot IA & modération automatique',
         icon: '🤖',
-        category: 'Avancé',
-      },
-      {
-        name: 'rpg',
-        displayName: 'RPG',
-        description: 'Système de jeu de rôle avec combats, quêtes et équipement',
-        icon: '⚔️',
-        category: 'Divertissement',
+        category: 'advanced',
       },
     ];
+
     return res.json({ modules });
   } catch (error) {
     logger.error('Error fetching modules:', error);
@@ -69,37 +72,32 @@ moduleRouter.get('/', lenientRateLimiter, async (req, res) => {
  * Toggle module for guild
  * POST /api/modules/:guildId/:moduleName/toggle
  */
-moduleRouter.post('/:guildId/:moduleName/toggle', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
+moduleRouter.post('/:guildId/:moduleName/toggle', async (req: AuthRequest, res) => {
   try {
-    const { guildId, moduleName } = req.params;
+    const guildId = String(req.params.guildId);
+    const moduleName = String(req.params.moduleName);
     const { enabled } = req.body;
 
     if (typeof enabled !== 'boolean') {
-      return res.status(400).json({ error: 'Enabled must be a boolean' });
+      return res.status(400).json({ error: 'Invalid enabled value' });
     }
 
     const database: DatabaseManager = req.app.locals.database;
     const redis: RedisManager = req.app.locals.redis;
-    const websocket: WebSocketServer = req.app.locals.websocket;
 
     await database.toggleModule(guildId, moduleName, enabled);
 
     // Invalidate cache
-    await redis.del(`module:${guildId}:${moduleName}`);
     await redis.invalidateGuildConfig(guildId);
 
     // Notify via WebSocket
     websocket.notifyModuleToggle(guildId, moduleName, enabled);
 
-    // Log action
-    await database.logAction(req.user!.id, 'MODULE_TOGGLE', {
-      guildId,
-      moduleName,
+    return res.json({
+      success: true,
+      module: moduleName,
       enabled,
     }, guildId);
-
-    logger.info(`Module ${moduleName} ${enabled ? 'enabled' : 'disabled'} for guild ${guildId}`);
-    return res.json({ success: true, moduleName, enabled });
   } catch (error) {
     logger.error('Error toggling module:', error);
     return res.status(500).json({ error: 'Failed to toggle module' });
@@ -107,21 +105,21 @@ moduleRouter.post('/:guildId/:moduleName/toggle', standardRateLimiter, authMiddl
 });
 
 /**
- * Update module configuration
- * PATCH /api/modules/:guildId/:moduleName/config
+ * Update module config
+ * PUT /api/modules/:guildId/:moduleName/config
  */
-moduleRouter.patch('/:guildId/:moduleName/config', standardRateLimiter, authMiddleware, guildAccessMiddleware, async (req: AuthRequest, res) => {
+moduleRouter.put('/:guildId/:moduleName/config', async (req: AuthRequest, res) => {
   try {
-    const { guildId, moduleName } = req.params;
+    const guildId = String(req.params.guildId);
+    const moduleName = String(req.params.moduleName);
     const { config } = req.body;
 
     if (!config || typeof config !== 'object') {
-      return res.status(400).json({ error: 'Config must be an object' });
+      return res.status(400).json({ error: 'Invalid config object' });
     }
 
     const database: DatabaseManager = req.app.locals.database;
     const redis: RedisManager = req.app.locals.redis;
-    const websocket: WebSocketServer = req.app.locals.websocket;
 
     await database.updateModuleConfig(guildId, moduleName, config);
 
@@ -131,15 +129,11 @@ moduleRouter.patch('/:guildId/:moduleName/config', standardRateLimiter, authMidd
     // Notify via WebSocket
     websocket.notifyConfigUpdate(guildId, { module: moduleName, config });
 
-    // Log action
-    await database.logAction(req.user!.id, 'MODULE_CONFIG_UPDATE', {
-      guildId,
-      moduleName,
+    return res.json({
+      success: true,
+      module: moduleName,
       config,
     }, guildId);
-
-    logger.info(`Module ${moduleName} config updated for guild ${guildId}`);
-    return res.json({ success: true });
   } catch (error) {
     logger.error('Error updating module config:', error);
     return res.status(500).json({ error: 'Failed to update module configuration' });
