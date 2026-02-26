@@ -118,7 +118,7 @@ export class GroqClient {
       }
       
       logger.error('Groq API unexpected error:', error);
-      throw new Error(`❌ Erreur inattendue: ${error.message || 'Impossible de contacter l\\'API Groq'}`);
+      throw new Error(`❌ Erreur inattendue: ${error.message || "Impossible de contacter l'API Groq"}`);
     }
   }
 
