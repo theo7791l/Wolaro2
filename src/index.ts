@@ -12,7 +12,12 @@ import { logger } from './utils/logger';
 import { MigrationsManager } from './database/migrations';
 import protectionModule from './modules/moderation/protection/index';
 
-dotenv.config();
+// Charger le .env depuis la racine du projet (pas depuis dist/)
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+// Fallback : essayer aussi le dossier courant
+if (!process.env.DISCORD_TOKEN) {
+  dotenv.config();
+}
 
 // Extend Client type to include commands collection
 interface ExtendedClient extends Client {
