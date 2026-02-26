@@ -110,7 +110,7 @@ export class PlayCommand implements ICommand {
       const manager = getMusicManager();
       const res = await manager.search(focusedValue, interaction.user);
 
-      const choices = res.tracks.slice(0, 10).map((track) => ({
+      const choices = res.tracks.slice(0, 10).map((track: any) => ({
         name: `${track.title} - ${track.author}`.substring(0, 100),
         value: track.uri,
       }));
