@@ -20,6 +20,23 @@ interface ExtendedClient extends Client {
   dbPool?: Pool;
 }
 
+// Vérifier les variables d'environnement obligatoires
+if (!process.env.DATABASE_URL && (!process.env.DB_HOST || !process.env.DB_NAME)) {
+  logger.error('❌ DATABASE_URL ou DB_HOST/DB_NAME/DB_USER/DB_PASSWORD manquants dans .env');
+  logger.error('Le bot nécessite une base de données PostgreSQL pour fonctionner.');
+  process.exit(1);
+}
+
+if (!process.env.DISCORD_TOKEN) {
+  logger.error('❌ DISCORD_TOKEN manquant dans .env');
+  process.exit(1);
+}
+
+if (!process.env.CLIENT_ID) {
+  logger.error('❌ CLIENT_ID manquant dans .env');
+  process.exit(1);
+}
+
 // Create Discord client
 const client: ExtendedClient = new Client({
   intents: [
@@ -37,27 +54,28 @@ const client: ExtendedClient = new Client({
 // Initialize commands collection
 client.commands = new Collection();
 
-// Create database pool (optional)
-let dbPool: Pool | null = null;
-if (process.env.DATABASE_URL) {
-  dbPool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    max: parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-  });
-  client.dbPool = dbPool;
-} else {
-  logger.warn('⚠️  DATABASE_URL not configured. Running without database.');
-}
+// Create database pool
+const dbPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT || '5432'),
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  max: parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+
+client.dbPool = dbPool;
 
 // Load commands
 function loadCommands() {
-  const commandsLoaded = [];
+  const commandsLoaded: string[] = [];
   const foldersPath = path.join(__dirname, 'modules');
 
   if (!fs.existsSync(foldersPath)) {
-    logger.warn('Modules folder not found, skipping command loading');
+    logger.warn('⚠️  Modules folder not found, skipping command loading');
     return;
   }
 
@@ -107,44 +125,52 @@ function loadCommands() {
     }
   }
 
-  logger.info(`📦 Loaded ${commandsLoaded.length} commands: ${commandsLoaded.join(', ')}`);
+  if (commandsLoaded.length > 0) {
+    logger.info(`📦 Loaded ${commandsLoaded.length} commands`);
+  } else {
+    logger.warn('⚠️  No commands loaded');
+  }
 }
 
 async function main() {
   try {
     logger.info('Starting Wolaro2...');
 
-    // Load commands first
-    loadCommands();
-
-    // Test database connection if available
-    if (dbPool) {
-      try {
-        logger.info('Testing database connection...');
-        await dbPool.query('SELECT NOW()');
-        logger.info('✅ Database connected');
-
-        // Run migrations automatically
-        logger.info('Running database migrations...');
-        const migrations = new MigrationsManager(dbPool);
-        await migrations.runMigrations();
-        logger.info('✅ Migrations completed');
-      } catch (error) {
-        logger.error('❌ Database connection failed:', error);
-        logger.warn('⚠️  Continuing without database...');
-      }
+    // Test database connection (OBLIGATOIRE)
+    logger.info('Testing database connection...');
+    try {
+      await dbPool.query('SELECT NOW()');
+      logger.info('✅ Database connected');
+    } catch (error) {
+      logger.error('❌ Failed to connect to database:', error);
+      logger.error('Le bot ne peut pas démarrer sans connexion à la base de données.');
+      logger.error('Vérifiez vos variables d\'environnement DATABASE_URL ou DB_HOST/DB_NAME/DB_USER/DB_PASSWORD');
+      process.exit(1);
     }
 
-    // Initialize protection module if database is available
-    if (dbPool) {
-      try {
-        logger.info('Initializing protection module...');
-        await protectionModule.initialize(client as Client);
-        logger.info('✅ Protection module ready');
-      } catch (error) {
-        logger.error('Failed to initialize protection module:', error);
-        logger.warn('Continuing without protection module...');
-      }
+    // Run migrations automatically
+    logger.info('Running database migrations...');
+    try {
+      const migrations = new MigrationsManager(dbPool);
+      await migrations.runMigrations();
+      logger.info('✅ Migrations completed');
+    } catch (error) {
+      logger.error('❌ Failed to run migrations:', error);
+      logger.warn('⚠️  Continuing without migrations (tables may be missing)...');
+    }
+
+    // Load commands
+    logger.info('Loading commands...');
+    loadCommands();
+
+    // Initialize protection module
+    logger.info('Initializing protection module...');
+    try {
+      await protectionModule.initialize(client as Client);
+      logger.info('✅ Protection module ready');
+    } catch (error) {
+      logger.error('❌ Failed to initialize protection module:', error);
+      logger.warn('⚠️  Continuing without protection module...');
     }
 
     // Login to Discord
@@ -195,20 +221,16 @@ client.on('interactionCreate', async (interaction) => {
 // Graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Shutting down...');
-  if (dbPool) {
-    await protectionModule.shutdown();
-    await dbPool.end();
-  }
+  await protectionModule.shutdown();
+  await dbPool.end();
   client.destroy();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   logger.info('Shutting down...');
-  if (dbPool) {
-    await protectionModule.shutdown();
-    await dbPool.end();
-  }
+  await protectionModule.shutdown();
+  await dbPool.end();
   client.destroy();
   process.exit(0);
 });
