@@ -21,12 +21,12 @@ export class GroqClient {
   
   // ⚡ ARCHITECTURE HYBRIDE MULTI-MODÈLES
   // Chat: llama-3.3-70b-versatile (30 RPM, 1000 RPD) -> fallback llama-3.1-8b-instant (30 RPM, 14400 RPD)
-  // Moderation: llama-guard-3-8b (30 RPM, 14400 RPD) - Spécialisé sécurité
+  // Moderation: llama-3.1-8b-instant (30 RPM, 14400 RPD) - Remplacement de llama-guard-3-8b (déprécié)
   // Support: qwen-32b-instruct (30 RPM, 14400 RPD) - Expertise technique
   // Dev: openai/gpt-oss-120b (30 RPM, 1000 RPD) - Code & raisonnement avancé
   private chatPrimaryModel = 'llama-3.3-70b-versatile';
   private chatFallbackModel = 'llama-3.1-8b-instant';
-  private moderationModel = 'llama-guard-3-8b';
+  private moderationModel = 'llama-3.1-8b-instant'; // Remplacement de llama-guard-3-8b
   private supportModel = 'qwen-32b-instruct';
   private devModel = 'openai/gpt-oss-120b';
 
@@ -171,14 +171,14 @@ export class GroqClient {
 
   async analyzeToxicity(text: string): Promise<number> {
     try {
-      // Utilise Llama Guard 3 8B spécialisé pour la modération
+      // Utilise llama-3.1-8b-instant pour la modération (remplacement de llama-guard-3-8b)
       const response = await this.generateText(
         `Analyze the following message for toxicity, harassment, hate speech, or inappropriate content. Respond ONLY with a number between 0.0 and 1.0, where 0.0 is completely safe and 1.0 is extremely toxic.\n\nMessage: "${text}"\n\nToxicity score:`,
         {
           maxTokens: 10,
           temperature: 0.1,
           systemPrompt: 'You are a toxicity analyzer. Respond ONLY with a decimal number between 0.0 and 1.0.',
-          useCase: 'moderation', // Utilise llama-guard-3-8b
+          useCase: 'moderation', // Utilise llama-3.1-8b-instant
         }
       );
 
