@@ -1,16 +1,14 @@
 /**
  * Wolaro2 - Discord Bot Multi-tenant avec Architecture Modulaire
- * System de chargement manuel des modules - VERSION CORRIGÉE v3
+ * System de chargement manuel des modules - VERSION CORRIGÉE v4 avec Lavalink
  */
-
-// IMPORTANT : Charger libsodium-wrappers AVANT discord.js/voice
-import sodium from 'libsodium-wrappers';
 
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
 import { config } from './config';
 import { logger } from './utils/logger';
 import { DatabaseManager } from './database/manager';
 import { RedisManager } from './cache/redis';
+import { initializeMusicManager } from './modules/music/manager';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -58,10 +56,6 @@ const globalContext = {
 
 async function start() {
   try {
-    // Initialiser libsodium AVANT tout le reste
-    await sodium.ready;
-    logger.info('✅ Libsodium initialized for voice encryption');
-
     // Connect to database
     await databaseManager.connect();
     logger.info('✅ Database connected');
@@ -210,6 +204,13 @@ async function onReady() {
   logger.info(`✅ Bot ready as ${client.user.tag}`);
   logger.info(`👥 Serving ${client.guilds.cache.size} guilds`);
   logger.info(`🛡️ Protection systems active`);
+
+  // Initialiser le music manager après que le bot soit prêt
+  try {
+    initializeMusicManager(client);
+  } catch (error) {
+    logger.error('Failed to initialize music manager:', error);
+  }
 
   // Set status
   client.user.setPresence({
