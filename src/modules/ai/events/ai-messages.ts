@@ -62,6 +62,7 @@ export class AIMessageHandler implements IEvent {
   ): Promise<void> {
     try {
       const groq = new GroqClient(apiKey);
+      // analyzeToxicity utilise automatiquement llama-guard-3-8b (useCase: 'moderation')
       const toxicityScore = await groq.analyzeToxicity(message.content);
 
       // ✅ FIX: Utiliser autoModThreshold (pas toxicity_threshold)
@@ -143,7 +144,7 @@ export class AIMessageHandler implements IEvent {
         .map((m) => `${m.author.username}: ${m.content}`)
         .join('\n');
 
-      // Generate response
+      // Generate response avec llama-3.3-70b (fallback auto vers 8B si rate limit)
       const groq = new GroqClient(apiKey);
       const systemPrompt =
         config.system_prompt ||
@@ -155,6 +156,7 @@ export class AIMessageHandler implements IEvent {
         maxTokens: 800,
         temperature: config.temperature || 0.8,
         systemPrompt,
+        useCase: 'chat', // Utilise llama-3.3-70b avec fallback auto vers llama-3.1-8b
       });
 
       // Reply to message
