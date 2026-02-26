@@ -17,6 +17,7 @@ export interface ProtectionConfig {
   badwords_action: 'delete' | 'warn' | 'timeout';
   badwords_strict_mode: boolean;
   badwords_whitelist: string[];
+  badwords_custom_list: string[]; // Liste personnalisée de mots à bloquer
   
   // Anti-Raid
   antiraid_enabled: boolean;
@@ -61,6 +62,7 @@ export const DEFAULT_PROTECTION_CONFIG: Omit<ProtectionConfig, 'guild_id' | 'cre
   badwords_action: 'delete',
   badwords_strict_mode: false,
   badwords_whitelist: [],
+  badwords_custom_list: [], // Liste vide par défaut
   antiraid_enabled: true,
   antiraid_captcha_enabled: false,
   antiraid_auto_lockdown: false,
