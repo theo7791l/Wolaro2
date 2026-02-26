@@ -1,6 +1,6 @@
 /**
  * Wolaro2 - Discord Bot Multi-tenant avec Architecture Modulaire
- * System de chargement manuel des modules - VERSION CORRIGÉE
+ * System de chargement manuel des modules - VERSION CORRIGÉE v2
  */
 
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
@@ -141,12 +141,13 @@ async function loadAllModules() {
         }
       }
 
-      // Charger les événements avec contexte
+      // Charger les événements avec contexte comme DERNIER paramètre
       if (module.events && Array.isArray(module.events)) {
         for (const event of module.events) {
           if (event && event.name && typeof event.execute === 'function') {
             const handler = (...args: any[]) => {
               try {
+                // Ajouter le contexte comme dernier argument
                 event.execute(...args, globalContext);
               } catch (error) {
                 logger.error(`Event error [${event.name}]:`, error);
