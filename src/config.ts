@@ -7,6 +7,7 @@ export const config = {
   token: process.env.DISCORD_TOKEN || '',
   clientId: process.env.DISCORD_CLIENT_ID || '',
   clientSecret: process.env.DISCORD_CLIENT_SECRET || '',
+  publicKey: process.env.DISCORD_PUBLIC_KEY || '',
   redirectUri: process.env.DISCORD_REDIRECT_URI || 'http://localhost:3000/api/auth/callback',
   
   database: {
