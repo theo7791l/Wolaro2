@@ -8,9 +8,13 @@ export class ProtectionMemberAddHandler implements IEvent {
 
   async execute(member: GuildMember): Promise<void> {
     try {
-      // Check anti-raid (simplified - just track join)
-      // The actual anti-raid system will handle detection internally
-      await protectionModule.antiRaid.handleMemberJoin(member);
+      // Anti-raid analysis
+      const riskAnalysis = await protectionModule.antiRaid.analyzeMemberJoin(member);
+      
+      if (riskAnalysis.isRaid) {
+        logger.warn(`Potential raid detected in ${member.guild.name}`);
+        // Le système anti-raid gère automatiquement les actions
+      }
 
       // Check if captcha is enabled
       const config = await (protectionModule as any).db.getConfig(member.guild.id);

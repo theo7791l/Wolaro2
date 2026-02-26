@@ -1,6 +1,6 @@
 /**
  * Wolaro2 - Discord Bot Multi-tenant avec Architecture Modulaire
- * Fix: DatabaseManager & RedisManager injection dans CommandContext
+ * System de chargement manuel des modules
  */
 
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
@@ -8,9 +8,8 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import { DatabaseManager } from './database/manager';
 import { RedisManager } from './cache/redis';
-import { loadModules } from './core/module-loader-v2';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 import protectionModule from './modules/moderation/protection';
 
 // ==============================================
@@ -39,12 +38,7 @@ const client = new Client({
 // ==============================================
 
 const databaseManager = new DatabaseManager();
-const redisManager = new RedisManager(
-  config.redis.host,
-  config.redis.port,
-  config.redis.password,
-  config.redis.db
-);
+const redisManager = new RedisManager();
 
 // ==============================================
 // STARTUP SEQUENCE
@@ -56,25 +50,19 @@ async function start() {
     await databaseManager.connect();
     logger.info('✅ Database connected');
 
-    // Connect to Redis
-    await redisManager.connect();
-    logger.info('✅ Redis connected');
+    logger.info(`✅ Redis ${redisManager.isConnected() ? 'connected' : 'disabled (optional)'}`);
 
     // Initialize protection module
     await protectionModule.initialize(client, databaseManager);
     logger.info('✅ Protection module initialized');
 
     // Load all modules
-    await loadModules(client, databaseManager, redisManager);
+    await loadAllModules();
     logger.info('✅ All modules loaded');
 
     // Load event handlers
-    loadEvents();
-    logger.info('✅ Events loaded');
-
-    // Load slash commands
-    loadCommands();
-    logger.info('✅ Commands loaded');
+    loadGlobalEvents();
+    logger.info('✅ Global events loaded');
 
     // Start bot
     await client.login(config.token);
@@ -85,34 +73,56 @@ async function start() {
 }
 
 // ==============================================
-// EVENT LOADER
+// MODULE LOADER
 // ==============================================
 
-function loadEvents() {
-  const events = [
-    { name: 'ready', execute: () => onReady() },
-    { name: 'interactionCreate', execute: (interaction: any) => onInteraction(interaction) },
-    { name: 'guildCreate', execute: (guild: any) => onGuildJoin(guild) },
-    { name: 'guildDelete', execute: (guild: any) => onGuildLeave(guild) },
-  ];
+async function loadAllModules() {
+  const modulesPath = path.join(__dirname, 'modules');
+  const moduleFolders = fs.readdirSync(modulesPath);
 
-  for (const event of events) {
-    client.on(event.name, event.execute);
+  for (const folder of moduleFolders) {
+    const modulePath = path.join(modulesPath, folder);
+    const indexPath = path.join(modulePath, 'index.js');
+
+    if (!fs.existsSync(indexPath)) continue;
+
+    try {
+      const moduleData = require(indexPath);
+      const module = moduleData.default || moduleData;
+
+      if (module.commands) {
+        for (const command of module.commands) {
+          (client as any).commands.set(command.data.name, command);
+        }
+      }
+
+      if (module.events) {
+        for (const event of module.events) {
+          if (event.once) {
+            client.once(event.name, (...args) => event.execute(...args));
+          } else {
+            client.on(event.name, (...args) => event.execute(...args));
+          }
+        }
+      }
+
+      logger.info(`  ✓ Loaded module: ${folder}`);
+    } catch (error) {
+      logger.error(`  ✗ Failed to load module ${folder}:`, error);
+    }
   }
 }
 
 // ==============================================
-// COMMAND LOADER
+// GLOBAL EVENT HANDLERS
 // ==============================================
 
-function loadCommands() {
-  // Les commandes sont déjà chargées par loadModules()
-  logger.info(`Loaded ${(client as any).commands.size} slash commands`);
+function loadGlobalEvents() {
+  client.on('ready', onReady);
+  client.on('interactionCreate', onInteraction);
+  client.on('guildCreate', onGuildJoin);
+  client.on('guildDelete', onGuildLeave);
 }
-
-// ==============================================
-// EVENT HANDLERS
-// ==============================================
 
 async function onReady() {
   if (!client.user) return;
@@ -135,11 +145,10 @@ async function onInteraction(interaction: any) {
   if (!command) return;
 
   try {
-    // FIX CRITIQUE: passer DatabaseManager et RedisManager au lieu de Pool brut
     const context = {
       client,
-      database: databaseManager,  // Avant: pool brut → getGuildConfig is not a function
-      redis: redisManager,        // Avant: null → erreurs cache
+      database: databaseManager,
+      redis: redisManager,
     };
 
     await command.execute(interaction, context);
@@ -180,7 +189,6 @@ process.on('SIGINT', async () => {
   logger.info('🛑 Shutting down gracefully...');
 
   await protectionModule.shutdown();
-  await redisManager.disconnect();
   await databaseManager.disconnect();
 
   process.exit(0);
