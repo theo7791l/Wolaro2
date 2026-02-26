@@ -4,6 +4,7 @@ interface GenerateOptions {
   maxTokens?: number;
   temperature?: number;
   systemPrompt?: string;
+  useCase?: 'chat' | 'moderation' | 'support'; // Nouveau paramètre pour choisir le modèle
 }
 
 interface GroqErrorResponse {
@@ -17,25 +18,66 @@ interface GroqErrorResponse {
 export class GroqClient {
   private apiKey: string;
   private baseUrl = 'https://api.groq.com/openai/v1';
-  // ⚡ GROQ: 30 RPM + 14400 RPD GRATUIT (vs Gemini 15 RPM + 1000 RPD)
-  // Llama 3.3 70B = qualité équivalente GPT-4 pour modération
-  private model = 'llama-3.3-70b-versatile'; // Alternative: llama-3.1-8b-instant (+ rapide)
+  
+  // ⚡ ARCHITECTURE HYBRIDE MULTI-MODÈLES
+  // Chat: llama-3.3-70b-versatile (30 RPM, 1000 RPD) -> fallback llama-3.1-8b-instant (30 RPM, 14400 RPD)
+  // Moderation: llama-guard-3-8b (30 RPM, 14400 RPD) - Spécialisé sécurité
+  // Support: qwen-32b-instruct (30 RPM, 14400 RPD) - Expertise technique
+  private chatPrimaryModel = 'llama-3.3-70b-versatile';
+  private chatFallbackModel = 'llama-3.1-8b-instant';
+  private moderationModel = 'llama-guard-3-8b';
+  private supportModel = 'qwen-32b-instruct';
 
   constructor(apiKey: string) {
     if (!apiKey || apiKey === 'your_groq_api_key_here') {
       throw new Error('GROQ_API_KEY is not configured. Please set a valid API key in your .env file.');
     }
     this.apiKey = apiKey;
-    logger.info(`🚀 Groq client initialized with model: ${this.model} (30 RPM, 14400 RPD free), API key: ${apiKey.substring(0, 8)}...`);
+    logger.info(`🚀 Groq client initialized with hybrid architecture:`);
+    logger.info(`   - Chat: ${this.chatPrimaryModel} (fallback: ${this.chatFallbackModel})`);
+    logger.info(`   - Moderation: ${this.moderationModel}`);
+    logger.info(`   - Support: ${this.supportModel}`);
+  }
+
+  private selectModel(useCase?: string): string {
+    switch (useCase) {
+      case 'moderation':
+        return this.moderationModel;
+      case 'support':
+        return this.supportModel;
+      case 'chat':
+      default:
+        return this.chatPrimaryModel;
+    }
   }
 
   async generateText(prompt: string, options: GenerateOptions = {}): Promise<string> {
+    const selectedModel = this.selectModel(options.useCase);
+    
+    try {
+      return await this.executeRequest(selectedModel, prompt, options);
+    } catch (error: any) {
+      // Fallback uniquement pour le chat si erreur 429 (rate limit)
+      if (options.useCase === 'chat' && error.message && error.message.includes('429')) {
+        logger.warn(`⚠️ Rate limit atteint sur ${this.chatPrimaryModel}, fallback vers ${this.chatFallbackModel}`);
+        try {
+          return await this.executeRequest(this.chatFallbackModel, prompt, options);
+        } catch (fallbackError: any) {
+          logger.error('Fallback model also failed:', fallbackError);
+          throw fallbackError;
+        }
+      }
+      throw error;
+    }
+  }
+
+  private async executeRequest(model: string, prompt: string, options: GenerateOptions): Promise<string> {
     try {
       const url = `${this.baseUrl}/chat/completions`;
       
       logger.debug('Groq API request:', {
-        model: this.model,
-        url: url.replace(this.apiKey, 'REDACTED'),
+        model: model,
+        useCase: options.useCase || 'default',
         promptLength: prompt.length,
       });
 
@@ -60,7 +102,7 @@ export class GroqClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: this.model,
+          model: model,
           messages,
           max_tokens: options.maxTokens || 8192,
           temperature: options.temperature !== undefined ? options.temperature : 1.0,
@@ -74,7 +116,7 @@ export class GroqClient {
           status: response.status,
           statusText: response.statusText,
           error: errorData,
-          model: this.model,
+          model: model,
           apiKeyPrefix: this.apiKey.substring(0, 12),
         });
         
@@ -87,7 +129,7 @@ export class GroqClient {
           errorMessage = `❌ API Key invalide (401)\nℹ️ Créez une nouvelle clé sur https://console.groq.com/keys`;
         } else if (response.status === 429) {
           const details = errorData?.error?.message || 'Trop de requêtes';
-          errorMessage = `⏳ Limite de requêtes atteinte (429) - Groq: 30/min, 14400/jour\n${details}\nℹ️ Attendez 60 secondes ou vérifiez votre quota`;
+          errorMessage = `⏳ Limite de requêtes atteinte (429) - Modèle: ${model}\n${details}\nℹ️ Attendez 60 secondes ou vérifiez votre quota`;
         } else if (response.status === 500 || response.status === 503) {
           errorMessage = `⚠️ Erreur serveur Groq (${response.status})\nℹ️ Réessayez dans quelques instants`;
         } else {
@@ -101,6 +143,7 @@ export class GroqClient {
       const data = await response.json() as any;
       
       logger.debug('Groq API response:', {
+        model: model,
         hasChoices: !!data.choices,
         choicesCount: data.choices?.length || 0,
       });
@@ -113,7 +156,6 @@ export class GroqClient {
       return data.choices[0].message.content;
     } catch (error: any) {
       if (error.message && error.message.includes('❌')) {
-        logger.error('Groq API error:', error.message);
         throw error;
       }
       
@@ -124,12 +166,14 @@ export class GroqClient {
 
   async analyzeToxicity(text: string): Promise<number> {
     try {
+      // Utilise Llama Guard 3 8B spécialisé pour la modération
       const response = await this.generateText(
         `Analyze the following message for toxicity, harassment, hate speech, or inappropriate content. Respond ONLY with a number between 0.0 and 1.0, where 0.0 is completely safe and 1.0 is extremely toxic.\n\nMessage: "${text}"\n\nToxicity score:`,
         {
           maxTokens: 10,
           temperature: 0.1,
           systemPrompt: 'You are a toxicity analyzer. Respond ONLY with a decimal number between 0.0 and 1.0.',
+          useCase: 'moderation', // Utilise llama-guard-3-8b
         }
       );
 
