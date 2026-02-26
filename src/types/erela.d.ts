@@ -1,4 +1,4 @@
-declare module 'erela.js' {
+declare module 'erela.js-apple' {
   import { Client, User } from 'discord.js';
 
   export class Manager {
@@ -76,11 +76,5 @@ declare module 'erela.js' {
       name: string;
       duration: number;
     };
-  }
-}
-
-declare module 'erela.js-deezer' {
-  export default class Deezer {
-    constructor(options?: any);
   }
 }
