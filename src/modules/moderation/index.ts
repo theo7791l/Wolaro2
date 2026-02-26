@@ -45,6 +45,10 @@ export default class ModerationModule implements IModule {
     maxWarnings: 3,
   };
 
+  private client!: Client;
+  private database!: DatabaseManager;
+  private redis!: RedisManager;
+
   commands = [
     new BanCommand(),
     new KickCommand(),
@@ -65,11 +69,16 @@ export default class ModerationModule implements IModule {
     new ProtectionRoleDeleteHandler(),
   ];
 
+  // Constructeur avec paramètres optionnels pour permettre l'instanciation automatique
   constructor(
-    private client: Client,
-    private database: DatabaseManager,
-    private redis: RedisManager
-  ) {}
+    client?: Client,
+    database?: DatabaseManager,
+    redis?: RedisManager
+  ) {
+    if (client) this.client = client;
+    if (database) this.database = database;
+    if (redis) this.redis = redis;
+  }
 
   async initialize(): Promise<void> {
     // Initialiser le sous-module protection
