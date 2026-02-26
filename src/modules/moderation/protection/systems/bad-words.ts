@@ -1,5 +1,5 @@
 /**
- * Bad Words System - Version corrigée avec liste réelle
+ * Bad Words System - Version corrigée avec liste strictement limitée aux VRAIS gros mots
  */
 
 import { Message } from 'discord.js';
@@ -8,29 +8,29 @@ import { logger } from '../../../../utils/logger';
 import type { BadWordDetectionResult } from '../types';
 
 export class BadWordsSystem {
-  // Liste de mots interdits (français)
+  // UNIQUEMENT les insultes graves et vulgarités EXPLICITES
+  // Pas de mots communs qui pourraient être utilisés innocemment
   private badWords = [
-    // Insultes graves
-    'connard', 'connasse', 'salope', 'pute', 'putain',
-    'enculer', 'enculé', 'enfoiré', 'fdp', 'ntm',
-    'pd', 'tapette', 'tantouze', 'pédé',
+    // Insultes graves en français
+    'connard', 'connasse', 'salope', 'pute', 
+    'enculé', 'encule', 'enculer', 'enfoiré', 
+    'fdp', 'ntm', 'pd', 'tapette', 'pédé', 'pede',
     'batard', 'bâtard', 'fils de pute',
     
-    // Racisme et discrimination
+    // Racisme (strictement interdit)
     'négro', 'nègre', 'bamboula', 'bougnoule',
     'raton', 'youpin', 'feuj',
     
-    // Autres insultes
-    'con', 'conne', 'débile', 'crétin', 'idiot',
-    'abruti', 'imbécile', 'taré', 'attardé',
+    // Insultes communes mais graves
+    'abruti', 'imbécile', 'crétin', 'débile',
     
-    // Vulgarités sexuelles
-    'bite', 'couille', 'chatte', 'cul', 'foutre',
-    'branler', 'sucer', 'niquer', 'baiser',
+    // Vulgarités sexuelles explicites
+    'bite', 'couille', 'couilles', 'chatte', 'cul',
+    'branler', 'niquer', 'baiser',
     
-    // Variations anglaises communes
+    // Anglais (insultes graves uniquement)
     'fuck', 'shit', 'bitch', 'ass', 'dick',
-    'pussy', 'cock', 'nigga', 'nigger', 'fag',
+    'pussy', 'cock', 'nigga', 'nigger', 'fag', 'faggot',
   ];
 
   constructor(private db: ProtectionDatabase) {}
@@ -53,7 +53,7 @@ export class BadWordsSystem {
     
     // Découper le message en mots (séparer par espaces, ponctuation, etc.)
     const words = content
-      .split(/[\s,.!?;:()\[\]{}"'`]+/)
+      .split(/[\s,.!?;:()\[\]{}"'`\-_=+*\/\\|<>~]+/)
       .filter(w => w.length > 0);
     
     // Chercher les mots interdits (match exact uniquement)
@@ -63,21 +63,24 @@ export class BadWordsSystem {
       // Normaliser les caractères spéciaux courants (leet speak basique)
       const normalized = word
         .replace(/[0@]/g, 'o')
-        .replace(/[1!i]/g, 'i')
+        .replace(/[1!i\|]/g, 'i')
         .replace(/[3]/g, 'e')
         .replace(/[4]/g, 'a')
-        .replace(/[5]/g, 's')
-        .replace(/[7]/g, 't');
+        .replace(/[5\$]/g, 's')
+        .replace(/[7]/g, 't')
+        .replace(/[8]/g, 'b');
       
       // Vérifier si le mot normalisé correspond à un mot interdit
-      if (this.badWords.some(badWord => {
+      for (const badWord of this.badWords) {
         const normalizedBadWord = badWord.toLowerCase();
-        return normalized === normalizedBadWord || 
-               word === normalizedBadWord ||
-               // Permettre les variations avec accents
-               this.removeDiacritics(normalized) === this.removeDiacritics(normalizedBadWord);
-      })) {
-        detectedWords.push(word);
+        
+        // Match exact ou avec accents retirés
+        if (normalized === normalizedBadWord || 
+            word === normalizedBadWord ||
+            this.removeDiacritics(normalized) === this.removeDiacritics(normalizedBadWord)) {
+          detectedWords.push(word);
+          break;
+        }
       }
     }
 
@@ -101,9 +104,11 @@ export class BadWordsSystem {
 
   async handle(message: Message): Promise<void> {
     try {
+      // Supprimer le message
       await message.delete();
       await this.db.incrementStat(message.guild!.id, 'badwords_filtered');
 
+      // Envoyer un avertissement temporaire
       if (message.channel.isSendable()) {
         const reply = await message.channel.send({
           content: `⚠️ **${message.author}** Langage inapproprié détecté. Merci de respecter les règles du serveur.`,
