@@ -4,7 +4,7 @@ interface GenerateOptions {
   maxTokens?: number;
   temperature?: number;
   systemPrompt?: string;
-  useCase?: 'chat' | 'moderation' | 'support'; // Nouveau paramètre pour choisir le modèle
+  useCase?: 'chat' | 'moderation' | 'support' | 'dev'; // Ajout 'dev'
 }
 
 interface GroqErrorResponse {
@@ -23,10 +23,12 @@ export class GroqClient {
   // Chat: llama-3.3-70b-versatile (30 RPM, 1000 RPD) -> fallback llama-3.1-8b-instant (30 RPM, 14400 RPD)
   // Moderation: llama-guard-3-8b (30 RPM, 14400 RPD) - Spécialisé sécurité
   // Support: qwen-32b-instruct (30 RPM, 14400 RPD) - Expertise technique
+  // Dev: openai/gpt-oss-120b (30 RPM, 1000 RPD) - Code & raisonnement avancé
   private chatPrimaryModel = 'llama-3.3-70b-versatile';
   private chatFallbackModel = 'llama-3.1-8b-instant';
   private moderationModel = 'llama-guard-3-8b';
   private supportModel = 'qwen-32b-instruct';
+  private devModel = 'openai/gpt-oss-120b';
 
   constructor(apiKey: string) {
     if (!apiKey || apiKey === 'your_groq_api_key_here') {
@@ -37,6 +39,7 @@ export class GroqClient {
     logger.info(`   - Chat: ${this.chatPrimaryModel} (fallback: ${this.chatFallbackModel})`);
     logger.info(`   - Moderation: ${this.moderationModel}`);
     logger.info(`   - Support: ${this.supportModel}`);
+    logger.info(`   - Dev: ${this.devModel}`);
   }
 
   private selectModel(useCase?: string): string {
@@ -45,6 +48,8 @@ export class GroqClient {
         return this.moderationModel;
       case 'support':
         return this.supportModel;
+      case 'dev':
+        return this.devModel;
       case 'chat':
       default:
         return this.chatPrimaryModel;
