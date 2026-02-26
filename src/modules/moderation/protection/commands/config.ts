@@ -101,12 +101,13 @@ export class ProtectionConfigCommand implements ICommand {
     try {
       if (subcommand === 'view') {
         // Récupérer la config depuis la base de données
+        // context.database.query retourne directement un tableau (rows)
         const result = await context.database.query(
           'SELECT * FROM protection_config WHERE guild_id = $1',
           [interaction.guild.id]
         );
 
-        const config = result.rows[0] || {
+        const config = result[0] || {
           antispam_enabled: true,
           antispam_level: 'medium',
           badwords_enabled: true,
@@ -180,7 +181,6 @@ export class ProtectionConfigCommand implements ICommand {
         await interaction.reply({ embeds: [embed], ephemeral: true });
       } else {
         // Mise à jour de la configuration
-        const updates: any = {};
         const updateFields: string[] = [];
         const updateValues: any[] = [];
         let paramIndex = 2; // Start at 2 because guild_id is $1
