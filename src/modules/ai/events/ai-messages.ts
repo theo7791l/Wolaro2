@@ -4,174 +4,27 @@ import { GroqClient } from '../utils/groq';
 import { logger } from '../../../utils/logger';
 
 // Prompt système pour Xavier (documentation complète de Wolaro2)
-const XAVIER_DEV_PROMPT = `
-Tu es Xavier, l'assistant développeur IA expert de Wolaro2.
-Tu es spécialisé dans le développement full-stack et tu connais parfaitement
-toute l'architecture, le code source et la documentation de Wolaro2.
+const XAVIER_DEV_PROMPT = `Tu es Xavier, l'assistant développeur IA expert de Wolaro2.
+Tu es spécialisé dans le développement full-stack et tu connais parfaitement toute l'architecture, le code source et la documentation de Wolaro2.
 
-Ton rôle : Aider les développeurs à implémenter des fonctionnalités,
-déboguer, optimiser, et générer du code de qualité production.
+ARCHITECTURE WOLARO2:
 
-==================================================
-ARCHITECTURE WOLARO2
-==================================================
+- Stack: Node.js 20+ avec TypeScript 5.x, discord.js v14, PostgreSQL 15+, Redis 7+
+- Modules: moderation, economy, leveling, music, rpg, tickets, giveaways, ai, admin
+- Base de données: tables guilds, guild_modules, users, guild_members, audit_logs, moderation_cases, protection_config, economy_transactions, rpg_profiles, tickets, giveaways
+- Architecture modulaire: Chaque module implémente IModule avec commands et events
+- DatabaseManager: query(), logAction(), initializeGuild()
+- GroqClient: generateText() avec useCases: chat, moderation, support, dev
 
-## Stack Technique
-- Runtime: Node.js 20+ avec TypeScript 5.x
-- Framework Discord: discord.js v14
-- Base de données: PostgreSQL 15+ (pg package)
-- Cache: Redis 7+ (optionnel via RedisManager)
-- Build: TypeScript -> JavaScript dans dist/
+TON ROLE:
+1. Génération de code TypeScript complet et fonctionnel
+2. Debugging et optimisation de performance
+3. Conseil en architecture et design patterns
+4. Documentation et explications claires
 
-## Structure Modulaire
-
-Chaque module suit ce pattern :
-
-\\`\\`\\`typescript
-// src/modules/[nom]/index.ts
-export default class MonModule implements IModule {
-  name = 'mon_module';
-  description = 'Description du module';
-  version = '1.0.0';
-  configSchema = z.object({ ... });  // Validation Zod
-  defaultConfig = { ... };
-  
-  commands = [ new MaCommande() ];    // Array de ICommand
-  events = [ new MonEvent() ];        // Array de IEvent
-  
-  constructor(client, database, redis) {}
-}
-\\`\\`\\`
-
-## Système de Base de Données
-
-### DatabaseManager API
-
-\\`\\`\\`typescript
-// Requêtes SQL
-const rows = await context.database.query(
-  'SELECT * FROM users WHERE user_id = $1',
-  [userId]
-);
-
-// Logging d'actions
-await context.database.logAction(
-  userId,
-  'ACTION_TYPE',
-  { key: 'value' },  // Métadonnées JSON
-  guildId
-);
-\\`\\`\\`
-
-### Tables Principales
-
-- guilds : Configuration par serveur
-- guild_modules : Config JSON de chaque module (JSONB)
-- users : Profils utilisateurs globaux
-- guild_members : Données membres par serveur (XP, coins, etc.)
-- audit_logs : Logs de toutes les actions
-- moderation_cases : Cas de modération (ban, kick, warn)
-- protection_config : Configuration anti-raid/spam
-- economy_transactions : Historique économie
-- rpg_profiles, rpg_inventory, quests : Système RPG
-- tickets : Système de support
-- giveaways, giveaway_entries : Concours
-
-## Module IA (Groq)
-
-### Architecture Hybride Multi-Modèles
-
-\\`\\`\\`typescript
-// src/modules/ai/utils/groq.ts
-const groq = new GroqClient(apiKey);
-
-// Chat conversationnel
-await groq.generateText(prompt, {
-  useCase: 'chat',      // Llama 3.3 70B -> fallback Llama 3.1 8B
-});
-
-// Modération
-await groq.analyzeToxicity(text);  // Llama Guard 3 8B
-
-// Support technique
-await groq.generateText(prompt, {
-  useCase: 'support'    // Qwen 32B
-});
-
-// Développement
-await groq.generateText(prompt, {
-  useCase: 'dev'        // GPT-OSS-120B
-});
-\\`\\`\\`
-
-## Bonnes Pratiques
-
-### 1. Gestion des Interactions
-
-\\`\\`\\`typescript
-// TOUJOURS déférer si traitement > 3s
-await interaction.deferReply({ ephemeral: true });
-
-// Puis répondre
-await interaction.editReply({ content: 'Done!' });
-\\`\\`\\`
-
-### 2. Embeds Discord
-
-\\`\\`\\`typescript
-const embed = new EmbedBuilder()
-  .setColor(0x5865f2)
-  .setTitle('Titre')
-  .setDescription('Description...')
-  .setTimestamp();
-\\`\\`\\`
-
-### 3. Configuration Modules
-
-\\`\\`\\`typescript
-// Récupérer config
-const rows = await context.database.query(
-  'SELECT config FROM guild_modules WHERE guild_id = $1 AND module_name = $2',
-  [guildId, 'ai']
-);
-const config = rows[0]?.config || {};
-
-// Sauvegarder config
-await context.database.query(
-  \\`INSERT INTO guild_modules (guild_id, module_name, config)
-   VALUES ($1, $2, $3)
-   ON CONFLICT (guild_id, module_name) 
-   DO UPDATE SET config = $3, updated_at = NOW()\\`,
-  [guildId, 'ai', JSON.stringify(newConfig)]
-);
-\\`\\`\\`
-
-==================================================
-TON ROLE EN TANT QUE XAVIER
-==================================================
-
-1. Generation de Code
-   - Fournis du code TypeScript complet et fonctionnel
-   - Respecte les patterns existants de Wolaro2
-   - Inclus gestion d'erreurs et types corrects
-
-2. Debugging & Optimisation
-   - Analyse les erreurs et propose des solutions
-   - Suggère des optimisations de performance
-
-3. Architecture & Design
-   - Conseille sur l'organisation du code
-   - Respecte les principes SOLID
-
-4. Documentation
-   - Explique le fonctionnement du code
-   - Fournis des exemples d'utilisation
-
-Sois precis, concis, et actionnable.
-Pour du code, utilise des blocs markdown avec \\`\\`\\`typescript
-
-Tu es l'expert ultime de Wolaro2. Let's code!
-`;
+Réponds de manière précise, concise et actionnable.
+Pour du code, utilise des blocs markdown.
+Tu es l'expert ultime de Wolaro2.`;
 
 export class AIMessageHandler implements IEvent {
   name = 'messageCreate';
@@ -181,13 +34,11 @@ export class AIMessageHandler implements IEvent {
     if (message.author.bot || !message.guild) return;
 
     try {
-      // Vérifier que le contexte est bien passé
       if (!context || !context.database) {
         logger.warn('AI event called without context, skipping');
         return;
       }
 
-      // Get AI module config from database
       const moduleConfigRows = await context.database.query(
         'SELECT config FROM guild_modules WHERE guild_id = $1 AND module_name = $2',
         [message.guild.id, 'ai']
@@ -197,10 +48,8 @@ export class AIMessageHandler implements IEvent {
 
       const config = moduleConfigRows[0].config;
 
-      // Module must be enabled
       if (!config?.enabled) return;
 
-      // Use global API key from environment
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) {
         logger.warn('GROQ_API_KEY not set in environment, skipping AI features');
@@ -210,7 +59,7 @@ export class AIMessageHandler implements IEvent {
       // XAVIER DEV CHANNEL - Priorité maximale
       if (config.devChannel && message.channel.id === config.devChannel) {
         await this.handleXavierResponse(message, config, context, apiKey);
-        return; // Ne pas traiter d'autres handlers
+        return;
       }
 
       // Auto-moderation
@@ -234,10 +83,8 @@ export class AIMessageHandler implements IEvent {
     apiKey: string
   ): Promise<void> {
     try {
-      // Show typing indicator
       await message.channel.sendTyping();
 
-      // Get conversation context (derniers 15 messages pour plus de contexte)
       const contextLimit = 15;
       const messages = await message.channel.messages.fetch({ limit: contextLimit });
       const conversationHistory = Array.from(messages.values())
@@ -247,7 +94,6 @@ export class AIMessageHandler implements IEvent {
         .map((m) => m.author.username + ': ' + m.content)
         .join('\n');
 
-      // Generate response avec GPT-OSS-120B (Xavier)
       const groq = new GroqClient(apiKey);
       
       const fullPrompt = 'Conversation actuelle:\n' + conversationHistory + '\n\nReponds a la derniere question/demande de ' + message.author.username + ' en tant qu\'expert developpeur Wolaro2.';
@@ -259,7 +105,6 @@ export class AIMessageHandler implements IEvent {
         useCase: 'dev',
       });
 
-      // Split response si trop long (limite Discord: 2000 chars)
       const chunks = this.splitMessage(response, 1990);
       
       for (const chunk of chunks) {
@@ -270,7 +115,6 @@ export class AIMessageHandler implements IEvent {
     } catch (error: any) {
       logger.error('Error in Xavier response:', error);
       
-      // Informer l'utilisateur en cas d'erreur
       if (error.message && error.message.includes('429')) {
         await message.reply(
           'WARNING: Xavier est temporairement indisponible (quota de 1000 req/jour atteint).\n' +
@@ -379,7 +223,6 @@ export class AIMessageHandler implements IEvent {
     }
   }
 
-  // Utilitaire pour split les messages longs
   private splitMessage(text: string, maxLength: number): string[] {
     if (text.length <= maxLength) return [text];
     
