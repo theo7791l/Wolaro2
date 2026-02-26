@@ -1,9 +1,10 @@
 /**
- * Protection Module - Fixed imports and initialization
+ * Protection Module - Système de protection avancé
+ * Intégré au module moderation avec tous les systèmes actifs
  */
 
 import { Client } from 'discord.js';
-import { Pool } from 'pg';
+import { DatabaseManager } from '../../../database/manager';
 import { logger } from '../../../utils/logger';
 import { AntiSpamSystem } from './systems/anti-spam';
 import { BadWordsSystem } from './systems/bad-words';
@@ -15,31 +16,26 @@ import { SmartLockdownSystem } from './systems/smart-lockdown';
 import { CaptchaSystem } from './systems/captcha';
 import { ProtectionDatabase } from './database';
 
-// Fix: Définition locale de l'interface au lieu d'import
-interface WolaroModule {
-  name: string;
-  initialize: (client: Client) => Promise<void>;
-  shutdown?: () => Promise<void>;
-}
-
-class ProtectionModule implements WolaroModule {
+export class ProtectionModule {
   name = 'protection';
   private db!: ProtectionDatabase;
-  antiSpam!: AntiSpamSystem;
-  badWords!: BadWordsSystem;
-  antiRaid!: AntiRaidSystem;
-  antiPhishing!: AntiPhishingSystem;
-  antiNuke!: AntiNukeSystem;
-  nsfwDetection!: NSFWDetectionSystem;
-  lockdown!: SmartLockdownSystem;
-  captcha!: CaptchaSystem;
+  
+  // Systèmes exposés publiquement pour accès depuis les commandes/events
+  public antiSpam!: AntiSpamSystem;
+  public badWords!: BadWordsSystem;
+  public antiRaid!: AntiRaidSystem;
+  public antiPhishing!: AntiPhishingSystem;
+  public antiNuke!: AntiNukeSystem;
+  public nsfwDetection!: NSFWDetectionSystem;
+  public lockdown!: SmartLockdownSystem;
+  public captcha!: CaptchaSystem;
 
-  async initialize(client: Client): Promise<void> {
+  async initialize(client: Client, database: DatabaseManager): Promise<void> {
     try {
-      const pool = (client as any).dbPool as Pool;
-      this.db = new ProtectionDatabase(pool);
+      // Utiliser le nouveau DatabaseManager au lieu de l'ancien Pool
+      this.db = new ProtectionDatabase(database.getPool());
 
-      // Initialize systems
+      // Initialize systems dans le bon ordre (captcha avant antiRaid)
       this.badWords = new BadWordsSystem(this.db);
       this.antiSpam = new AntiSpamSystem(this.db);
       this.captcha = new CaptchaSystem(this.db);
@@ -57,6 +53,7 @@ class ProtectionModule implements WolaroModule {
       logger.info(`  → Anti-Nuke: ✅ Active`);
       logger.info(`  → NSFW Detection: ${this.nsfwDetection.isEnabled() ? '✅ Active' : '⚠️  Disabled (API not configured)'}`);
       logger.info(`  → Smart Lockdown: ✅ Active`);
+      logger.info(`  → Captcha System: ✅ Active`);
     } catch (error) {
       logger.error('Failed to initialize protection module:', error);
       throw error;
