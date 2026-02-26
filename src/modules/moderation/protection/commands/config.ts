@@ -9,11 +9,12 @@ import {
   PermissionFlagsBits,
   EmbedBuilder
 } from 'discord.js';
+import { Command, CommandContext } from '../../../../types';
 import protectionModule from '../index';
 import { logger } from '../../../../utils/logger';
 
-export default {
-  data: new SlashCommandBuilder()
+export class ProtectionConfigCommand implements Command {
+  data = new SlashCommandBuilder()
     .setName('protection-config')
     .setDescription('Configure les systèmes de protection')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
@@ -86,9 +87,9 @@ export default {
         .setDescription('Configurer le système de lockdown')
         .addBooleanOption(opt => opt.setName('enabled').setDescription('Activer/désactiver'))
         .addBooleanOption(opt => opt.setName('auto_trigger').setDescription('Déclenchement auto'))
-    ),
+    );
 
-  async execute(interaction: ChatInputCommandInteraction) {
+  async execute(interaction: ChatInputCommandInteraction, context: CommandContext): Promise<void> {
     if (!interaction.guild) return;
 
     const subcommand = interaction.options.getSubcommand();
@@ -230,4 +231,4 @@ export default {
       });
     }
   }
-};
+}
