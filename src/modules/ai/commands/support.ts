@@ -4,8 +4,8 @@ import { GroqClient } from '../utils/groq';
 
 // ============================================================
 // Système de prompt : connaissance complète de Wolaro
-// Groq (Llama 3.3) répond UNIQUEMENT sur le bot, en français,
-// de façon précise et concise.
+// Qwen 32B (spécialisé expertise technique) répond UNIQUEMENT
+// sur le bot, en français, de façon précise et concise.
 // ============================================================
 const WOLARO_SYSTEM_PROMPT = `
 Tu es WolaroAssist, l'assistant support officiel du bot Discord Wolaro.
@@ -13,9 +13,9 @@ Tu ne réponds QU'aux questions sur Wolaro et ses fonctionnalités.
 Sois précis, concis, et toujours en français. Utilise des emojis pour rendre
 ta réponse plus lisible. Si une question est hors-sujet, décline poliment.
 
-══════════════════════════════════════
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 📦 MODULES ET COMMANDES DE WOLARO
-══════════════════════════════════════
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 
 1️⃣  MODÉRATION (8 commandes)
 • /ban [user] [raison]             → Bannir un membre
@@ -69,12 +69,16 @@ Fonctionnalités : XP auto sur messages, rôles-récompenses, cartes de profil
   /config tickets    → catégorie, rôle support, auto-close
   /config giveaways  → rôle ping, âge min compte/serveur
 
-6️⃣  IA GROQ (5 commandes) - Llama 3.3 70B
-• /ask [question]                  → Poser une question libre à Groq
-• /aichat                          → Chat conversationnel (contexte 10 msgs)
-• /automod                         → Configurer l'auto-modération IA
-• /support [question]              → Aide sur Wolaro (cette commande !)
-⚡ Groq: 30 req/min, 14,400 req/jour GRATUIT
+6️⃣  IA GROQ - ARCHITECTURE HYBRIDE (4 commandes)
+• /ask [question]                  → Poser une question libre (Llama 3.1 8B)
+• /aichat                          → Chat conversationnel (Llama 3.3 70B + fallback 8B)
+• /automod                         → Auto-modération IA (Llama Guard 3 8B)
+• /support [question]              → Aide sur Wolaro (Qwen 32B - cette commande !)
+⚡ Groq gratuit: 30 req/min par modèle
+  - Llama 3.3 70B : 1,000 req/jour (chat premium)
+  - Llama 3.1 8B  : 14,400 req/jour (chat fallback)
+  - Llama Guard 3 : 14,400 req/jour (modération)
+  - Qwen 32B      : 14,400 req/jour (support technique)
 
 7️⃣  RPG (6 commandes)
 • /rpgprofile                      → Voir son profil RPG
@@ -101,9 +105,9 @@ Fonctionnalités : claim staff, auto-close 24h, max 3 tickets/utilisateur
 • /glist                           → Voir les giveaways actifs
 Fonctionnalités : vérif âge compte/serveur, bouton interactif, embed dynamique
 
-══════════════════════════════════════
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 🚀 INSTALLATION
-══════════════════════════════════════
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 Prérequis : Node.js 20+, PostgreSQL 15+, Redis 7+, Discord Bot Token
 Option IA  : GROQ_API_KEY (gratuit sur https://console.groq.com/keys)
 
@@ -117,17 +121,17 @@ Manuel :
   psql -U wolaro -d wolaro -f src/database/schema.sql
   npm run build && npm start
 
-══════════════════════════════════════
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 ⚙️ VARIABLES D'ENVIRONNEMENT REQUISES
-══════════════════════════════════════
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET,
 DISCORD_PUBLIC_KEY, DB_PASSWORD, API_JWT_SECRET, ENCRYPTION_KEY
 
 Optionnel : GROQ_API_KEY (module IA)
 
-══════════════════════════════════════
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 🛡️ SÉCURITÉ
-══════════════════════════════════════
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 • Chiffrement AES-256 pour les données sensibles
 • Triple rate limiting (IP / User / Guild)
 • Anti-raid automatique avec logs
@@ -141,7 +145,7 @@ Ne réponds jamais à des questions non liées à Wolaro.
 export class SupportCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('support')
-    .setDescription('🤖 Obtenir de l\'aide sur Wolaro grâce à l\'IA')
+    .setDescription('🤖 Obtenir de l\'aide sur Wolaro grâce à l\'IA (Qwen 32B)')
     .addStringOption((option) =>
       option
         .setName('question')
@@ -180,9 +184,11 @@ export class SupportCommand implements ICommand {
       const fullPrompt = `${WOLARO_SYSTEM_PROMPT}\n\n---\n\nQuestion de l'utilisateur : ${question}`;
 
       const groq = new GroqClient(apiKey);
+      // Utilise Qwen 32B spécialisé pour le support technique
       const response = await groq.generateText(fullPrompt, {
         maxTokens: 1500,
         temperature: 0.35, // Réponses précises et cohérentes
+        useCase: 'support', // Utilise qwen-32b-instruct
       });
 
       // Tronquer si la réponse dépasse la limite Discord (4096 chars pour embed description)
@@ -197,7 +203,7 @@ export class SupportCommand implements ICommand {
       const embed = new EmbedBuilder()
         .setColor(0x5865f2) // Bleu Discord brand
         .setAuthor({
-          name: 'WolaroAssist — Support IA (Groq Llama 3.3)',
+          name: 'WolaroAssist — Support IA (Qwen 32B)',
           iconURL: interaction.client.user?.displayAvatarURL(),
         })
         .setDescription(description)
