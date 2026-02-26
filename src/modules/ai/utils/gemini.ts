@@ -17,14 +17,16 @@ interface GeminiErrorResponse {
 export class GeminiClient {
   private apiKey: string;
   private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-  private model = 'gemini-2.5-flash'; // Version stable juin 2025 - Meilleure performance et 65K tokens output
+  // ⚡ OPTIMISATION: Flash-Lite = 15 RPM + 1000 RPD gratuit (vs Flash = 10 RPM + 250 RPD)
+  // Parfait pour chatbot Discord avec beaucoup d'utilisateurs
+  private model = 'gemini-2.5-flash-lite'; // 15 req/min, 1000 req/jour GRATUIT !
 
   constructor(apiKey: string) {
     if (!apiKey || apiKey === 'your_gemini_api_key_here') {
       throw new Error('GEMINI_API_KEY is not configured. Please set a valid API key in your .env file.');
     }
     this.apiKey = apiKey;
-    logger.info(`Gemini client initialized with model: ${this.model}, API key: ${apiKey.substring(0, 8)}...`);
+    logger.info(`🚀 Gemini client initialized with model: ${this.model} (15 RPM, 1000 RPD free), API key: ${apiKey.substring(0, 8)}...`);
   }
 
   async generateText(prompt: string, options: GenerateOptions = {}): Promise<string> {
@@ -55,7 +57,7 @@ export class GeminiClient {
             },
           ],
           generationConfig: {
-            maxOutputTokens: options.maxTokens || 8192, // gemini-2.5-flash supporte jusqu'à 65K
+            maxOutputTokens: options.maxTokens || 8192, // Flash-Lite supporte jusqu'à 65K tokens output
             temperature: options.temperature !== undefined ? options.temperature : 1.0,
           },
         }),
@@ -88,7 +90,7 @@ export class GeminiClient {
           errorMessage = `❌ Modèle "${this.model}" non trouvé (404): ${details}\nℹ️ Votre clé API est invalide ou expirée. Créez-en une nouvelle sur https://aistudio.google.com/apikey`;
         } else if (response.status === 429) {
           const details = errorData?.error?.message || 'Trop de requêtes';
-          errorMessage = `⏳ Limite de requêtes atteinte (429)\n${details}\nℹ️ Attendez 60 secondes ou vérifiez votre quota sur https://aistudio.google.com/apikey`;
+          errorMessage = `⏳ Limite de requêtes atteinte (429) - Flash-Lite: 15/min, 1000/jour\n${details}\nℹ️ Attendez 60 secondes ou vérifiez votre quota sur https://aistudio.google.com/apikey`;
         } else if (response.status === 500 || response.status === 503) {
           errorMessage = `⚠️ Erreur serveur Gemini (${response.status})\nℹ️ Réessayez dans quelques instants`;
         } else {
@@ -138,7 +140,7 @@ export class GeminiClient {
       const imageBuffer = await imageResponse.arrayBuffer();
       const base64Image = Buffer.from(imageBuffer).toString('base64');
 
-      // Utiliser le même modèle pour la vision (gemini-2.5-flash supporte les images)
+      // Utiliser le même modèle pour la vision (Flash-Lite supporte les images)
       const url = `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`;
 
       const response = await fetch(url, {
