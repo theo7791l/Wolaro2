@@ -15,6 +15,17 @@ import play from 'play-dl';
 import { logger } from '../../../utils/logger';
 import { NewPipeAudioInfo, newpipe } from './newpipe';
 
+// Configurer FFmpeg avec ffmpeg-static
+try {
+  const ffmpegStatic = require('ffmpeg-static');
+  if (ffmpegStatic) {
+    play.setFFmpegPath(ffmpegStatic);
+    logger.info(`🎵 FFmpeg configured from ffmpeg-static: ${ffmpegStatic}`);
+  }
+} catch (error) {
+  logger.warn('⚠️ ffmpeg-static not found, using system FFmpeg');
+}
+
 export interface QueueItem {
   info: NewPipeAudioInfo;
   requestedBy: string;
@@ -73,30 +84,26 @@ export class MusicPlayer {
         channelId: channel.id,
         guildId: channel.guild.id,
         adapterCreator: channel.guild.voiceAdapterCreator as any,
-        selfDeaf: true, // Se mettre sourd pour éviter de recevoir l'audio des autres
-        selfMute: false, // Ne pas se mute pour pouvoir parler (jouer de la musique)
+        selfDeaf: true,
+        selfMute: false,
       });
 
       // Gérer la reconnexion automatique
       this.connection.on('stateChange', async (oldState, newState) => {
         logger.debug(`Voice connection state: ${oldState.status} -> ${newState.status}`);
 
-        // Gestion de la reconnexion si Disconnected
         if (newState.status === VoiceConnectionStatus.Disconnected) {
           try {
             await Promise.race([
               entersState(this.connection!, VoiceConnectionStatus.Signalling, 5000),
               entersState(this.connection!, VoiceConnectionStatus.Connecting, 5000),
             ]);
-            // Semble pouvoir se reconnecter, attendre qu'il se reconnecte
           } catch {
-            // Impossible de se reconnecter, détruire la connexion
             logger.warn('Failed to reconnect, destroying connection');
             this.connection?.destroy();
             this.connection = null;
           }
         } else if (newState.status === VoiceConnectionStatus.Destroyed) {
-          // Connexion détruite, nettoyer
           logger.warn('Connection destroyed');
           this.stop();
           this.connection = null;
@@ -105,7 +112,6 @@ export class MusicPlayer {
           (newState.status === VoiceConnectionStatus.Connecting ||
             newState.status === VoiceConnectionStatus.Signalling)
         ) {
-          // En train de se connecter, verrouiller et attendre Ready
           this.readyLock = true;
           try {
             await entersState(this.connection!, VoiceConnectionStatus.Ready, 20000);
@@ -124,31 +130,29 @@ export class MusicPlayer {
         logger.error('Voice connection error:', error);
       });
 
-      // Attendre l'état Ready avec timeout réduit à 15 secondes
+      // Timeout réduit à 8 secondes (Discord kick après ~10-15s)
       try {
-        await entersState(this.connection, VoiceConnectionStatus.Ready, 15000);
+        await entersState(this.connection, VoiceConnectionStatus.Ready, 8000);
         logger.info(`✅ Successfully joined voice channel: ${channel.name}`);
       } catch (error) {
-        logger.error('Failed to enter Ready state after 15s:', error);
+        logger.error('Failed to enter Ready state after 8s');
         
-        // Donner 5 secondes supplémentaires si toujours en train de se connecter
         const currentStatus = this.connection?.state.status;
         if (
           this.connection &&
           (currentStatus === VoiceConnectionStatus.Connecting ||
            currentStatus === VoiceConnectionStatus.Signalling)
         ) {
-          logger.warn('Still connecting, waiting 5 more seconds...');
+          logger.warn('Still connecting, waiting 2 more seconds...');
           
           try {
-            await entersState(this.connection, VoiceConnectionStatus.Ready, 5000);
-            logger.info(`✅ Successfully joined voice channel after extra wait: ${channel.name}`);
+            await entersState(this.connection, VoiceConnectionStatus.Ready, 2000);
+            logger.info(`✅ Successfully joined after extra wait`);
           } catch {
-            // Échec définitif après 20s total
-            throw new Error('Timeout lors de la connexion au salon vocal (20s)');
+            throw new Error('Timeout connexion vocal (10s) - Vérifiez que le bot a les permissions');
           }
         } else {
-          throw new Error('Timeout lors de la connexion au salon vocal (15s)');
+          throw new Error('Impossible de se connecter au salon vocal');
         }
       }
 
@@ -159,12 +163,11 @@ export class MusicPlayer {
     } catch (error: any) {
       logger.error('Failed to join voice channel:', error);
       
-      // Nettoyer la connexion en cas d'erreur
       if (this.connection) {
         try {
           this.connection.destroy();
         } catch (e) {
-          // Ignorer les erreurs de destruction
+          // Ignorer
         }
         this.connection = null;
       }
@@ -173,12 +176,8 @@ export class MusicPlayer {
     }
   }
 
-  /**
-   * Ajouter une piste à la queue
-   */
   async addToQueue(videoUrl: string, requestedBy: string): Promise<QueueItem> {
     try {
-      // Extraire les infos audio
       const audioInfo = await newpipe.getAudioUrl(videoUrl);
 
       const item: QueueItem = {
@@ -189,7 +188,6 @@ export class MusicPlayer {
       this.queue.push(item);
       logger.info(`Added to queue: ${audioInfo.title}`);
 
-      // Si rien n'est en lecture, commencer
       if (!this.isPlaying && !this.currentTrack) {
         await this.playNext();
       }
@@ -201,9 +199,6 @@ export class MusicPlayer {
     }
   }
 
-  /**
-   * Jouer la prochaine piste
-   */
   private async playNext() {
     if (this.queue.length === 0) {
       this.currentTrack = null;
@@ -218,18 +213,15 @@ export class MusicPlayer {
     try {
       logger.info(`Playing next track: ${item.info.title}`);
       
-      // Obtenir le stream audio depuis YouTube via play-dl
       const stream = await play.stream(item.info.url, {
-        quality: 2, // Haute qualité audio
+        quality: 2,
       });
 
-      // Créer une ressource audio depuis le stream
       const resource = createAudioResource(stream.stream, {
         inputType: stream.type,
         inlineVolume: true,
       });
 
-      // Appliquer le volume actuel
       resource.volume?.setVolume(this.volume);
       this.currentResource = resource;
 
@@ -237,7 +229,6 @@ export class MusicPlayer {
     } catch (error: any) {
       logger.error('Failed to play track:', error);
       
-      // Essayer la suivante si disponible
       if (this.queue.length > 0) {
         logger.info('Trying next track in queue...');
         await this.playNext();
@@ -248,16 +239,10 @@ export class MusicPlayer {
     }
   }
 
-  /**
-   * Passer à la piste suivante
-   */
   skip() {
     this.player.stop();
   }
 
-  /**
-   * Arrêter la lecture et vider la queue
-   */
   stop() {
     this.player.stop();
     this.queue = [];
@@ -265,9 +250,6 @@ export class MusicPlayer {
     this.currentResource = null;
   }
 
-  /**
-   * Quitter le salon vocal
-   */
   disconnect() {
     this.stop();
     if (this.connection) {
@@ -276,52 +258,33 @@ export class MusicPlayer {
     }
   }
 
-  /**
-   * Changer le volume (0.0 à 1.0)
-   * S'applique immédiatement à la piste actuelle ET aux prochaines
-   */
   setVolume(volume: number) {
-    // Limiter le volume entre 0.0 et 1.0
     this.volume = Math.max(0.0, Math.min(1.0, volume));
     logger.info(`Volume set to: ${this.volume * 100}%`);
 
-    // Appliquer le volume à la ressource actuelle si elle existe
     if (this.currentResource && this.currentResource.volume) {
       this.currentResource.volume.setVolume(this.volume);
       logger.info('Volume applied to current track');
     }
   }
 
-  /**
-   * Obtenir le volume actuel (0.0 à 1.0)
-   */
   getVolume(): number {
     return this.volume;
   }
 
-  /**
-   * Obtenir la piste actuelle
-   */
   getCurrentTrack(): QueueItem | null {
     return this.currentTrack;
   }
 
-  /**
-   * Obtenir la queue
-   */
   getQueue(): QueueItem[] {
     return this.queue;
   }
 
-  /**
-   * Vérifier si le player est connecté
-   */
   isConnected(): boolean {
     return this.connection !== null && this.connection.state.status !== VoiceConnectionStatus.Destroyed;
   }
 }
 
-// Gestionnaire de players par guild
 const players = new Map<string, MusicPlayer>();
 
 export function getPlayer(guildId: string): MusicPlayer {
