@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, GuildMember } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
-import { MusicQueue } from '../utils/queue';
+import { getPlayer } from '../utils/player';
+import { logger } from '../../../utils/logger';
 
 export class VolumeCommand implements ICommand {
   data = new SlashCommandBuilder()
@@ -25,25 +26,47 @@ export class VolumeCommand implements ICommand {
 
     if (!voiceChannel) {
       await interaction.reply({
-        content: '\u274c Vous devez \u00eatre dans un salon vocal.',
+        content: '❌ Vous devez être dans un salon vocal.',
         ephemeral: true,
       });
       return;
     }
 
-    const queue = MusicQueue.get(interaction.guildId!);
+    try {
+      const player = getPlayer(interaction.guildId!);
 
-    if (!queue || !queue.isPlaying()) {
+      if (!player.isConnected()) {
+        await interaction.reply({
+          content: '❌ Aucune musique en cours de lecture.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const current = player.getCurrentTrack();
+      if (!current) {
+        await interaction.reply({
+          content: '❌ Aucune musique en cours de lecture.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const volume = interaction.options.getInteger('niveau', true);
+      const volumeDecimal = volume / 100; // Convertir 1-100 en 0.01-1.0
+      
+      player.setVolume(volumeDecimal);
+
+      await interaction.reply(
+        `🔊 Volume réglé à **${volume}%**\n` +
+        `⚠️ Le changement s'appliquera à la prochaine musique.`
+      );
+    } catch (error: any) {
+      logger.error('Error in volume command:', error);
       await interaction.reply({
-        content: '\u274c Aucune musique en cours.',
+        content: '❌ Erreur lors du changement de volume.',
         ephemeral: true,
       });
-      return;
     }
-
-    const volume = interaction.options.getInteger('niveau', true);
-    queue.setVolume(volume);
-
-    await interaction.reply(`\ud83d\udd0a Volume r\u00e9gl\u00e9 \u00e0 **${volume}%**`);
   }
 }
