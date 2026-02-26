@@ -4,7 +4,6 @@ import { RedisManager } from '../../cache/redis';
 import { IModule } from '../../types';
 import { AskCommand } from './commands/ask';
 import { ChatCommand } from './commands/chat';
-import { ImageCommand } from './commands/image';
 import { AutoModCommand } from './commands/automod';
 import { SupportCommand } from './commands/support';
 import { AIMessageHandler } from './events/ai-messages';
@@ -25,8 +24,8 @@ export const AIConfigSchema = z.object({
 
 export default class AIModule implements IModule {
   name = 'ai';
-  description = 'Intelligence artificielle avec Groq AI (Llama 3.3) pour chatbot, support et auto-modération';
-  version = '1.2.0';
+  description = 'Intelligence artificielle avec Groq AI (architecture hybride multi-modèles)';
+  version = '1.3.0';
   author = 'Wolaro';
   configSchema = AIConfigSchema;
   defaultConfig = {
@@ -43,7 +42,6 @@ export default class AIModule implements IModule {
   commands = [
     new AskCommand(),
     new ChatCommand(),
-    new ImageCommand(),
     new AutoModCommand(),
     new SupportCommand(),
   ];
