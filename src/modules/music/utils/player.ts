@@ -8,6 +8,7 @@ import {
   VoiceConnectionStatus,
   entersState,
   StreamType,
+  AudioResource,
 } from '@discordjs/voice';
 import { VoiceBasedChannel } from 'discord.js';
 import play from 'play-dl';
@@ -24,8 +25,10 @@ export class MusicPlayer {
   private connection: VoiceConnection | null = null;
   private queue: QueueItem[] = [];
   private currentTrack: QueueItem | null = null;
+  private currentResource: AudioResource | null = null;
   private isPlaying: boolean = false;
   private readyLock = false;
+  private volume: number = 0.5; // Volume par défaut (50%)
 
   constructor() {
     this.player = createAudioPlayer();
@@ -36,6 +39,7 @@ export class MusicPlayer {
     this.player.on(AudioPlayerStatus.Idle, () => {
       logger.debug('Player is idle, playing next track');
       this.isPlaying = false;
+      this.currentResource = null;
       this.playNext();
     });
 
@@ -47,6 +51,7 @@ export class MusicPlayer {
     this.player.on('error', (error) => {
       logger.error('Audio player error:', error);
       this.isPlaying = false;
+      this.currentResource = null;
       this.playNext();
     });
   }
@@ -194,6 +199,7 @@ export class MusicPlayer {
   private async playNext() {
     if (this.queue.length === 0) {
       this.currentTrack = null;
+      this.currentResource = null;
       logger.debug('Queue is empty');
       return;
     }
@@ -215,8 +221,9 @@ export class MusicPlayer {
         inlineVolume: true,
       });
 
-      // Définir le volume par défaut
-      resource.volume?.setVolume(0.5);
+      // Appliquer le volume actuel
+      resource.volume?.setVolume(this.volume);
+      this.currentResource = resource;
 
       this.player.play(resource);
     } catch (error: any) {
@@ -228,6 +235,7 @@ export class MusicPlayer {
         await this.playNext();
       } else {
         this.currentTrack = null;
+        this.currentResource = null;
       }
     }
   }
@@ -246,6 +254,7 @@ export class MusicPlayer {
     this.player.stop();
     this.queue = [];
     this.currentTrack = null;
+    this.currentResource = null;
   }
 
   /**
@@ -261,11 +270,25 @@ export class MusicPlayer {
 
   /**
    * Changer le volume (0.0 à 1.0)
+   * S'applique immédiatement à la piste actuelle ET aux prochaines
    */
   setVolume(volume: number) {
-    // Volume sera appliqué à la prochaine ressource
-    // Pour la piste actuelle, on ne peut pas changer dynamiquement
-    logger.info(`Volume set to: ${volume}`);
+    // Limiter le volume entre 0.0 et 1.0
+    this.volume = Math.max(0.0, Math.min(1.0, volume));
+    logger.info(`Volume set to: ${this.volume * 100}%`);
+
+    // Appliquer le volume à la ressource actuelle si elle existe
+    if (this.currentResource && this.currentResource.volume) {
+      this.currentResource.volume.setVolume(this.volume);
+      logger.info('Volume applied to current track');
+    }
+  }
+
+  /**
+   * Obtenir le volume actuel (0.0 à 1.0)
+   */
+  getVolume(): number {
+    return this.volume;
   }
 
   /**
