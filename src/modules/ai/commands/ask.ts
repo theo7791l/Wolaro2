@@ -1,11 +1,11 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { ICommand, ICommandContext } from '../../../types';
-import { GeminiClient } from '../utils/gemini';
+import { GroqClient } from '../utils/groq';
 
 export class AskCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('ask')
-    .setDescription('Poser une question à l\'IA Gemini')
+    .setDescription('Poser une question à l\'IA Groq (Llama 3.3)')
     .addStringOption((option) =>
       option
         .setName('question')
@@ -24,10 +24,10 @@ export class AskCommand implements ICommand {
 
     try {
       // Use global API key from environment
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GROQ_API_KEY;
 
       if (!apiKey) {
-        await interaction.editReply('❌ Le module IA n\'est pas configuré. Veuillez configurer GEMINI_API_KEY dans les variables d\'environnement.');
+        await interaction.editReply('❌ Le module IA n\'est pas configuré. Veuillez configurer GROQ_API_KEY dans les variables d\'environnement.');
         return;
       }
 
@@ -35,8 +35,8 @@ export class AskCommand implements ICommand {
       const config = await context.database.getGuildConfig(interaction.guildId!);
       const aiModule = config?.modules?.find((m: any) => m.module_name === 'ai');
 
-      const gemini = new GeminiClient(apiKey);
-      const response = await gemini.generateText(question, {
+      const groq = new GroqClient(apiKey);
+      const response = await groq.generateText(question, {
         maxTokens: aiModule?.config?.maxTokens || 2000,
         temperature: aiModule?.config?.temperature || 0.7,
       });
