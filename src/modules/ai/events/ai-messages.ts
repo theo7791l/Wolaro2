@@ -11,15 +11,22 @@ export class AIMessageHandler implements IEvent {
     if (message.author.bot || !message.guild) return;
 
     try {
+      // Vérifier que le contexte est bien passé
+      if (!context || !context.database) {
+        logger.warn('AI event called without context, skipping');
+        return;
+      }
+
       // Get AI module config from database
-      const moduleConfigRow = await context.database.query(
+      // context.database.query retourne directement un tableau (rows)
+      const moduleConfigRows = await context.database.query(
         'SELECT config FROM guild_modules WHERE guild_id = $1 AND module_name = $2',
         [message.guild.id, 'ai']
       );
 
-      if (!moduleConfigRow.rows.length) return;
+      if (!moduleConfigRows || moduleConfigRows.length === 0) return;
 
-      const config = moduleConfigRow.rows[0].config;
+      const config = moduleConfigRows[0].config;
 
       // Module must be enabled
       if (!config?.enabled) return;
