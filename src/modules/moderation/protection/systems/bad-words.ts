@@ -1,5 +1,5 @@
 /**
- * Bad Words System - Version corrigée avec liste strictement limitée aux VRAIS gros mots
+ * Bad Words System - Avec support des mots personnalisés par serveur
  */
 
 import { Message } from 'discord.js';
@@ -8,9 +8,8 @@ import { logger } from '../../../../utils/logger';
 import type { BadWordDetectionResult } from '../types';
 
 export class BadWordsSystem {
-  // UNIQUEMENT les insultes graves et vulgarités EXPLICITES
-  // Pas de mots communs qui pourraient être utilisés innocemment
-  private badWords = [
+  // Liste par défaut - UNIQUEMENT les insultes graves et vulgarités EXPLICITES
+  private defaultBadWords = [
     // Insultes graves en français
     'connard', 'connasse', 'salope', 'pute', 
     'enculé', 'encule', 'enculer', 'enfoiré', 
@@ -37,7 +36,7 @@ export class BadWordsSystem {
 
   /**
    * Vérifie si le message contient des mots interdits
-   * Détection par mots entiers uniquement (pas de sous-chaînes)
+   * Combine la liste par défaut + les mots personnalisés du serveur
    */
   async check(message: Message): Promise<BadWordDetectionResult> {
     if (!message.guild) {
@@ -48,6 +47,10 @@ export class BadWordsSystem {
     if (!config.badwords_enabled) {
       return { detected: false, words: [], severity: 'low' };
     }
+
+    // Combiner liste par défaut + mots personnalisés
+    const customWords = config.badwords_custom_list || [];
+    const allBadWords = [...this.defaultBadWords, ...customWords];
 
     const content = message.content.toLowerCase();
     
@@ -71,7 +74,7 @@ export class BadWordsSystem {
         .replace(/[8]/g, 'b');
       
       // Vérifier si le mot normalisé correspond à un mot interdit
-      for (const badWord of this.badWords) {
+      for (const badWord of allBadWords) {
         const normalizedBadWord = badWord.toLowerCase();
         
         // Match exact ou avec accents retirés
