@@ -11,9 +11,9 @@ export function initializeMusicManager(client: Client) {
     [
       {
         name: 'main',
-        url: 'lavalink.darrennathanael.com:443',
+        url: 'lavalink.eu:2333',
         auth: 'youshallnotpass',
-        secure: true,
+        secure: false,
       },
     ],
     {
