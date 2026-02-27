@@ -18,26 +18,26 @@ export function initializeMusicManager(client: Client) {
     ],
     {
       moveOnDisconnect: false,
-      resumable: false,
-      resumableTimeout: 30,
+      resume: false,
+      resumeTimeout: 30,
       reconnectTries: 2,
       restTimeout: 10000,
     }
   );
 
-  shoukaku.on('ready', (name) => {
+  shoukaku.on('ready', (name: string) => {
     logger.info(`✅ Lavalink node "${name}" connected`);
   });
 
-  shoukaku.on('error', (name, error) => {
+  shoukaku.on('error', (name: string, error: any) => {
     logger.error(`❌ Lavalink node "${name}" error:`, error);
   });
 
-  shoukaku.on('close', (name, code, reason) => {
+  shoukaku.on('close', (name: string, code: number, reason: string) => {
     logger.warn(`⚠️ Lavalink node "${name}" closed: ${code} - ${reason}`);
   });
 
-  shoukaku.on('disconnect', (name, count) => {
+  shoukaku.on('disconnect', (name: string, count: number) => {
     logger.warn(`⚠️ Lavalink node "${name}" disconnected (${count} tries)`);
   });
 
