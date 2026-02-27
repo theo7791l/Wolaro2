@@ -1,4 +1,4 @@
-import { Manager } from '@apple502j/erela.js';
+import { Manager } from 'erela.js';
 import { Client, TextChannel } from 'discord.js';
 import { logger } from '../../utils/logger';
 
@@ -73,7 +73,7 @@ export function initializeMusicManager(client: Client) {
   // Init manager
   musicManager.init(client.user?.id || '');
   
-  logger.info('🎵 Music manager initialized with Lavalink (@apple502j/erela.js)');
+  logger.info('🎵 Music manager initialized with Lavalink (erela.js from GitHub)');
 }
 
 export function getMusicManager(): Manager {
