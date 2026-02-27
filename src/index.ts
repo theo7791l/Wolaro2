@@ -1,6 +1,6 @@
 /**
  * Wolaro2 - Discord Bot Multi-tenant avec Architecture Modulaire
- * System de chargement manuel des modules - VERSION CORRIGÉE v4 avec Lavalink
+ * System de chargement manuel des modules
  */
 
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
@@ -8,7 +8,6 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import { DatabaseManager } from './database/manager';
 import { RedisManager } from './cache/redis';
-import { initializeMusicManager } from './modules/music/manager';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -79,7 +78,7 @@ async function start() {
 }
 
 // ==============================================
-// MODULE LOADER - VERSION CORRIGÉE
+// MODULE LOADER
 // ==============================================
 
 async function loadAllModules() {
@@ -204,13 +203,6 @@ async function onReady() {
   logger.info(`✅ Bot ready as ${client.user.tag}`);
   logger.info(`👥 Serving ${client.guilds.cache.size} guilds`);
   logger.info(`🛡️ Protection systems active`);
-
-  // Initialiser le music manager après que le bot soit prêt
-  try {
-    initializeMusicManager(client);
-  } catch (error) {
-    logger.error('Failed to initialize music manager:', error);
-  }
 
   // Set status
   client.user.setPresence({
