@@ -22,7 +22,7 @@
   "dependencies": {
     "discord.js": "^14.16.3",
     "@discordjs/rest": "^2.4.0",
-    "erela.js-apple": "^2.3.3",
+    "@apple502j/erela.js": "^2.3.3",
     "pg": "^8.13.1",
     "redis": "^4.7.0",
     "axios": "^1.7.9",
