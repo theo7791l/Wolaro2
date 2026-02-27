@@ -44,18 +44,18 @@ export class PlayCommand implements ICommand {
       }
 
       // Chercher la musique
-      const result = await node.rest.resolve(query.startsWith('http') ? query : `ytsearch:${query}`);
+      const result: any = await node.rest.resolve(query.startsWith('http') ? query : `ytsearch:${query}`);
 
-      if (!result || !result.tracks.length) {
+      if (!result || result.loadType === 'empty' || !result.data) {
         await interaction.editReply('❌ Aucun résultat trouvé.');
         return;
       }
 
       // Créer ou récupérer le player
-      let player = players.get(interaction.guildId!);
+      let player: any = players.get(interaction.guildId!);
 
       if (!player) {
-        player = await node.joinChannel({
+        player = await shoukaku.joinVoiceChannel({
           guildId: interaction.guildId!,
           channelId: voiceChannel.id,
           shardId: interaction.guild!.shardId,
@@ -71,11 +71,11 @@ export class PlayCommand implements ICommand {
           if (data.reason === 'finished') {
             if (player.queue.length > 0) {
               const next = player.queue.shift();
-              player.playTrack({ track: { encoded: next.track } });
+              player.playTrack({ track: next.track });
             } else {
               setTimeout(() => {
                 if (player.queue.length === 0) {
-                  player.connection.disconnect();
+                  player.disconnect();
                   players.delete(interaction.guildId!);
 
                   const channel = interaction.client.channels.cache.get(player.textChannel) as TextChannel;
@@ -88,27 +88,29 @@ export class PlayCommand implements ICommand {
           }
         });
 
-        player.on('start', (data: any) => {
+        player.on('start', () => {
           const channel = interaction.client.channels.cache.get(player.textChannel) as TextChannel;
+          const currentTrack = player.queue[0] || { info: { title: 'Unknown', author: 'Unknown' } };
           if (channel?.isTextBased()) {
-            channel.send(`🎶 En lecture : **${data.track.info.title}** par **${data.track.info.author}**`).catch(() => {});
+            channel.send(`🎶 En lecture : **${currentTrack.info.title}** par **${currentTrack.info.author}**`).catch(() => {});
           }
         });
       }
 
-      const track = result.tracks[0];
-
-      if (result.playlistInfo && result.playlistInfo.name) {
+      if (result.loadType === 'playlist') {
         // Playlist
-        player.queue.push(...result.tracks.map((t: any) => ({ track: t.encoded, info: t.info })));
+        const tracks = result.data.tracks || [];
+        player.queue.push(...tracks.map((t: any) => ({ track: t.encoded, info: t.info })));
         await interaction.editReply(
-          `🎶 Playlist ajoutée : **${result.playlistInfo.name}** (${result.tracks.length} pistes)`
+          `🎶 Playlist ajoutée : **${result.data.info?.name || 'Playlist'}** (${tracks.length} pistes)`
         );
       } else {
         // Piste unique
+        const track = result.data;
+        
         if (!player.track) {
           // Rien en cours, jouer directement
-          await player.playTrack({ track: { encoded: track.encoded } });
+          await player.playTrack({ track: track.encoded });
           await interaction.editReply(
             `🎵 Lecture de : **${track.info.title}** par **${track.info.author}**`
           );
@@ -124,7 +126,7 @@ export class PlayCommand implements ICommand {
       // Si queue et rien en cours
       if (player.queue.length > 0 && !player.track) {
         const next = player.queue.shift();
-        await player.playTrack({ track: { encoded: next.track } });
+        await player.playTrack({ track: next.track });
       }
     } catch (error: any) {
       logger.error('Error in play command:', error);
