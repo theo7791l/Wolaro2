@@ -1,4 +1,4 @@
-declare module '@apple502j/erela.js' {
+declare module 'erela.js' {
   import { Client, User } from 'discord.js';
 
   export class Manager {
