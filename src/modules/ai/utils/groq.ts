@@ -22,12 +22,12 @@ export class GroqClient {
   // ⚡ ARCHITECTURE HYBRIDE MULTI-MODÈLES
   // Chat: llama-3.3-70b-versatile (30 RPM, 1000 RPD) -> fallback llama-3.1-8b-instant (30 RPM, 14400 RPD)
   // Moderation: llama-3.1-8b-instant (30 RPM, 14400 RPD) - Remplacement de llama-guard-3-8b (déprécié)
-  // Support: qwen-32b-instruct (30 RPM, 14400 RPD) - Expertise technique
+  // Support: qwen/qwen3-32b (30 RPM, 14400 RPD) - Expertise technique
   // Dev: openai/gpt-oss-120b (30 RPM, 1000 RPD) - Code & raisonnement avancé
   private chatPrimaryModel = 'llama-3.3-70b-versatile';
   private chatFallbackModel = 'llama-3.1-8b-instant';
   private moderationModel = 'llama-3.1-8b-instant'; // Remplacement de llama-guard-3-8b
-  private supportModel = 'qwen-32b-instruct';
+  private supportModel = 'qwen/qwen3-32b'; // Fix: qwen-32b-instruct n'existe pas sur Groq
   private devModel = 'openai/gpt-oss-120b';
 
   constructor(apiKey: string) {
