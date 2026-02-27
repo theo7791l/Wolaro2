@@ -3,11 +3,6 @@ import { DatabaseManager } from '../../database/manager';
 import { RedisManager } from '../../cache/redis';
 import { IModule } from '../../types';
 import { PlayCommand } from './commands/play';
-import { StopCommand } from './commands/stop';
-import { SkipCommand } from './commands/skip';
-import { QueueCommand } from './commands/queue';
-import { NowPlayingCommand } from './commands/nowplaying';
-import { VolumeCommand } from './commands/volume';
 import { z } from 'zod';
 
 export const MusicConfigSchema = z.object({
@@ -39,11 +34,7 @@ export default class MusicModule implements IModule {
 
   commands = [
     new PlayCommand(),
-    new StopCommand(),
-    new SkipCommand(),
-    new QueueCommand(),
-    new NowPlayingCommand(),
-    new VolumeCommand(),
+    // Les autres commandes seront ajoutées après test de /play
   ];
 
   events = [];
