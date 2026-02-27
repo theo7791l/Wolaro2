@@ -11,8 +11,8 @@ export function initializeMusicManager(client: Client) {
     [
       {
         name: 'main',
-        url: 'lava-v3.ajieblogs.eu.org:443',
-        auth: 'https://dsc.gg/ajidevserver',
+        url: 'lavalink.darrennathanael.com:443',
+        auth: 'youshallnotpass',
         secure: true,
       },
     ],
