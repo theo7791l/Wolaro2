@@ -1,84 +1,52 @@
-import { Manager } from 'erela.js';
-import { Client, TextChannel } from 'discord.js';
+import { Shoukaku, Connectors } from 'shoukaku';
+import { Client } from 'discord.js';
 import { logger } from '../../utils/logger';
 
-export let musicManager: Manager;
+export let shoukaku: Shoukaku;
+export const players = new Map<string, any>();
 
 export function initializeMusicManager(client: Client) {
-  musicManager = new Manager({
-    nodes: [
+  shoukaku = new Shoukaku(
+    new Connectors.DiscordJS(client),
+    [
       {
-        host: 'lava-v3.ajieblogs.eu.org',
-        port: 443,
-        password: 'https://dsc.gg/ajidevserver',
+        name: 'main',
+        url: 'lava-v3.ajieblogs.eu.org:443',
+        auth: 'https://dsc.gg/ajidevserver',
         secure: true,
-        identifier: 'main-node',
       },
     ],
-    send: (id: string, payload: any) => {
-      const guild = client.guilds.cache.get(id);
-      if (guild) guild.shard.send(payload);
-    },
-  });
-
-  // Events
-  musicManager.on('nodeConnect', (node: any) => {
-    logger.info(`✅ Lavalink node "${node.options.identifier}" connected`);
-  });
-
-  musicManager.on('nodeError', (node: any, error: any) => {
-    logger.error(`❌ Lavalink node "${node.options.identifier}" error:`, error);
-  });
-
-  musicManager.on('nodeDisconnect', (node: any) => {
-    logger.warn(`⚠️ Lavalink node "${node.options.identifier}" disconnected`);
-  });
-
-  musicManager.on('trackStart', (player: any, track: any) => {
-    logger.info(`🎵 Playing: ${track.title} by ${track.author}`);
-    
-    const channel = client.channels.cache.get(player.textChannel) as TextChannel;
-    if (channel?.isTextBased()) {
-      channel.send(`🎶 En lecture : **${track.title}** par **${track.author}**`).catch(() => {});
+    {
+      moveOnDisconnect: false,
+      resumable: false,
+      resumableTimeout: 30,
+      reconnectTries: 2,
+      restTimeout: 10000,
     }
+  );
+
+  shoukaku.on('ready', (name) => {
+    logger.info(`✅ Lavalink node "${name}" connected`);
   });
 
-  musicManager.on('queueEnd', (player: any) => {
-    logger.info('Queue ended, leaving voice channel');
-    
-    const channel = client.channels.cache.get(player.textChannel) as TextChannel;
-    if (channel?.isTextBased()) {
-      channel.send('⏹️ File d\'attente terminée. Je quitte le salon vocal.').catch(() => {});
-    }
-    
-    player.destroy();
+  shoukaku.on('error', (name, error) => {
+    logger.error(`❌ Lavalink node "${name}" error:`, error);
   });
 
-  musicManager.on('playerMove', (player: any, oldChannel: string, newChannel: string) => {
-    player.voiceChannel = newChannel;
+  shoukaku.on('close', (name, code, reason) => {
+    logger.warn(`⚠️ Lavalink node "${name}" closed: ${code} - ${reason}`);
   });
 
-  musicManager.on('trackError', (player: any, track: any, error: any) => {
-    logger.error(`Track error: ${track?.title}`, error);
-    
-    const channel = client.channels.cache.get(player.textChannel) as TextChannel;
-    if (channel?.isTextBased()) {
-      channel.send(`❌ Erreur lors de la lecture de **${track?.title || 'la piste'}**.`).catch(() => {});
-    }
+  shoukaku.on('disconnect', (name, count) => {
+    logger.warn(`⚠️ Lavalink node "${name}" disconnected (${count} tries)`);
   });
 
-  // Raw event handler pour Discord
-  client.on('raw', (d: any) => musicManager.updateVoiceState(d));
-
-  // Init manager
-  musicManager.init(client.user?.id || '');
-  
-  logger.info('🎵 Music manager initialized with Lavalink (erela.js from GitHub)');
+  logger.info('🎵 Music manager initialized with Shoukaku');
 }
 
-export function getMusicManager(): Manager {
-  if (!musicManager) {
-    throw new Error('Music manager not initialized');
+export function getShoukaku(): Shoukaku {
+  if (!shoukaku) {
+    throw new Error('Shoukaku not initialized');
   }
-  return musicManager;
+  return shoukaku;
 }
