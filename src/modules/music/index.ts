@@ -3,6 +3,11 @@ import { DatabaseManager } from '../../database/manager';
 import { RedisManager } from '../../cache/redis';
 import { IModule } from '../../types';
 import { PlayCommand } from './commands/play';
+import { SkipCommand } from './commands/skip';
+import { StopCommand } from './commands/stop';
+import { QueueCommand } from './commands/queue';
+import { VolumeCommand } from './commands/volume';
+import { NowPlayingCommand } from './commands/nowplaying';
 import { z } from 'zod';
 
 export const MusicConfigSchema = z.object({
@@ -18,7 +23,7 @@ export const MusicConfigSchema = z.object({
 
 export default class MusicModule implements IModule {
   name = 'music';
-  description = 'Lecteur de musique avec support YouTube, Spotify et SoundCloud';
+  description = 'Lecteur de musique avec support YouTube via NewPipe';
   version = '1.0.0';
   author = 'Wolaro';
   configSchema = MusicConfigSchema;
@@ -34,7 +39,11 @@ export default class MusicModule implements IModule {
 
   commands = [
     new PlayCommand(),
-    // Les autres commandes seront ajoutées après test de /play
+    new SkipCommand(),
+    new StopCommand(),
+    new QueueCommand(),
+    new VolumeCommand(),
+    new NowPlayingCommand(),
   ];
 
   events = [];
