@@ -43,25 +43,28 @@ export class APIServer {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'", "https://wolaro.fr"],
-          scriptSrc: ["'self'", "https://wolaro.fr"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://wolaro.fr", "https://panel.wolaro.fr"],
+          scriptSrc: ["'self'", "https://wolaro.fr", "https://panel.wolaro.fr"],
           imgSrc: ["'self'", "data:", "https:"],
-          connectSrc: ["'self'", "https://wolaro.fr", "wss://wolaro.fr"],
+          connectSrc: ["'self'", "https://wolaro.fr", "https://panel.wolaro.fr", "wss://wolaro.fr"],
         },
       },
     }));
 
-    // SECURITY FIX: Conditional CORS based on environment
+    // ✅ SECURITY FIX: Conditional CORS based on environment
     const allowedOrigins = process.env.NODE_ENV === 'production'
       ? [
           'https://wolaro.fr',
           'https://www.wolaro.fr',
+          'https://panel.wolaro.fr',  // ✅ Ajouté
           ...config.api.corsOrigin.filter((origin) => !origin.includes('localhost')),
         ]
       : [
           'https://wolaro.fr',
           'https://www.wolaro.fr',
+          'https://panel.wolaro.fr',  // ✅ Ajouté
           'http://localhost:3001',
+          'http://localhost:5173',
           ...config.api.corsOrigin,
         ];
 
@@ -158,6 +161,7 @@ export class APIServer {
     this.app.listen(port, host, () => {
       logger.info(`API Server started on ${host}:${port}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`CORS Origins: ${allowedOrigins.join(', ')}`);
     });
   }
 
