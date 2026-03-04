@@ -2,6 +2,7 @@ import { Client } from 'discord.js';
 import { DatabaseManager } from '../../database/manager';
 import { RedisManager } from '../../cache/redis';
 import { IModule } from '../../types';
+import { HelpCommand } from './commands/help';
 import { AskCommand } from './commands/ask';
 import { ChatCommand } from './commands/chat';
 import { AutoModCommand } from './commands/automod';
@@ -25,8 +26,8 @@ export const AIConfigSchema = z.object({
 
 export default class AIModule implements IModule {
   name = 'ai';
-  description = 'Intelligence artificielle avec Groq AI (architecture hybride multi-modèles + Xavier dev assistant)';
-  version = '1.4.0';
+  description = 'Intelligence artificielle + /help centralisé — architecture hybride multi-modèles';
+  version = '1.5.0';
   author = 'Wolaro';
   configSchema = AIConfigSchema;
   defaultConfig = {
@@ -40,7 +41,9 @@ export default class AIModule implements IModule {
     temperature: 0.7,
   };
 
+  // /help en premier pour visibilité
   commands = [
+    new HelpCommand(),
     new AskCommand(),
     new ChatCommand(),
     new AutoModCommand(),
