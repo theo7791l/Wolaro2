@@ -3,6 +3,7 @@ import { DatabaseManager } from '../../database/manager';
 import { RedisManager } from '../../cache/redis';
 import { IModule } from '../../types';
 import { RpgStartCommand } from './commands/rpgstart';
+import { RpgResetCommand } from './commands/rpgreset';
 import { ProfileCommand } from './commands/profile';
 import { BattleCommand } from './commands/battle';
 import { InventoryCommand } from './commands/inventory';
@@ -13,21 +14,21 @@ import { DailyCommand } from './commands/daily';
 import { z } from 'zod';
 
 export const RPGConfigSchema = z.object({
-  enabled:          z.boolean().default(true),
-  pvpEnabled:       z.boolean().default(true),
-  pveEnabled:       z.boolean().default(true),
-  questsEnabled:    z.boolean().default(true),
-  dailyRewardGold:  z.number().min(10).max(1000).default(50),
-  dailyRewardXP:    z.number().min(10).max(500).default(100),
+  enabled:         z.boolean().default(true),
+  pvpEnabled:      z.boolean().default(true),
+  pveEnabled:      z.boolean().default(true),
+  questsEnabled:   z.boolean().default(true),
+  dailyRewardGold: z.number().min(10).max(1000).default(50),
+  dailyRewardXP:   z.number().min(10).max(500).default(100),
 });
 
 export default class RPGModule implements IModule {
   name        = 'rpg';
-  description = 'Système RPG complet — combats, classes, inventaire, quêtes, équipement';
-  version     = '2.0.0';
+  description = 'Système RPG complet — classes, combats, inventaire, quêtes, équipement';
+  version     = '2.1.0';
   author      = 'Wolaro';
 
-  configSchema = RPGConfigSchema;
+  configSchema  = RPGConfigSchema;
   defaultConfig = {
     enabled:         true,
     pvpEnabled:      true,
@@ -37,14 +38,15 @@ export default class RPGModule implements IModule {
     dailyRewardXP:   100,
   };
 
-  // Ordre logique : rpgstart en premier (prérequis de toutes les autres)
+  // Ordre logique : setup → profil → actions → admin
   commands = [
     new RpgStartCommand(),
+    new RpgResetCommand(),
     new ProfileCommand(),
     new BattleCommand(),
+    new BuyCommand(),
     new InventoryCommand(),
     new ShopCommand(),
-    new BuyCommand(),
     new QuestCommand(),
     new DailyCommand(),
   ];

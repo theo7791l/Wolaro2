@@ -26,7 +26,7 @@ const CRIT_RATES: Record<string, number> = {
 };
 
 export class RPGManager {
-  // ─── Exists check (no auto-create) ───────────────────────────────────────
+  // ─── Exists check ───────────────────────────────────────────────────────────
   static async profileExists(guildId: string, userId: string, db: DatabaseManager): Promise<boolean> {
     const r = await db.query(
       'SELECT 1 FROM rpg_profiles WHERE guild_id = $1 AND user_id = $2',
@@ -35,7 +35,7 @@ export class RPGManager {
     return r.length > 0;
   }
 
-  // ─── Get (null if not registered) ────────────────────────────────────────
+  // ─── Get profile (null si pas encore inscrit) ───────────────────────────────
   static async getProfile(guildId: string, userId: string, db: DatabaseManager): Promise<RPGProfile | null> {
     const r = await db.query(
       'SELECT * FROM rpg_profiles WHERE guild_id = $1 AND user_id = $2',
@@ -45,7 +45,7 @@ export class RPGManager {
     return this.mapRow(r[0]);
   }
 
-  // ─── Legacy: kept for commands that don't require /rpgstart ──────────────
+  // ─── Legacy: get or auto-create (Warrior par défaut) ───────────────────────
   static async getOrCreateProfile(guildId: string, userId: string, db: DatabaseManager): Promise<RPGProfile> {
     const p = await this.getProfile(guildId, userId, db);
     if (p) return p;
@@ -63,15 +63,14 @@ export class RPGManager {
     };
   }
 
-  // ─── Update (with level-up loop + max_health save) ───────────────────────
+  // ─── Update (avec loop de level-up + sauvegarde max_health) ────────────────────
   static async updateProfile(guildId: string, userId: string, profile: RPGProfile, db: DatabaseManager): Promise<void> {
-    // Apply pending level-ups
     while (profile.xp >= this.calculateXPForLevel(profile.level + 1)) {
       profile.level++;
       profile.maxHealth += 5;
       profile.attack    += 2;
       profile.defense   += 1;
-      profile.health     = profile.maxHealth; // full heal on level-up
+      profile.health     = profile.maxHealth;
     }
 
     await db.query(
@@ -92,25 +91,27 @@ export class RPGManager {
     return Math.floor(100 * Math.pow(level, 1.5));
   }
 
+  // ─── mapRow : TOUS les champs en Number() pour éviter la concaténation de strings ───
   private static mapRow(d: any): RPGProfile {
-    const wins   = d.wins   ?? 0;
-    const losses = d.losses ?? 0;
+    const wins   = Number(d.wins   ?? 0);
+    const losses = Number(d.losses ?? 0);
+    const level  = Number(d.level  ?? 1);
     return {
-      level:        d.level,
-      xp:           d.xp,
-      xpToNextLevel: this.calculateXPForLevel(d.level + 1),
-      gold:         d.gold,
-      health:       d.health,
-      maxHealth:    d.max_health,
-      attack:       d.attack,
-      defense:      d.defense,
-      critRate:     CRIT_RATES[d.class] ?? 10,
+      level,
+      xp:            Number(d.xp   ?? 0),
+      xpToNextLevel: this.calculateXPForLevel(level + 1),
+      gold:          Number(d.gold  ?? 0),
+      health:        Number(d.health     ?? 100),
+      maxHealth:     Number(d.max_health ?? 100),
+      attack:        Number(d.attack     ?? 10),
+      defense:       Number(d.defense    ?? 5),
+      critRate:      CRIT_RATES[d.class] ?? 10,
       wins,
       losses,
-      winRate:      wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0,
-      class:        d.class,
-      inventory:    d.inventory ?? [],
-      equipped:     d.equipped  ?? {},
+      winRate: wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0,
+      class:     d.class     ?? 'warrior',
+      inventory: d.inventory ?? [],
+      equipped:  d.equipped  ?? {},
     };
   }
 }
