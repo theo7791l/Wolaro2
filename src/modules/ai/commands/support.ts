@@ -3,160 +3,113 @@ import { ICommand, ICommandContext } from '../../../types';
 import { GroqClient } from '../utils/groq';
 
 // ============================================================
-// Système de prompt : connaissance complète de Wolaro
-// Qwen 32B (spécialisé expertise technique) répond UNIQUEMENT
-// sur le bot, en français, de façon précise et concise.
+// Système de prompt : connaissance des fonctionnalités MEMBRES
+// Ce prompt ne contient que ce que les membres du serveur
+// ont besoin de savoir. Aucune info technique interne.
 // ============================================================
 const WOLARO_SYSTEM_PROMPT = `
 Tu es WolaroAssist, l'assistant support officiel du bot Discord Wolaro.
-Tu ne réponds QU'aux questions sur Wolaro et ses fonctionnalités.
-Sois précis, concis, et toujours en français. Utilise des emojis pour rendre
-ta réponse plus lisible. Si une question est hors-sujet, décline poliment.
+Tu ne réponds QU'aux questions sur Wolaro et ses fonctionnalités pour les membres.
+Sois précis, concis et toujours en français. Utilise des emojis pour rendre ta réponse lisible.
+Si une question est hors-sujet ou technique/interne, décline poliment.
+Ne mentionne JAMAIS les noms de modèles IA, les clés API, les quotas, les détails serveur ou tout ce qui est réservé aux administrateurs.
 
 ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 📦 MODULES ET COMMANDES DE WOLARO
 ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 
-1️⃣  MODÉRATION (8 commandes)
-• /ban [user] [raison]             → Bannir un membre
-• /kick [user] [raison]            → Expulser un membre
-• /warn [user] [raison]            → Avertir un membre
-• /timeout [user] [durée] [raison] → Mettre en sourdine
-• /clear [nombre]                  → Supprimer des messages
-• /lockdown                        → Verrouiller le serveur
-• /cases [user]                    → Voir les cas de modération
-• /case [id]                       → Voir un cas précis
-Fonctionnalités : auto-modération, anti-raid, anti-spam, filtres
+1️⃣  MODÉRATION
+• /ban [user] [raison]             → Bannir un membre (modérateur)
+• /kick [user] [raison]            → Expulser un membre (modérateur)
+• /warn [user] [raison]            → Avertir un membre (modérateur)
+• /timeout [user] [durée] [raison] → Mettre en sourdine (modérateur)
+• /clear [nombre]                  → Supprimer des messages (modérateur)
+• /cases [user]                    → Voir l’historique d’un membre
+• /case [id]                       → Voir un cas de modération précis
+Fonctionnalités automatiques : anti-spam, anti-raid, filtres de contenu
 
-2️⃣  ÉCONOMIE (7 commandes)
+2️⃣  ÉCONOMIE
 • /balance                         → Voir son solde (banque + portefeuille)
 • /daily                           → Récompense quotidienne (streaks)
 • /work                            → Travailler pour gagner des coins
-• /pay [user] [montant]            → Transférer des coins
-• /shop                            → Voir la boutique
+• /pay [user] [montant]            → Transférer des coins à quelqu’un
+• /shop                            → Voir la boutique du serveur
 • /inventory                       → Voir son inventaire
-• /leaderboard                     → Classement
+• /leaderboard                     → Classement des plus riches
 
-3️⃣  LEVELING (3 commandes)
-• /rank                            → Voir son niveau et XP
-• /levels                          → Voir tous les paliers
-• /setxp [user] [montant]          → (Admin) Modifier l'XP
-Fonctionnalités : XP auto sur messages, rôles-récompenses, cartes de profil
+3️⃣  LEVELING (XP)
+• /rank                            → Voir son niveau et son XP
+• /levels                          → Voir tous les paliers de récompense
+Fonctionnement : tu gagnes de l’XP automatiquement en envoyant des messages.
+Les admins peuvent configurer des rôles-récompenses à certains niveaux.
 
-4️⃣  MUSIQUE (6 commandes)
-• /play [url/titre]                → Jouer (YouTube, Spotify, SoundCloud)
-• /stop                            → Arrêter
-• /skip                            → Passer à la suivante
-• /queue                           → Voir la file (max 100 titres)
-• /nowplaying                      → Musique en cours
+4️⃣  MUSIQUE 🎵
+• /play [url/titre]                → Jouer une musique (YouTube, Spotify, SoundCloud)
+• /stop                            → Arrêter la musique
+• /skip                            → Passer à la musique suivante
+• /queue                           → Voir la file d’attente (max 100 titres)
+• /nowplaying                      → Voir la musique en cours
 • /volume [0-100]                  → Régler le volume
+Note : tu dois être dans un salon vocal pour utiliser ces commandes.
 
-5️⃣  ADMIN — MASTER ONLY (6 commandes)
-• /config [module]                 → Configurer tous les modules
-• /impersonate [guild]             → Agir au nom d'un serveur
-• /blacklist [guild] [raison]      → Blacklister un serveur
-• /stats                           → Métriques temps réel
-• /reload [module]                 → Hot-reload sans redémarrage
-• /eval [code]                     → Exécuter du code ⚠️ DANGER
+5️⃣  INTELLIGENCE ARTIFICIELLE 🤖
+• /ask [question]                  → Poser une question libre à l’IA
+• /aichat                          → Démarrer une conversation avec l’IA
+• /support [question]              → Obtenir de l’aide sur Wolaro (cette commande)
+Note : les réponses IA peuvent être limitées selon l’activité du serveur.
 
-  Sous-commandes de /config :
-  /config moderation → salon logs, rôle mute, seuil spam
-  /config economy    → nom devise, récompenses daily/work
-  /config leveling   → XP/message, salon level-up
-  /config music      → volume par défaut, taille queue, rôle DJ
-  /config ai         → salon chat IA, auto-mod, seuil toxicité
-  /config rpg        → or/santé départ, récompense daily
-  /config tickets    → catégorie, rôle support, auto-close
-  /config giveaways  → rôle ping, âge min compte/serveur
-
-6️⃣  IA GROQ - ARCHITECTURE HYBRIDE (4 commandes)
-• /ask [question]                  → Poser une question libre (Llama 3.1 8B)
-• /aichat                          → Chat conversationnel (Llama 3.3 70B + fallback 8B)
-• /automod                         → Auto-modération IA (Llama Guard 3 8B)
-• /support [question]              → Aide sur Wolaro (Qwen 32B - cette commande !)
-⚡ Groq gratuit: 30 req/min par modèle
-  - Llama 3.3 70B : 1,000 req/jour (chat premium)
-  - Llama 3.1 8B  : 14,400 req/jour (chat fallback)
-  - Llama Guard 3 : 14,400 req/jour (modération)
-  - Qwen 32B      : 14,400 req/jour (support technique)
-
-7️⃣  RPG (6 commandes)
-• /rpgprofile                      → Voir son profil RPG
-• /battle [user/monstre]           → Combat PvP ou PvE
-  Monstres disponibles : Squelette, Zombie, Dragon, Boss
-• /rpginventory                    → Inventaire RPG
+6️⃣  RPG 🐉
+• /rpgstart                        → Créer son profil RPG (requis en premier)
+• /rpgprofile                      → Voir son profil RPG (niveau, stats, équipement)
+• /battle [user/monstre]           → Combat PvP contre un autre membre ou PvE contre un monstre
+  Monstres : Squelette, Zombie, Dragon, Boss
+• /rpginventory                    → Voir son inventaire RPG
 • /rpgshop                         → Boutique RPG (armes, armures, potions)
 • /quest                           → Voir et accepter des quêtes
 • /rpgdaily                        → Récompense quotidienne + soins
 
-8️⃣  TICKETS (5 commandes)
-• /ticket [type] [sujet]           → Créer un ticket
-  Types : Support, Bug, Suggestion, Signalement, Paiement
-• /closeticket [raison]            → Fermer un ticket
-• /ticketadd [user]                → Ajouter quelqu'un
-• /ticketremove [user]             → Retirer quelqu'un
-• /transcript                      → Générer un transcript HTML
-Fonctionnalités : claim staff, auto-close 24h, max 3 tickets/utilisateur
+7️⃣  TICKETS 🎫
+• /ticket [type] [sujet]           → Créer un ticket de support
+  Types disponibles : Support, Bug, Suggestion, Signalement, Paiement
+• /closeticket [raison]            → Fermer son ticket
+• /ticketadd [user]                → Ajouter quelqu’un à ton ticket
+• /ticketremove [user]             → Retirer quelqu’un de ton ticket
+• /transcript                      → Générer un résumé de ton ticket
+Limite : maximum 3 tickets ouverts par utilisateur.
 
-9️⃣  GIVEAWAYS (4 commandes)
-• /giveaway [durée] [lots] [nb]    → Créer un giveaway (max 20 gagnants)
+8️⃣  GIVEAWAYS 🎁
+• /giveaway [durée] [lots] [nb]    → Créer un giveaway (modérateur)
 • /reroll [message_id]             → Retirer de nouveaux gagnants
-• /gend [message_id]               → Terminer manuellement
+• /gend [message_id]               → Terminer un giveaway manuellement
 • /glist                           → Voir les giveaways actifs
-Fonctionnalités : vérif âge compte/serveur, bouton interactif, embed dynamique
+Fonctionnalités : vérification âge du compte, bouton interactif, max 20 gagnants.
 
 ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-🚀 INSTALLATION
+ℹ️ INFORMATIONS GÉNÉRALES
 ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-Prérequis : Node.js 20+, PostgreSQL 15+, Redis 7+, Discord Bot Token
-Option IA  : GROQ_API_KEY (gratuit sur https://console.groq.com/keys)
+• Certaines commandes nécessitent d’être modérateur ou d’avoir le rôle approprié.
+• Pour toute configuration du bot, contacte un administrateur du serveur.
+• En cas de problème, ouvre un ticket avec /ticket.
 
-Docker (recommandé) :
-  git clone https://github.com/theo7791l/Wolaro2.git
-  cp .env.example .env  # remplir les variables
-  docker-compose up -d
-
-Manuel :
-  npm install --legacy-peer-deps
-  psql -U wolaro -d wolaro -f src/database/schema.sql
-  npm run build && npm start
-
-╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-⚙️ VARIABLES D'ENVIRONNEMENT REQUISES
-╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET,
-DISCORD_PUBLIC_KEY, DB_PASSWORD, API_JWT_SECRET, ENCRYPTION_KEY
-
-Optionnel : GROQ_API_KEY (module IA)
-
-╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-🛡️ SÉCURITÉ
-╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-• Chiffrement AES-256 pour les données sensibles
-• Triple rate limiting (IP / User / Guild)
-• Anti-raid automatique avec logs
-• Audit logs complets (toutes les actions)
-• Master Admin System : contrôle total
-
-Si tu n'as pas la réponse, dis-le honnêtement.
+Si tu n’as pas la réponse, dis-le honnêcement et invite l’utilisateur à ouvrir un ticket.
 Ne réponds jamais à des questions non liées à Wolaro.
 `;
 
 export class SupportCommand implements ICommand {
   data = new SlashCommandBuilder()
     .setName('support')
-    .setDescription('🤖 Obtenir de l\'aide sur Wolaro grâce à l\'IA (Qwen 32B)')
+    .setDescription('🤖 Obtenir de l\'aide sur Wolaro grâce à l\'IA')
     .addStringOption((option) =>
       option
         .setName('question')
-        .setDescription('Ta question (ex: comment créer un ticket ? comment fonctionne l\'IA ?)')
+        .setDescription('Ta question (ex: comment créer un ticket ? comment fonctionne le RPG ?)')
         .setRequired(true)
         .setMaxLength(500)
     ) as SlashCommandBuilder;
 
   module = 'ai';
   guildOnly = true;
-  cooldown = 8; // 8s de cooldown pour éviter le spam
+  cooldown = 8;
 
   async execute(interaction: ChatInputCommandInteraction, context: ICommandContext): Promise<void> {
     const question = interaction.options.getString('question', true);
@@ -171,27 +124,23 @@ export class SupportCommand implements ICommand {
           .setColor(0xff6b6b)
           .setTitle('⚠️ Module IA non configuré')
           .setDescription(
-            'La variable `GROQ_API_KEY` n\'est pas définie sur ce bot.\n' +
-            'Contactez un administrateur pour l\'activer.\n\n' +
-            '🆓 Obtenir une clé gratuite : https://console.groq.com/keys'
+            'Le module IA n\'est pas activé sur ce serveur.\n' +
+            'Contactez un administrateur pour plus d\'informations.'
           )
           .setTimestamp();
         await interaction.editReply({ embeds: [embed] });
         return;
       }
 
-      // Construire le prompt complet : contexte Wolaro + question
-      const fullPrompt = `${WOLARO_SYSTEM_PROMPT}\n\n---\n\nQuestion de l'utilisateur : ${question}`;
-
       const groq = new GroqClient(apiKey);
-      // Utilise Qwen 32B spécialisé pour le support technique
-      const response = await groq.generateText(fullPrompt, {
-        maxTokens: 1500,
-        temperature: 0.35, // Réponses précises et cohérentes
-        useCase: 'support', // Utilise qwen-32b-instruct
+      const response = await groq.generateText(question, {
+        maxTokens: 1200,
+        temperature: 0.35,
+        systemPrompt: WOLARO_SYSTEM_PROMPT,
+        useCase: 'support',
       });
 
-      // Tronquer si la réponse dépasse la limite Discord (4096 chars pour embed description)
+      // Tronquer si la réponse dépasse la limite Discord (4096 chars)
       const description = response.length > 4000
         ? response.substring(0, 3997) + '...'
         : response;
@@ -201,9 +150,9 @@ export class SupportCommand implements ICommand {
         : question;
 
       const embed = new EmbedBuilder()
-        .setColor(0x5865f2) // Bleu Discord brand
+        .setColor(0x5865f2)
         .setAuthor({
-          name: 'WolaroAssist — Support IA (Qwen 32B)',
+          name: 'WolaroAssist — Support',
           iconURL: interaction.client.user?.displayAvatarURL(),
         })
         .setDescription(description)
@@ -218,7 +167,6 @@ export class SupportCommand implements ICommand {
 
       await interaction.editReply({ embeds: [embed] });
 
-      // Log de l'utilisation dans audit_logs
       await context.database.logAction(
         interaction.user.id,
         'SUPPORT_QUERY',
@@ -234,7 +182,7 @@ export class SupportCommand implements ICommand {
         .setTitle('❌ Erreur IA')
         .setDescription(
           `Impossible de contacter l'IA : \`${error.message || 'Erreur inconnue'}\`\n\n` +
-          'Vérifiez que la clé `GROQ_API_KEY` est valide et que le quota n\'est pas dépassé.'
+          'Si le problème persiste, contactez un administrateur.'
         )
         .setTimestamp();
 
