@@ -24,6 +24,8 @@ export class APIServer {
   private redis: RedisManager;
   private pubsub: PubSubManager;
   private client: Client;
+  // ✅ FIX: propriété de classe pour être accessible dans start()
+  private allowedOrigins: string[];
 
   constructor(client: Client, database: DatabaseManager, redis: RedisManager, pubsub: PubSubManager) {
     this.app = express();
@@ -31,6 +33,23 @@ export class APIServer {
     this.database = database;
     this.redis = redis;
     this.pubsub = pubsub;
+
+    // Initialiser avant setupMiddlewares
+    this.allowedOrigins = process.env.NODE_ENV === 'production'
+      ? [
+          'https://wolaro.fr',
+          'https://www.wolaro.fr',
+          'https://panel.wolaro.fr',
+          ...config.api.corsOrigin.filter((origin) => !origin.includes('localhost')),
+        ]
+      : [
+          'https://wolaro.fr',
+          'https://www.wolaro.fr',
+          'https://panel.wolaro.fr',
+          'http://localhost:3001',
+          'http://localhost:5173',
+          ...config.api.corsOrigin,
+        ];
 
     this.setupMiddlewares();
     this.setupRoutes();
@@ -51,25 +70,8 @@ export class APIServer {
       },
     }));
 
-    // ✅ SECURITY FIX: Conditional CORS based on environment
-    const allowedOrigins = process.env.NODE_ENV === 'production'
-      ? [
-          'https://wolaro.fr',
-          'https://www.wolaro.fr',
-          'https://panel.wolaro.fr',  // ✅ Ajouté
-          ...config.api.corsOrigin.filter((origin) => !origin.includes('localhost')),
-        ]
-      : [
-          'https://wolaro.fr',
-          'https://www.wolaro.fr',
-          'https://panel.wolaro.fr',  // ✅ Ajouté
-          'http://localhost:3001',
-          'http://localhost:5173',
-          ...config.api.corsOrigin,
-        ];
-
     this.app.use(cors({
-      origin: allowedOrigins,
+      origin: this.allowedOrigins,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
@@ -161,7 +163,7 @@ export class APIServer {
     this.app.listen(port, host, () => {
       logger.info(`API Server started on ${host}:${port}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`CORS Origins: ${allowedOrigins.join(', ')}`);
+      logger.info(`CORS Origins: ${this.allowedOrigins.join(', ')}`);
     });
   }
 
