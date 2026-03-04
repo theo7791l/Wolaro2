@@ -9,95 +9,108 @@ export interface RPGProfile {
   maxHealth: number;
   attack: number;
   defense: number;
+  critRate: number;
   wins: number;
   losses: number;
   winRate: number;
   class?: string;
   inventory?: any[];
-  equipped?: any;
+  equipped?: Record<string, any>;
 }
 
+const CRIT_RATES: Record<string, number> = {
+  warrior: 10,
+  mage:    20,
+  archer:  25,
+  paladin: 5,
+};
+
 export class RPGManager {
-  static async getOrCreateProfile(
-    guildId: string,
-    userId: string,
-    database: DatabaseManager
-  ): Promise<RPGProfile> {
-    const result = await database.query(
+  // ─── Exists check (no auto-create) ───────────────────────────────────────
+  static async profileExists(guildId: string, userId: string, db: DatabaseManager): Promise<boolean> {
+    const r = await db.query(
+      'SELECT 1 FROM rpg_profiles WHERE guild_id = $1 AND user_id = $2',
+      [guildId, userId]
+    );
+    return r.length > 0;
+  }
+
+  // ─── Get (null if not registered) ────────────────────────────────────────
+  static async getProfile(guildId: string, userId: string, db: DatabaseManager): Promise<RPGProfile | null> {
+    const r = await db.query(
       'SELECT * FROM rpg_profiles WHERE guild_id = $1 AND user_id = $2',
       [guildId, userId]
     );
+    if (r.length === 0) return null;
+    return this.mapRow(r[0]);
+  }
 
-    if (result.length > 0) {
-      const data = result[0];
-      return {
-        level: data.level,
-        xp: data.xp,
-        xpToNextLevel: this.calculateXPForLevel(data.level + 1),
-        gold: data.gold,
-        health: data.health,
-        maxHealth: data.max_health,
-        attack: data.attack,
-        defense: data.defense,
-        wins: data.wins,
-        losses: data.losses,
-        winRate: data.wins + data.losses > 0 
-          ? Math.round((data.wins / (data.wins + data.losses)) * 100) 
-          : 0,
-        class: data.class,
-        inventory: data.inventory,
-        equipped: data.equipped,
-      };
-    }
-
-    // Create new profile
-    await database.query(
-      `INSERT INTO rpg_profiles (guild_id, user_id, level, xp, gold, health, max_health, attack, defense)
-       VALUES ($1, $2, 1, 0, 100, 100, 100, 10, 5)`,
+  // ─── Legacy: kept for commands that don't require /rpgstart ──────────────
+  static async getOrCreateProfile(guildId: string, userId: string, db: DatabaseManager): Promise<RPGProfile> {
+    const p = await this.getProfile(guildId, userId, db);
+    if (p) return p;
+    await db.query(
+      `INSERT INTO rpg_profiles
+       (guild_id, user_id, level, xp, gold, health, max_health, attack, defense, class, wins, losses, inventory, equipped)
+       VALUES ($1, $2, 1, 0, 100, 150, 150, 15, 10, 'warrior', 0, 0, '[]', '{}')`,
       [guildId, userId]
     );
-
     return {
-      level: 1,
-      xp: 0,
-      xpToNextLevel: this.calculateXPForLevel(2),
-      gold: 100,
-      health: 100,
-      maxHealth: 100,
-      attack: 10,
-      defense: 5,
-      wins: 0,
-      losses: 0,
-      winRate: 0,
+      level: 1, xp: 0, xpToNextLevel: this.calculateXPForLevel(2),
+      gold: 100, health: 150, maxHealth: 150, attack: 15, defense: 10,
+      critRate: 10, wins: 0, losses: 0, winRate: 0,
+      class: 'warrior', inventory: [], equipped: {},
     };
   }
 
-  static async updateProfile(
-    guildId: string,
-    userId: string,
-    profile: RPGProfile,
-    database: DatabaseManager
-  ): Promise<void> {
-    await database.query(
+  // ─── Update (with level-up loop + max_health save) ───────────────────────
+  static async updateProfile(guildId: string, userId: string, profile: RPGProfile, db: DatabaseManager): Promise<void> {
+    // Apply pending level-ups
+    while (profile.xp >= this.calculateXPForLevel(profile.level + 1)) {
+      profile.level++;
+      profile.maxHealth += 5;
+      profile.attack    += 2;
+      profile.defense   += 1;
+      profile.health     = profile.maxHealth; // full heal on level-up
+    }
+
+    await db.query(
       `UPDATE rpg_profiles
-       SET level = $3, xp = $4, gold = $5, health = $6, attack = $7, defense = $8, wins = $9, losses = $10
-       WHERE guild_id = $1 AND user_id = $2`,
+       SET level=$3, xp=$4, gold=$5, health=$6, max_health=$7, attack=$8, defense=$9, wins=$10, losses=$11
+       WHERE guild_id=$1 AND user_id=$2`,
       [
-        guildId,
-        userId,
-        profile.level,
-        profile.xp,
-        profile.gold,
-        profile.health,
-        profile.attack,
-        profile.defense,
-        profile.wins,
-        profile.losses,
+        guildId, userId,
+        profile.level, profile.xp, profile.gold,
+        profile.health, profile.maxHealth,
+        profile.attack, profile.defense,
+        profile.wins, profile.losses,
       ]
     );
   }
 
   static calculateXPForLevel(level: number): number {
     return Math.floor(100 * Math.pow(level, 1.5));
+  }
+
+  private static mapRow(d: any): RPGProfile {
+    const wins   = d.wins   ?? 0;
+    const losses = d.losses ?? 0;
+    return {
+      level:        d.level,
+      xp:           d.xp,
+      xpToNextLevel: this.calculateXPForLevel(d.level + 1),
+      gold:         d.gold,
+      health:       d.health,
+      maxHealth:    d.max_health,
+      attack:       d.attack,
+      defense:      d.defense,
+      critRate:     CRIT_RATES[d.class] ?? 10,
+      wins,
+      losses,
+      winRate:      wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0,
+      class:        d.class,
+      inventory:    d.inventory ?? [],
+      equipped:     d.equipped  ?? {},
+    };
   }
 }
